@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1d2a2f">
+  <title>GPS 實境解謎</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 選擇專案 -->
+  <section id="v-projects" class="page hidden">
+    <h1 id="site-name">GPS 實境解謎</h1>
+    <p class="muted">選擇這次要挑戰的任務</p>
+    <div id="project-list" class="stack"></div>
+  </section>
+
+  <!-- 專案介紹 / 開始 -->
+  <section id="v-intro" class="page hidden">
+    <div class="hero">
+      <img id="intro-cover" class="hidden" alt="">
+      <div class="inner">
+        <h1 id="intro-name"></h1>
+        <div id="intro-desc" class="muted" style="color:#cfd8d4"></div>
+      </div>
+    </div>
+    <div class="card stack">
+      <div id="intro-text" class="pre"></div>
+      <div class="row wrap" id="intro-meta"></div>
+    </div>
+    <div class="card">
+      <h2>建立隊伍</h2>
+      <div class="field">
+        <label for="f-team">隊伍名稱 *</label>
+        <input id="f-team" maxlength="30" placeholder="例如：第三小隊" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="f-members">成員（選填）</label>
+        <input id="f-members" maxlength="200" placeholder="例如：小明、小華、小美" autocomplete="off">
+      </div>
+      <div class="field" id="run-field">
+        <label for="f-run">場次代碼<span id="run-req"></span></label>
+        <input id="f-run" maxlength="30" placeholder="關主提供的場次代碼" autocomplete="off">
+        <div class="help">同一個任務在不同時間、不同班級舉辦時，用場次代碼區分紀錄。</div>
+      </div>
+      <button id="btn-start" class="big">開始闖關</button>
+      <p class="help center" style="margin-top:10px">開始後會詢問定位權限，請按「允許」。不需要登入帳號。</p>
+    </div>
+    <p class="center"><a href="#" id="link-back-projects" class="small">← 看其他任務</a></p>
+  </section>
+
+  <!-- 遊戲主畫面 -->
+  <section id="v-game" class="hidden">
+    <div class="topbar">
+      <div class="title" id="g-title"></div>
+      <span class="chip" id="g-gps"><span class="gps-dot"></span> 定位</span>
+      <span class="chip hidden" id="g-timer">⏱ --:--</span>
+    </div>
+    <div class="page">
+      <div class="card">
+        <div class="row">
+          <div class="grow">
+            <div class="small muted">隊伍</div>
+            <div><b id="g-team"></b> <span class="chip gray" id="g-code" title="隊伍代碼"></span></div>
+          </div>
+          <div class="center">
+            <div class="small muted">分數</div>
+            <div style="font-size:1.4rem;font-weight:800" id="g-score">0</div>
+          </div>
+        </div>
+        <div class="row small muted" style="margin:10px 0 4px">
+          <span class="grow">進度</span><span id="g-progress-text"></span>
+        </div>
+        <div class="progress"><i id="g-progress" style="width:0"></i></div>
+      </div>
+
+      <div id="g-finished" class="card hidden" style="border-color:var(--forest)">
+        <div class="row">
+          <div class="grow"><b>🎉 任務完成！</b><div class="small muted">點這裡看成績與排行</div></div>
+          <button id="btn-show-finish" class="sm">查看</button>
+        </div>
+      </div>
+      <div id="g-timeup" class="card hidden" style="border-color:var(--red)">
+        <b>⏰ 闖關時間已到</b>
+        <div class="small muted">紀錄已保存，請回到集合點。</div>
+      </div>
+
+      <div class="card" id="map-card" style="padding:8px">
+        <div id="g-map" class="map"></div>
+        <div class="row small muted" style="padding:6px 4px 0">
+          <span class="grow" id="g-gps-text">正在取得定位…</span>
+          <button class="sm ghost" id="btn-locate">📍 回到我的位置</button>
+        </div>
+      </div>
+
+      <h2 style="margin:18px 0 10px">關卡</h2>
+      <div id="g-stages" class="stage-list"></div>
+
+      <p class="center small" style="margin-top:24px">
+        <a href="#" id="link-reset">換一支隊伍／重新開始</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- 完成畫面 -->
+  <section id="v-finish" class="page hidden">
+    <div class="hero"><div class="inner center">
+      <div style="font-size:3rem">🏆</div>
+      <h1>任務完成！</h1>
+      <div id="fin-team" style="color:#cfd8d4"></div>
+    </div></div>
+    <div class="stat-row">
+      <div class="stat"><b id="fin-score">0</b><span>總分</span></div>
+      <div class="stat"><b id="fin-solved">0</b><span>完成關卡</span></div>
+      <div class="stat"><b id="fin-time">—</b><span>花費時間</span></div>
+    </div>
+    <div class="card pre" id="fin-message" style="margin-top:12px"></div>
+    <div class="card hidden" id="fin-board-card">
+      <h2>排行榜</h2>
+      <div id="fin-board"></div>
+    </div>
+    <button class="big ghost" id="btn-back-game" style="margin-top:12px">回到關卡列表</button>
+  </section>
+
+  <!-- 錯誤畫面 -->
+  <section id="v-error" class="page hidden">
+    <div class="card center stack">
+      <div style="font-size:2.4rem">🧭</div>
+      <h2 id="err-text">發生錯誤</h2>
+      <button id="btn-retry">重新整理</button>
+      <a href="./" class="small">回到任務列表</a>
+    </div>
+  </section>
+
+  <!-- 關卡詳細面板 -->
+  <div id="sheet" class="sheet hidden">
+    <div class="sheet-body" id="sheet-body"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="config.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/player.js"></script>
+</body>
+</html>

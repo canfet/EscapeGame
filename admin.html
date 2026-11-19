@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>實境解謎 · 管理後台</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 登入 -->
+  <section id="v-login" class="page" style="max-width:420px;padding-top:12vh">
+    <div class="card stack">
+      <h1>🧩 管理後台</h1>
+      <p class="muted small">請輸入管理密碼（在試算表選單「🧩 實境解謎 → 顯示管理密碼」可以查看）。</p>
+      <input type="password" id="login-key" placeholder="管理密碼" autocomplete="current-password">
+      <button class="big" id="btn-login">登入</button>
+    </div>
+  </section>
+
+  <!-- 主畫面 -->
+  <section id="v-app" class="hidden">
+    <div class="topbar">
+      <div class="title">🧩 實境解謎後台</div>
+      <nav class="tabs">
+        <button data-tab="projects" class="on">專案</button>
+        <button data-tab="stages">關卡</button>
+        <button data-tab="monitor">闖關紀錄</button>
+      </nav>
+      <a id="link-sheet" class="chip" target="_blank" rel="noopener" style="text-decoration:none">📊 試算表</a>
+      <button class="sm ghost" id="btn-logout" style="color:#fff;border-color:rgba(255,255,255,.3)">登出</button>
+    </div>
+
+    <!-- 專案 -->
+    <div id="t-projects" class="page wide">
+      <div class="row" style="margin-bottom:12px">
+        <h2 class="grow" style="margin:0">闖關專案</h2>
+        <button id="btn-new-project">＋ 新增專案</button>
+      </div>
+      <p class="muted small">一個「專案」就是一套完整的闖關路線。換地點時，可以「複製」既有專案再改座標。</p>
+      <div id="project-grid" class="project-grid"></div>
+    </div>
+
+    <!-- 關卡 -->
+    <div id="t-stages" class="page wide hidden">
+      <div class="row wrap" style="margin-bottom:12px">
+        <select id="stage-project" style="max-width:320px"></select>
+        <div class="grow"></div>
+        <button class="ghost" id="btn-preview">👀 開啟前台</button>
+        <button id="btn-new-stage">＋ 新增關卡</button>
+      </div>
+      <div class="editor-grid">
+        <div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th style="width:44px">#</th><th>關卡</th><th>作答</th><th>定位</th><th style="width:140px"></th></tr></thead>
+              <tbody id="stage-rows"></tbody>
+            </table>
+          </div>
+          <p class="help">⬆⬇ 調整順序。「依序解鎖」模式下，闖關者會照這個順序進行。</p>
+        </div>
+        <div><div id="stages-map" class="map tall"></div></div>
+      </div>
+    </div>
+
+    <!-- 闖關紀錄 -->
+    <div id="t-monitor" class="page wide hidden">
+      <div class="row wrap" style="margin-bottom:12px">
+        <select id="mon-project" style="max-width:280px"></select>
+        <select id="mon-run" style="max-width:200px"><option value="">全部場次</option></select>
+        <button class="ghost" id="btn-mon-refresh">↻ 重新整理</button>
+        <label class="check small"><input type="checkbox" id="mon-auto" checked> 每 20 秒自動更新</label>
+        <div class="grow"></div>
+        <span class="small muted" id="mon-updated"></span>
+      </div>
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
+        <div class="stat"><b id="mon-teams">0</b><span>隊伍</span></div>
+        <div class="stat"><b id="mon-playing">0</b><span>進行中</span></div>
+        <div class="stat"><b id="mon-finished">0</b><span>已完成</span></div>
+        <div class="stat"><b id="mon-subs">0</b><span>最近紀錄</span></div>
+      </div>
+      <div class="editor-grid">
+        <div>
+          <h3>隊伍</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>隊伍</th><th>場次</th><th>進度</th><th>分數</th><th>目前關卡</th><th>最後活動</th><th></th></tr></thead>
+              <tbody id="mon-sessions"></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h3>隊伍最後位置</h3>
+          <div id="mon-map" class="map tall"></div>
+        </div>
+      </div>
+      <h3 style="margin-top:18px">最新作答紀錄</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>時間</th><th>隊伍</th><th>關卡</th><th>動作</th><th>輸入</th><th>結果</th><th>距離</th><th>檔案</th></tr></thead>
+          <tbody id="mon-subs-rows"></tbody>
+        </table>
+      </div>
+      <p class="help">完整紀錄都在試算表的 Sessions 與 Submissions 工作表，可以直接篩選或下載。</p>
+    </div>
+  </section>
+
+  <!-- 專案編輯 -->
+  <div id="m-project" class="modal hidden">
+    <div class="modal-body narrow">
+      <div class="sheet-head"><h2 id="mp-title">專案</h2><button class="close-x" data-close>✕</button></div>
+      <div class="grid2">
+        <div class="field"><label>專案代碼 *</label><input id="mp-project_id" placeholder="例如 school-a-2026"><div class="help">用在網址 ?p=代碼，建立後不能改</div></div>
+        <div class="field"><label>專案名稱 *</label><input id="mp-name"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>狀態</label>
+          <select id="mp-status">
+            <option value="draft">draft：準備中（不能玩）</option>
+            <option value="hidden">hidden：不列在首頁，有連結可玩</option>
+            <option value="active">active：開放並列在首頁</option>
+            <option value="closed">closed：已結束</option>
+          </select></div>
+        <div class="field"><label>解鎖方式</label>
+          <select id="mp-unlock_mode">
+            <option value="sequential">依序解鎖（完成一關才開下一關）</option>
+            <option value="free">自由順序（全部關卡同時開放）</option>
+          </select></div>
+      </div>
+      <div class="field"><label>簡短說明</label><input id="mp-description"></div>
+      <div class="field"><label>開場介紹</label><textarea id="mp-intro" placeholder="任務背景、規則、注意事項…"></textarea></div>
+      <div class="field"><label>完成訊息</label><textarea id="mp-finish_message" placeholder="例如：請回到集合點找關主領獎"></textarea></div>
+      <div class="field"><label>封面圖片網址</label><input id="mp-cover_url" placeholder="https://…"></div>
+      <div class="grid2">
+        <div class="field"><label>開放時間</label><input type="datetime-local" id="mp-start_at"></div>
+        <div class="field"><label>結束時間</label><input type="datetime-local" id="mp-end_at"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>限時（分鐘）</label><input type="number" min="0" id="mp-time_limit_min"><div class="help">0 = 不限時，從隊伍按「開始」計算</div></div>
+        <div class="field"><label>可接受的定位誤差（公尺）</label><input type="number" min="10" id="mp-gps_max_accuracy"><div class="help">建議 50–100，室內可放寬</div></div>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" id="mp-is_default"> 設為首頁預設專案</label>
+        <label class="check"><input type="checkbox" id="mp-show_leaderboard"> 完成後顯示排行榜</label>
+        <label class="check"><input type="checkbox" id="mp-require_run_code"> 必須輸入場次代碼</label>
+      </div>
+      <div class="row"><div class="grow"></div><button class="ghost" data-close>取消</button><button id="mp-save">儲存</button></div>
+    </div>
+  </div>
+
+  <!-- 關卡編輯 -->
+  <div id="m-stage" class="modal hidden">
+    <div class="modal-body">
+      <div class="sheet-head"><h2 id="ms-title">關卡</h2><button class="close-x" data-close>✕</button></div>
+      <div class="editor-grid">
+        <div>
+          <div class="section-title">基本資料</div>
+          <div class="grid2">
+            <div class="field"><label>關卡名稱 *</label><input id="ms-title-input"></div>
+            <div class="field"><label>關卡代碼</label><input id="ms-stage_id" placeholder="留空自動產生"></div>
+          </div>
+          <label class="check field"><input type="checkbox" id="ms-enabled"> 啟用這個關卡</label>
+          <div class="field"><label>線索（抵達前就看得到）</label><textarea id="ms-clue" placeholder="引導闖關者找到地點的文字"></textarea></div>
+          <div class="field"><label>圖片網址（選填）</label><input id="ms-image_url" placeholder="https://…"></div>
+
+          <div class="section-title">抵達條件</div>
+          <label class="check"><input type="checkbox" id="ms-require_gps"> 需要 GPS 定位打卡</label>
+          <label class="check field"><input type="checkbox" id="ms-show_location"> 在地圖上顯示位置（不勾＝只靠線索找）</label>
+          <div class="field"><label>現場通關碼（選填）</label><input id="ms-bypass_code" placeholder="例如貼在現場的 4 位數">
+            <div class="help">定位不準或室內時可改輸入通關碼。不需要 GPS 時，設了通關碼就必須輸入才能作答。</div></div>
+
+          <div class="section-title">題目與作答</div>
+          <div class="field"><label>題目（抵達後才顯示）</label><textarea id="ms-question"></textarea></div>
+          <div class="grid2">
+            <div class="field"><label>作答方式</label>
+              <select id="ms-answer_type">
+                <option value="text">文字作答</option>
+                <option value="number">數字作答</option>
+                <option value="choice">選擇題</option>
+                <option value="photo">拍照上傳</option>
+                <option value="form">Google 表單</option>
+                <option value="none">打卡即過關</option>
+              </select></div>
+            <div class="field"><label>分數</label><input type="number" id="ms-points" min="0"></div>
+          </div>
+          <div class="field" data-show="choice"><label>選項（用 | 分隔）</label><input id="ms-choices" placeholder="選項A|選項B|選項C"></div>
+          <div class="field" data-show="text number choice"><label>正確答案（多個可接受答案用 | 分隔）</label><input id="ms-answer" placeholder="例如：台北|臺北|Taipei">
+            <div class="help">不分大小寫、全半形，會忽略空白與標點。留空＝開放式作答，送出就過關。</div></div>
+          <div class="field" data-show="text number choice"><label>最多作答次數</label><input type="number" min="0" id="ms-max_attempts"><div class="help">0 = 不限次數</div></div>
+          <div class="field" data-show="form"><label>Google 表單網址</label><input id="ms-form_url" placeholder="https://docs.google.com/forms/d/e/…/viewform?usp=pp_url&entry.123={code}">
+            <div class="help">可用 {code} 隊伍代碼、{team} 隊名、{run} 場次、{project} 專案代碼，會自動替換。</div></div>
+          <div class="field" data-show="form"><label>表單回應工作表名稱（選填，用來驗證）</label><input id="ms-form_verify_sheet" placeholder="表單回應 1">
+            <div class="help">把表單回應連到同一份試算表後填入工作表名稱，系統會檢查是否真的有送出。</div></div>
+          <div class="field"><label>過關訊息</label><input id="ms-success_message" placeholder="答對了！下一站是…"></div>
+
+          <div class="section-title">提示</div>
+          <div class="field"><input id="ms-hint1" placeholder="提示 1"></div>
+          <div class="field"><input id="ms-hint2" placeholder="提示 2"></div>
+          <div class="field"><input id="ms-hint3" placeholder="提示 3"></div>
+          <div class="field"><label>每使用一次提示扣幾分</label><input type="number" min="0" id="ms-hint_penalty"></div>
+        </div>
+        <div>
+          <div class="section-title">地點</div>
+          <div class="grid3">
+            <div class="field"><label>緯度</label><input id="ms-lat" inputmode="decimal"></div>
+            <div class="field"><label>經度</label><input id="ms-lng" inputmode="decimal"></div>
+            <div class="field"><label>範圍（公尺）</label><input type="number" min="5" id="ms-radius_m"></div>
+          </div>
+          <div class="field"><label>貼上座標</label><input id="ms-paste" placeholder="從 Google 地圖右鍵複製，例如 25.0330, 121.5654">
+            <div class="help">在 Google 地圖對地點按右鍵（手機長按），點最上面的座標就會複製。</div></div>
+          <div class="row" style="margin-bottom:8px">
+            <button class="ghost sm" id="ms-here">📍 使用我目前的位置</button>
+            <span class="small muted">或直接在地圖上點一下／拖曳標記</span>
+          </div>
+          <div id="ms-map" class="map tall"></div>
+          <p class="help">建議範圍：戶外空曠處 30–50 公尺；建築物旁 50–80 公尺（GPS 在高樓旁會飄）。</p>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="danger hidden" id="ms-delete">刪除關卡</button><div class="grow"></div><button class="ghost" data-close>取消</button><button id="ms-save">儲存關卡</button></div>
+    </div>
+  </div>
+
+  <!-- 分享連結 -->
+  <div id="m-link" class="modal hidden">
+    <div class="modal-body narrow">
+      <div class="sheet-head"><h2>闖關連結</h2><button class="close-x" data-close>✕</button></div>
+      <div class="field"><label>場次代碼（選填）</label><input id="ml-run" placeholder="例如 2026-11-25-AM 或 三年二班"><div class="help">加在連結裡，學生就不用自己輸入，紀錄也會自動分場次。</div></div>
+      <div class="field"><label>連結</label><div class="row"><input id="ml-url" readonly class="grow"><button id="ml-copy">複製</button></div></div>
+      <div class="center"><div id="ml-qr" style="display:inline-block;padding:12px;background:#fff;border-radius:12px"></div></div>
+      <p class="help center">把 QR Code 印出來或投影，學生用手機相機掃描就能進入。</p>
+      <div class="row"><a class="btn ghost grow" id="ml-open" target="_blank" rel="noopener">開啟前台</a></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="config.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
