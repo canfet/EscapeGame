@@ -357,14 +357,19 @@
     if (pan) A.edMap.setView([lat, lng], Math.max(A.edMap.getZoom(), 17));
   }
 
-  function useMyLocation() {
-    if (!navigator.geolocation) return Q.toast('此裝置不支援定位', 'err');
-    Q.loading(true);
-    navigator.geolocation.getCurrentPosition(function (p) {
-      Q.loading(false);
-      setEdPoint(p.coords.latitude, p.coords.longitude, true);
-      Q.toast('已設定為目前位置（誤差約 ' + Math.round(p.coords.accuracy) + ' 公尺）', 'ok');
-    }, function () { Q.loading(false); Q.toast('無法取得定位', 'err'); }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+  async function useMyLocation() {
+    var btn = $('#ms-here');
+    btn.disabled = true; btn.textContent = '定位中…';
+    try {
+      var p = await Q.locate();
+      setEdPoint(p.lat, p.lng, true);
+      var tip = p.acc > 100 ? '（電腦定位通常不準，建議到現場用手機設定，或在地圖上微調）' : '';
+      Q.toast('已設定為目前位置，誤差約 ' + Math.round(p.acc) + ' 公尺' + tip, p.acc > 100 ? 'warn' : 'ok', 6000);
+    } catch (e) {
+      Q.toast(e.message, 'err', 9000);
+    } finally {
+      btn.disabled = false; btn.textContent = '📍 使用我目前的位置';
+    }
   }
 
   async function saveStage() {

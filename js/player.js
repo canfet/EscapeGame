@@ -116,6 +116,7 @@
     if (P.project && P.project.require_run_code && !run) { Q.toast('請輸入場次代碼', 'warn'); return; }
     // 在使用者按下按鈕時要定位權限（iOS 比較穩）
     startWatch();
+    startCompass(true);
     try {
       var r = await Q.run(function () {
         return api('startSession', {
@@ -176,7 +177,7 @@
       var lab = Q.STATUS_LABEL[st.status];
       var right = st.status === 'solved' ? '+' + st.earned : st.status === 'locked' ? '🔒' : '›';
       var dist = '';
-      if (st.lat != null && P.pos && (st.status === 'open')) dist = '・距離 ' + Q.fmtDist(Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng));
+      if (st.lat != null && P.pos && (st.status === 'open')) dist = distText(st);
       return '<button class="stage-card ' + st.status + '" data-id="' + esc(st.stage_id) + '">' +
         '<div class="stage-no">' + (st.status === 'solved' ? '✓' : (i + 1)) + '</div>' +
         '<div class="grow"><div><b>' + esc(st.title) + '</b> <span class="chip ' + lab[1] + '">' + lab[0] + '</span></div>' +
@@ -224,6 +225,10 @@
     if (!('geolocation' in navigator)) { setGps('none'); return; }
     P.watchId = navigator.geolocation.watchPosition(function (p) {
       P.pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
+      // 走路時 GPS 會提供移動方向，沒有指南針的手機可以拿來用
+      if (p.coords.heading != null && !isNaN(p.coords.heading) && p.coords.speed > 0.7) {
+        P.gpsHeading = p.coords.heading; P.gpsHeadingT = Date.now();
+      }
       setGps('ok');
       updateMe();
       updateDistances();
@@ -248,21 +253,22 @@
   }
 
   /** 取得一次新鮮的定位 */
-  function getFix() {
-    return new Promise(function (resolve, reject) {
-      if (P.pos && Date.now() - P.pos.t < 8000 && P.pos.acc <= 40) return resolve(P.pos);
-      if (!('geolocation' in navigator)) return reject(new Error('這台裝置不支援定位'));
-      navigator.geolocation.getCurrentPosition(function (p) {
-        P.pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
-        setGps('ok'); updateMe();
-        resolve(P.pos);
-      }, function (err) {
-        setGps(err.code === 1 ? 'denied' : 'error');
-        reject(new Error(err.code === 1
-          ? '定位權限被拒絕。請到手機設定允許瀏覽器使用位置，再重新整理。'
-          : '無法取得定位，請移到空曠處再試一次'));
-      }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-    });
+  async function getFix() {
+    if (P.pos && Date.now() - P.pos.t < 8000 && P.pos.acc <= 40) return P.pos;
+    try {
+      P.pos = await Q.locate();
+      setGps('ok'); updateMe();
+      return P.pos;
+    } catch (e) {
+      setGps(e.code === 1 ? 'denied' : 'error');
+      throw e;
+    }
+  }
+
+  function distText(st) {
+    var d = Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng);
+    if (d <= st.radius_m) return '・✅ 已在範圍內';
+    return '・' + dirName(bearing(P.pos.lat, P.pos.lng, st.lat, st.lng)) + ' ' + Q.fmtDist(d);
   }
 
   function updateDistances() {
@@ -270,17 +276,120 @@
     P.state.stages.forEach(function (st) {
       if (st.lat == null || st.status !== 'open') return;
       var el = document.querySelector('[data-dist="' + st.stage_id + '"]');
-      if (el) el.textContent = '・距離 ' + Q.fmtDist(Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng));
+      if (el) el.textContent = distText(st);
     });
-    var live = $('#live-dist');
-    if (live && P.openId) {
-      var st = findStage(P.openId);
-      if (st && st.lat != null) {
-        var d = Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng);
-        live.textContent = Q.fmtDist(d);
-        live.style.color = d <= st.radius_m ? 'var(--forest)' : '';
-      }
+    updateCompass();
+  }
+
+  /* ---------- 方向與指南針 ---------- */
+  var DIRS = ['北', '東北', '東', '東南', '南', '西南', '西', '西北'];
+  var RELS = ['正前方', '右前方', '右邊', '右後方', '正後方', '左後方', '左邊', '左前方'];
+  function dirName(b) { return DIRS[Math.round(((b % 360) + 360) % 360 / 45) % 8]; }
+  function relName(r) { return RELS[Math.round(((r % 360) + 360) % 360 / 45) % 8]; }
+
+  /** 從 A 點看 B 點的方位角（0 = 北，90 = 東） */
+  function bearing(lat1, lng1, lat2, lng2) {
+    var t = Math.PI / 180;
+    var y = Math.sin((lng2 - lng1) * t) * Math.cos(lat2 * t);
+    var x = Math.cos(lat1 * t) * Math.sin(lat2 * t) - Math.sin(lat1 * t) * Math.cos(lat2 * t) * Math.cos((lng2 - lng1) * t);
+    return (Math.atan2(y, x) / t + 360) % 360;
+  }
+
+  /** 啟用手機指南針；iOS 必須在使用者點擊時要求權限 */
+  function startCompass(fromGesture, manual) {
+    if (P.compassOn || (P.compassDenied && !manual)) return;
+    var D = window.DeviceOrientationEvent;
+    if (!D) return;
+    if (typeof D.requestPermission === 'function') {
+      if (!fromGesture) return;
+      D.requestPermission().then(function (r) {
+        if (r === 'granted') listenCompass();
+        else {
+          P.compassDenied = true;
+          if (manual) Q.toast('沒有允許使用方向感測器。iPhone 請關閉 Safari 分頁後重新開啟網頁再試；箭頭會先以北方為上。', 'warn', 6000);
+          updateCompass();
+        }
+      }).catch(function () { /* 不是在點擊事件中 */ });
+    } else {
+      listenCompass();
     }
+  }
+
+  function listenCompass() {
+    P.compassOn = true;
+    P.compassStart = Date.now();
+    var evt = ('ondeviceorientationabsolute' in window) ? 'deviceorientationabsolute' : 'deviceorientation';
+    window.addEventListener(evt, onOrientation, true);
+    setTimeout(updateCompass, 3500); // 3.5 秒內沒收到資料 → 顯示「沒有指南針」
+    updateCompass();
+  }
+
+  function onOrientation(e) {
+    var h = null;
+    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) h = e.webkitCompassHeading; // iOS
+    else if (e.absolute && e.alpha != null) h = 360 - e.alpha;                                                  // Android
+    if (h == null) return;
+    var so = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    h = (h + so + 360) % 360;
+    if (P.heading == null) P.heading = h;
+    else { var diff = ((h - P.heading + 540) % 360) - 180; P.heading = (P.heading + diff * 0.25 + 360) % 360; } // 平滑
+    P.headingT = Date.now();
+    if (!P.compassRaf) P.compassRaf = requestAnimationFrame(function () { P.compassRaf = null; updateCompass(); });
+  }
+
+  /** 目前面向的方向：指南針優先，其次用走路時的 GPS 移動方向 */
+  function currentHeading() {
+    if (P.heading != null && Date.now() - P.headingT < 3000) return { h: P.heading, src: 'compass' };
+    if (P.gpsHeading != null && Date.now() - P.gpsHeadingT < 8000) return { h: P.gpsHeading, src: 'gps' };
+    return null;
+  }
+
+  function compassHtml(st) {
+    return '<div class="card compass-card">' +
+      '<div class="compass" id="cmp">' +
+      '<div class="compass-ring" id="cmp-ring"><span class="cn">北</span><span class="ce">東</span><span class="cs">南</span><span class="cw">西</span></div>' +
+      '<svg class="compass-arrow" id="cmp-arrow" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 6 L74 84 L50 68 L26 84 Z"/></svg>' +
+      '<div class="compass-me"></div></div>' +
+      '<div class="distance" id="live-dist">定位中…</div>' +
+      '<div id="live-dir" class="live-dir"></div>' +
+      '<div class="help" id="cmp-mode"></div>' +
+      '<div class="help">進入 ' + st.radius_m + ' 公尺範圍內即可打卡</div>' +
+      '<button class="sm ghost hidden" id="btn-compass" style="margin-top:8px">🧭 啟用指南針</button></div>';
+  }
+
+  function updateCompass() {
+    var arrow = document.getElementById('cmp-arrow');
+    if (!arrow || !P.openId) return;
+    var st = findStage(P.openId);
+    if (!st || st.status !== 'open' || st.lat == null) return;
+    var ring = $('#cmp-ring'), dist = $('#live-dist'), dir = $('#live-dir'), mode = $('#cmp-mode'), box = $('#cmp');
+    var btn = $('#btn-compass');
+    var needBtn = !P.compassOn && !P.compassDenied && window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function';
+    btn.classList.toggle('hidden', !needBtn);
+    if (!P.pos) { dist.textContent = '定位中…'; dir.textContent = '請允許位置權限，並移到空曠處'; return; }
+
+    var d = Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng);
+    var b = bearing(P.pos.lat, P.pos.lng, st.lat, st.lng);
+    var cur = currentHeading(), h = cur ? cur.h : 0;
+    var inside = d <= st.radius_m;
+    ring.style.transform = 'rotate(' + (-h) + 'deg)';
+    arrow.style.transform = 'rotate(' + (b - h) + 'deg)';
+    box.classList.toggle('inside', inside);
+    dist.textContent = inside ? '已抵達！' : Q.fmtDist(d);
+    if (inside) {
+      dir.textContent = '你已經在範圍內，按下方「我到了」打卡';
+    } else {
+      dir.innerHTML = '目標在你的 <b>' + dirName(b) + '方</b>（' + Math.round(b) + '°）' +
+        (cur ? '・<b>' + relName(b - h) + '</b>' : '');
+    }
+    var tips = [];
+    if (cur && cur.src === 'compass') tips.push('🧭 指南針已啟用，請把手機放平，箭頭就是目標方向');
+    else if (cur && cur.src === 'gps') tips.push('🚶 依你走路的方向判斷，停下來時會改成北方為上');
+    else if (P.compassDenied) tips.push('未允許方向感測器，箭頭以「北」為上（邊走路會自動判斷方向）');
+    else if (P.compassOn && Date.now() - P.compassStart > 3000) tips.push('這台裝置沒有指南針，箭頭以「北」為上（邊走路會自動判斷方向）');
+    else tips.push('箭頭以「北」為上');
+    if (P.pos.acc > 30) tips.push('定位誤差約 ' + Math.round(P.pos.acc) + ' 公尺，距離僅供參考');
+    mode.textContent = tips.join('；');
   }
 
   /* ---------- 地圖 ---------- */
@@ -329,6 +438,7 @@
 
   /* ---------- 關卡面板 ---------- */
   function openStage(id) {
+    startCompass(true); // 點擊關卡是使用者手勢，iOS 可在這時詢問方向權限
     if (P.openId !== id) { P.choice = null; P.photo = null; }
     P.openId = id;
     renderStage();
@@ -361,11 +471,7 @@
     }
 
     if (st.status === 'open') {
-      if (st.lat != null) {
-        var d = P.pos ? Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng) : null;
-        h.push('<div class="card center"><div class="small muted">與目標的距離</div><div class="distance" id="live-dist">' +
-          (d == null ? '定位中…' : Q.fmtDist(d)) + '</div><div class="small muted">進入 ' + st.radius_m + ' 公尺範圍內即可打卡</div></div>');
-      }
+      if (st.lat != null) h.push(compassHtml(st));
       if (playing) {
         if (st.require_gps) h.push('<button class="big" id="s-arrive">📍 我到了，定位打卡</button>');
         if (st.has_bypass) {
@@ -430,6 +536,8 @@
   function bindStage(st) {
     var on = function (id, fn) { var el = document.getElementById(id); if (el) el.onclick = fn; };
     on('s-close', closeStage);
+    on('btn-compass', function () { startCompass(true, true); });
+    updateCompass();
     on('s-arrive', function () { doArrive(st); });
     on('s-code-btn', function () {
       var code = $('#s-code').value.trim();

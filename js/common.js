@@ -122,6 +122,45 @@
     return { lat: lat, lng: lng };
   }
 
+  /**
+   * 取得一次定位：先試高精度（GPS），逾時或失敗再改用一般精度（Wi-Fi／網路）重試。
+   * 失敗時回傳具體原因與解決方法。
+   */
+  function locate(opt) {
+    opt = opt || {};
+    return new Promise(function (resolve, reject) {
+      if (!window.isSecureContext) {
+        return reject(new Error('定位只能在 https 網頁使用。請用 GitHub Pages 的 https 網址開啟，不要直接開電腦裡的檔案。'));
+      }
+      if (!('geolocation' in navigator)) return reject(new Error('這個瀏覽器不支援定位'));
+      var done = function (p) {
+        resolve({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() });
+      };
+      navigator.geolocation.getCurrentPosition(done, function (err) {
+        if (err.code === 1) return reject(locateError(err));
+        // 高精度失敗（電腦沒有 GPS、室內收不到）→ 改用一般精度再試一次
+        navigator.geolocation.getCurrentPosition(done, function (err2) { reject(locateError(err2)); },
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+      }, { enableHighAccuracy: true, timeout: opt.timeout || 12000, maximumAge: opt.maximumAge || 0 });
+    });
+  }
+
+  function locateError(err) {
+    var ua = navigator.userAgent, msg;
+    if (err.code === 1) {
+      if (/iPhone|iPad/.test(ua)) msg = '定位權限被拒絕。請到 iPhone「設定 → 隱私權與安全性 → 定位服務」確認已開啟，並把 Safari 網站設為「使用 App 期間」，再重新整理頁面。';
+      else if (/Android/.test(ua)) msg = '定位權限被拒絕。請點網址列左邊的圖示 → 權限 → 位置 → 允許，並確認手機的「定位」已開啟，再重新整理。';
+      else if (/Mac/.test(ua)) msg = '定位權限被拒絕。請點網址列左邊的圖示允許位置，並到「系統設定 → 隱私權與安全性 → 定位服務」開啟並允許瀏覽器，再重新整理。';
+      else msg = '定位權限被拒絕。請點網址列左邊的圖示允許位置，並到 Windows「設定 → 隱私權與安全性 → 位置」開啟位置服務並允許桌面應用程式存取，再重新整理。';
+    } else if (err.code === 3) {
+      msg = '定位逾時。請移到窗邊或戶外再試一次；電腦沒有 GPS 時建議改用地圖點選或貼上座標。';
+    } else {
+      msg = '目前無法判斷位置（裝置的定位服務可能關閉，或沒有連上 Wi-Fi）。可以改用地圖點選或貼上座標。';
+    }
+    var e = new Error(msg); e.code = err.code;
+    return e;
+  }
+
   var STATUS_LABEL = {
     locked: ['未解鎖', 'gray'], open: ['前往中', 'amber'], arrived: ['作答中', 'blue'],
     solved: ['已完成', 'green'], failed: ['未通過', 'red']
@@ -132,6 +171,6 @@
   global.Q = {
     api: api, $: $, $$: $$, esc: esc, linkify: linkify, toast: toast, loading: loading, run: run,
     distM: distM, fmtDist: fmtDist, fmtDuration: fmtDuration, fmtTime: fmtTime, toLocalInput: toLocalInput,
-    parseLatLng: parseLatLng, STATUS_LABEL: STATUS_LABEL, TYPE_LABEL: TYPE_LABEL, STATUS_COLOR: STATUS_COLOR
+    parseLatLng: parseLatLng, locate: locate, STATUS_LABEL: STATUS_LABEL, TYPE_LABEL: TYPE_LABEL, STATUS_COLOR: STATUS_COLOR
   };
 })(window);
