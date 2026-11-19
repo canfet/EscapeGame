@@ -36,6 +36,9 @@
     $('#ms-delete').onclick = deleteStage;
     $('#ms-answer_type').onchange = toggleTypeFields;
     $('#ms-here').onclick = useMyLocation;
+    $('#ms-restore').onclick = function () {
+      if (A.edOrig) { setEdPoint(A.edOrig.lat, A.edOrig.lng, true); Q.toast('已還原為原本位置', 'ok'); }
+    };
     $('#ms-paste').addEventListener('input', function () {
       var ll = Q.parseLatLng(this.value);
       if (ll) { setEdPoint(ll.lat, ll.lng, true); this.value = ''; Q.toast('已套用座標', 'ok'); }
@@ -336,7 +339,12 @@
       pts.push([s.lat, s.lng]);
     });
     if (A.edMarker) { A.edMap.removeLayer(A.edMarker); A.edMap.removeLayer(A.edCircle); A.edMarker = null; }
+    clearEdExtras();
     var lat = parseFloat($('#ms-lat').value), lng = parseFloat($('#ms-lng').value);
+    // 記住開啟時的原本位置，之後按「使用我目前的位置」仍可對照／還原
+    A.edOrig = (isFinite(lat) && isFinite(lng))
+      ? { lat: lat, lng: lng, r: parseFloat($('#ms-radius_m').value) || 40 } : null;
+    refreshEdOrig();
     if (isFinite(lat) && isFinite(lng)) setEdPoint(lat, lng, true);
     else if (pts.length) A.edMap.fitBounds(pts, { padding: [40, 40], maxZoom: 17 });
   }
@@ -355,6 +363,36 @@
       A.edMarker.setLatLng([lat, lng]); A.edCircle.setLatLng([lat, lng]).setRadius(r);
     }
     if (pan) A.edMap.setView([lat, lng], Math.max(A.edMap.getZoom(), 17));
+    refreshEdOrig();
+  }
+
+  function clearEdExtras() {
+    ['edOrigPin', 'edOrigLine', 'edMe', 'edMeAcc'].forEach(function (k) {
+      if (A[k] && A.edMap) A.edMap.removeLayer(A[k]);
+      A[k] = null;
+    });
+  }
+
+  // 原本位置（灰色虛線圈＋圖釘）、與目前設定點之間的虛線與距離
+  function refreshEdOrig() {
+    var info = $('#ms-orig-info'), btn = $('#ms-restore');
+    var lat = parseFloat($('#ms-lat').value), lng = parseFloat($('#ms-lng').value);
+    var o = A.edOrig;
+    if (A.edOrigPin && A.edMap) { A.edMap.removeLayer(A.edOrigPin); A.edOrigPin = null; }
+    if (A.edOrigLine && A.edMap) { A.edMap.removeLayer(A.edOrigLine); A.edOrigLine = null; }
+    var moved = o && isFinite(lat) && isFinite(lng) && A.edMap &&
+      A.edMap.distance([o.lat, o.lng], [lat, lng]) >= 1;
+    info.classList.toggle('hidden', !moved);
+    btn.classList.toggle('hidden', !moved);
+    if (!moved) return;
+    var d = Math.round(A.edMap.distance([o.lat, o.lng], [lat, lng]));
+    A.edOrigPin = L.layerGroup([
+      L.circle([o.lat, o.lng], { radius: o.r, color: '#c1440e', weight: 2, dashArray: '6 5', fillOpacity: .06 }),
+      L.marker([o.lat, o.lng], { icon: pinIcon('原', '#c1440e'), interactive: false })
+    ]).addTo(A.edMap);
+    A.edOrigLine = L.polyline([[o.lat, o.lng], [lat, lng]], { color: '#c1440e', weight: 2, dashArray: '4 6' })
+      .addTo(A.edMap).bindTooltip('相距 ' + d + ' 公尺', { permanent: true, direction: 'center', className: 'dist-tip' });
+    info.textContent = '紅色虛線圈「原」＝這關原本的位置（' + o.lat + ', ' + o.lng + '），與目前設定相距約 ' + d + ' 公尺。';
   }
 
   async function useMyLocation() {
@@ -362,7 +400,15 @@
     btn.disabled = true; btn.textContent = '定位中…';
     try {
       var p = await Q.locate();
-      setEdPoint(p.lat, p.lng, true);
+      setEdPoint(p.lat, p.lng, false);
+      // 另外顯示藍點（我的位置＋誤差圈），並讓地圖同時框住原本位置與新位置
+      if (A.edMe) { A.edMap.removeLayer(A.edMe); A.edMap.removeLayer(A.edMeAcc); }
+      A.edMeAcc = L.circle([p.lat, p.lng], { radius: p.acc, color: '#2f6690', weight: 1, fillOpacity: .1, interactive: false }).addTo(A.edMap);
+      A.edMe = L.circleMarker([p.lat, p.lng], { radius: 8, color: '#fff', weight: 3, fillColor: '#2f6690', fillOpacity: 1, interactive: false }).addTo(A.edMap);
+      var pts = [[p.lat, p.lng]];
+      if (A.edOrig) pts.push([A.edOrig.lat, A.edOrig.lng]);
+      if (pts.length > 1) A.edMap.fitBounds(pts, { padding: [50, 50], maxZoom: 18 });
+      else A.edMap.setView(pts[0], Math.max(A.edMap.getZoom(), 17));
       var tip = p.acc > 100 ? '（電腦定位通常不準，建議到現場用手機設定，或在地圖上微調）' : '';
       Q.toast('已設定為目前位置，誤差約 ' + Math.round(p.acc) + ' 公尺' + tip, p.acc > 100 ? 'warn' : 'ok', 6000);
     } catch (e) {
@@ -380,6 +426,11 @@
     });
     ['points', 'max_attempts', 'hint_penalty', 'radius_m', 'lat', 'lng'].forEach(function (f) { s[f] = s[f] === '' ? '' : Number(s[f]); });
     if (A.editStage) { s.stage_id = A.editStage.stage_id; s.order = A.editStage.order; }
+    // 防呆：位置離原本太遠（可能是電腦定位不準）時先確認
+    if (A.edOrig && isFinite(s.lat) && isFinite(s.lng)) {
+      var moved = Q.distM(A.edOrig.lat, A.edOrig.lng, s.lat, s.lng);
+      if (moved > 500 && !confirm('新位置離原本位置約 ' + Math.round(moved) + ' 公尺，確定要儲存嗎？\n（電腦定位常常不準，可按「還原原本位置」）')) return;
+    }
     try {
       var r = await call('adminSaveStage', { stage: s, isNew: !A.editStage });
       $('#m-stage').classList.add('hidden');

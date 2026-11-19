@@ -211,8 +211,10 @@
             <div class="help">在 Google 地圖對地點按右鍵（手機長按），點最上面的座標就會複製。</div></div>
           <div class="row" style="margin-bottom:8px">
             <button class="ghost sm" id="ms-here">📍 使用我目前的位置</button>
+            <button class="ghost sm hidden" id="ms-restore">↩ 還原原本位置</button>
             <span class="small muted">或直接在地圖上點一下／拖曳標記</span>
           </div>
+          <div class="help hidden" id="ms-orig-info"></div>
           <div id="ms-map" class="map tall"></div>
           <p class="help">建議範圍：戶外空曠處 30–50 公尺；建築物旁 50–80 公尺（GPS 在高樓旁會飄）。</p>
         </div>

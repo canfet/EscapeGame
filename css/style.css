@@ -118,6 +118,7 @@ input[type=checkbox] { width: auto; transform: scale(1.2); margin-right: 6px; }
 /* ----- 地圖 ----- */
 .map { height: 260px; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; z-index: 1; }
 .map.tall { height: 420px; }
+.leaflet-tooltip.dist-tip { background: #fff; border: 1px solid #c1440e; color: #c1440e; font-weight: 600; font-size: 12px; padding: 1px 6px; box-shadow: none; }
 .pin {
   width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff;
   font-weight: 800; font-size: 13px; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35);

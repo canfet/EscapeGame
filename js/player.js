@@ -38,6 +38,7 @@
     $('#link-reset').onclick = resetTeam;
     $('#btn-show-finish').onclick = showFinish;
     $('#btn-back-game').onclick = function () { show('v-game'); };
+    $('#btn-both').onclick = showBoth;
     $('#btn-locate').onclick = function () { if (P.pos && P.map) P.map.setView([P.pos.lat, P.pos.lng], 17); else toastGps(); };
     $('#sheet').addEventListener('click', function (e) { if (e.target.id === 'sheet') closeStage(); });
 
@@ -241,7 +242,8 @@
     P.gpsState = state;
     var dot = $('#g-gps .gps-dot'), txt = $('#g-gps-text');
     dot.className = 'gps-dot ' + (state === 'ok' ? 'ok' : state === 'wait' ? '' : 'bad');
-    if (state === 'ok') txt.textContent = '定位中，誤差約 ' + Math.round(P.pos.acc) + ' 公尺';
+    if (state === 'ok') txt.textContent = '定位中，誤差約 ' + Math.round(P.pos.acc) + ' 公尺' +
+      (P.pos.acc > 100 ? '　⚠️ 誤差很大（電腦定位常見），地圖距離僅供參考，建議用手機到現場' : '');
     else if (state === 'denied') txt.textContent = '⚠️ 定位權限被拒絕，請到瀏覽器設定允許位置存取';
     else if (state === 'none') txt.textContent = '⚠️ 這台裝置不支援定位';
     else if (state === 'error') txt.textContent = '⚠️ 暫時無法取得定位，請移到空曠處';
@@ -400,6 +402,7 @@
       maxZoom: 19, attribution: '&copy; OpenStreetMap'
     }).addTo(P.map);
     P.layers = L.layerGroup().addTo(P.map);
+    P.map.on('zoomend', updateLink);
     drawStagesOnMap();
   }
 
@@ -421,6 +424,7 @@
       else if (pts.length === 1) { P.map.setView(pts[0], 17); P.fitted = true; }
     }
     $('#map-card').classList.toggle('hidden', !pts.length && !P.pos);
+    updateLink();
   }
 
   function updateMe() {
@@ -434,6 +438,55 @@
     } else {
       P.me.setLatLng(ll); P.meAcc.setLatLng(ll).setRadius(P.pos.acc);
     }
+    updateLink();
+  }
+
+  /** 目前關注的目標：已打開的關卡，否則是離我最近、尚未完成的關卡 */
+  function focusStage() {
+    if (!P.state) return null;
+    var st = P.openId ? findStage(P.openId) : null;
+    if (st && st.status === 'open' && st.lat != null) return st;
+    var best = null, bd = Infinity;
+    P.state.stages.forEach(function (s) {
+      if (s.lat == null || s.status !== 'open') return;
+      var d = P.pos ? Q.distM(P.pos.lat, P.pos.lng, s.lat, s.lng) : 0;
+      if (d < bd) { bd = d; best = s; }
+    });
+    return best;
+  }
+
+  /** 我的位置 → 目標關卡 的虛線與距離，讓玩家一眼看出差多遠 */
+  function updateLink() {
+    if (!P.map) return;
+    var st = P.pos && focusStage();
+    P.focus = st || null;
+    if (!st) { if (P.link) { P.map.removeLayer(P.link); P.link = null; } return; }
+    var d = Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng);
+    var inside = d <= st.radius_m;
+    var ll = [[P.pos.lat, P.pos.lng], [st.lat, st.lng]];
+    var label = '距離「' + st.title + '」' + Q.fmtDist(d) + (P.pos.acc > 100 ? ' ⚠️誤差大' : '');
+    var style = { color: inside ? '#2d6a4f' : '#c1440e' };
+    if (!P.link) {
+      P.link = L.polyline(ll, { color: style.color, weight: 2.5, dashArray: '4 7', interactive: false }).addTo(P.map);
+      P.link.bindTooltip(label, { permanent: true, direction: 'center', className: 'dist-tip' });
+    } else {
+      P.link.setLatLngs(ll).setStyle(style);
+      P.link.setTooltipContent(label);
+    }
+    // 已在範圍內、或線太短（標籤會蓋住圖釘）時隱藏標籤，距離仍顯示在面板／指南針
+    var px = P.map.latLngToContainerPoint(ll[0]).distanceTo(P.map.latLngToContainerPoint(ll[1]));
+    if (inside || px < 90) P.link.closeTooltip(); else P.link.openTooltip();
+  }
+
+  function showBoth() {
+    if (!P.map) return;
+    updateLink();
+    var pts = [];
+    if (P.pos) pts.push([P.pos.lat, P.pos.lng]);
+    if (P.focus) pts.push([P.focus.lat, P.focus.lng]);
+    if (pts.length > 1) P.map.fitBounds(pts, { padding: [50, 50], maxZoom: 18 });
+    else if (pts.length === 1) P.map.setView(pts[0], 17);
+    else toastGps();
   }
 
   /* ---------- 關卡面板 ---------- */
@@ -441,6 +494,7 @@
     startCompass(true); // 點擊關卡是使用者手勢，iOS 可在這時詢問方向權限
     if (P.openId !== id) { P.choice = null; P.photo = null; }
     P.openId = id;
+    updateLink();
     renderStage();
     $('#sheet').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
@@ -448,6 +502,7 @@
 
   function closeStage() {
     P.openId = null;
+    updateLink();
     $('#sheet').classList.add('hidden');
     document.body.style.overflow = '';
   }
