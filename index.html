@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1d2a2f">
   <title>GPS 實境解謎</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261121k">
+  <link rel="stylesheet" href="css/style.css?v=20261121l">
 </head>
 <body class="quest">
   <div id="test-banner" class="inapp test hidden" role="status">🧪 <b>試玩模式</b>：這支隊伍不會計入排行榜與正式紀錄。</div>
@@ -145,16 +145,17 @@
       <div class="stat"><b id="fin-time">—</b><span>花費時間</span></div>
     </div>
     <div class="card pre" id="fin-message" style="margin-top:12px"></div>
-    <div class="card hidden" id="fin-badges-card">
-      <h2>🏅 你們的成就</h2>
-      <div id="fin-title" class="fin-title"></div>
-      <div id="fin-badges" class="fin-badges"></div>
-      <div id="fin-collection" class="item-grid" style="margin-top:10px"></div>
-    </div>
     <div class="card hidden" id="fin-board-card">
       <h2>排行榜</h2>
       <div class="row hidden" id="fin-board-tabs" style="margin-bottom:8px"><button class="sm" id="tab-board-route">本路線</button><button class="sm ghost" id="tab-board-all">全部隊伍</button></div>
       <div id="fin-board"></div>
+    </div>
+    <div class="card hidden" id="fin-badges-card">
+      <h2>🏅 你們的成就</h2>
+      <div id="fin-title" class="fin-title"></div>
+      <div id="fin-badges" class="fin-badges"></div>
+      <div class="help hidden" id="fin-col-help" style="margin-top:10px">點卡片可以放大看</div>
+      <div id="fin-collection" class="item-grid" style="margin-top:6px"></div>
     </div>
     <button class="big ghost" id="btn-back-game" style="margin-top:12px">回到關卡列表</button>
   </section>
@@ -243,8 +244,8 @@
   <div id="retry-bar" class="retry-bar hidden" role="alert"><span class="grow">連線失敗，請確認訊號後再試</span><button class="sm" id="retry-btn">重試</button><button class="sm ghost" id="retry-x" aria-label="關閉">✕</button></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="config.js?v=20261121k"></script>
-  <script src="js/common.js?v=20261121k"></script>
-  <script src="js/player.js?v=20261121k"></script>
+  <script src="config.js?v=20261121l"></script>
+  <script src="js/common.js?v=20261121l"></script>
+  <script src="js/player.js?v=20261121l"></script>
 </body>
 </html>

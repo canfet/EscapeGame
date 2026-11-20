@@ -1548,10 +1548,22 @@
     $('#fin-badges-card').classList.toggle('hidden', !fb.length && !fcol.length);
     $('#fin-title').textContent = s.title ? (se.avatar ? se.avatar + ' ' : '') + '稱號：' + s.title : '';
     $('#fin-badges').innerHTML = fb.map(function (b) { return '<div class="badge-row"><span class="badge-ic">' + esc(b.icon) + '</span><div><b>' + esc(b.name) + '</b><small>' + esc(b.desc) + '</small></div></div>'; }).join('');
-    $('#fin-collection').innerHTML = fcol.map(function (it) {
-      if (it.kind === 'card') return '<div class="deck-cell">' + Q.cardHtml(it.card, deckOpts({ mini: true })) + '</div>';
-      return '<div class="item-cell rar-' + esc(it.rarity) + (it.got ? ' got' : ' locked') + '"><span class="item-icon">' + iconHtml(it.icon) + '</span><span class="item-name">' + (it.got ? esc(it.name) : '？？？') + '</span></div>';
+    var finIsDeck = fcol.length && fcol[0].kind === 'card';
+    $('#fin-collection').className = finIsDeck ? 'deck-grid' : 'item-grid';
+    $('#fin-col-help').classList.toggle('hidden', !fcol.length);
+    $('#fin-collection').innerHTML = fcol.map(function (it, i) {
+      if (it.kind === 'card') return '<button type="button" class="deck-cell" data-fi="' + i + '">' + Q.cardHtml(it.card, deckOpts({ mini: true })) + '</button>';
+      return '<button type="button" class="item-cell rar-' + esc(it.rarity) + (it.got ? ' got' : ' locked') + '" data-fi="' + i + '"><span class="item-icon">' + iconHtml(it.icon) + '</span><span class="item-name">' + (it.got ? esc(it.name) : '？？？') + '</span></button>';
     }).join('');
+    // 點卡片：放大看（沒收集到的提示一下；一般收藏品顯示故事）
+    Q.$$('#fin-collection [data-fi]').forEach(function (btn) {
+      btn.onclick = function () {
+        var it = fcol[+btn.dataset.fi];
+        if (!it.got) return Q.toast('這一個沒有收集到', 'warn');
+        if (it.kind === 'card') return openCardView(it.card);
+        askConfirm((it.icon && !/^(https?:|data:)/i.test(it.icon) ? it.icon + ' ' : '') + it.name + '（' + RARITY_TXT[it.rarity] + '）', it.story || '收藏成功！', '關閉', true);
+      };
+    });
     show('v-finish');
     if (!s.project.show_leaderboard) return;
     var hasRoutes = !!(se.route && (s.project.routes || []).length > 1);
