@@ -170,7 +170,101 @@
   var TYPE_LABEL = { text: '文字作答', number: '數字作答', choice: '選擇題', photo: '拍照上傳', form: 'Google 表單', none: '打卡即過關' };
   var STATUS_COLOR = { locked: '#9a9486', open: '#e09f3e', arrived: '#2f6690', solved: '#2d6a4f', failed: '#b5452f' };
 
+  /** 排行榜列表 HTML：名次、隊伍、路線、進度條、狀態、分數、時間、最近活動 */
+  function boardHtml(rows, o) {
+    o = o || {};
+    var now = o.now ? new Date(o.now).getTime() : Date.now();
+    var ST = { playing: ['進行中', 'amber'], finished: ['已完成', 'green'], timeup: ['超時', 'red'] };
+    if (!rows.length) return '<div class="lb-empty">還沒有隊伍開始闖關</div>';
+    return rows.map(function (x, i) {
+      var pct = x.total ? Math.round(x.done / x.total * 100) : 0;
+      var medal = ['🥇', '🥈', '🥉'][i] || (i + 1);
+      var st = ST[x.status] || [x.status, 'gray'];
+      var t = x.status === 'finished' ? x.duration_sec : x.elapsed_sec;
+      var ago = '';
+      if (x.status === 'playing' && x.last_active_at) {
+        var m = Math.max(0, Math.round((now - new Date(x.last_active_at).getTime()) / 60000));
+        ago = m < 1 ? '剛剛有動作' : m + ' 分鐘前有動作';
+      }
+      var route = x.route_name ? '<span class="chip" style="background:' + esc(x.route_color || '#e6e3dc') + ';color:' + (x.route_color ? '#fff' : 'inherit') + '">' + esc(x.route_name) + '</span>' : '';
+      return '<div class="lb-row' + (i < 3 ? ' top' : '') + (o.me && x.team_name === o.me ? ' me' : '') + (x.status === 'finished' ? ' fin' : '') + '">' +
+        '<div class="lb-rank">' + medal + '</div>' +
+        '<div class="lb-main"><div class="lb-name">' + (x.avatar ? '<span class="lb-avatar">' + esc(x.avatar) + '</span>' : '') + '<b>' + esc(x.team_name) + '</b> ' + route +
+        (x.title ? ' <span class="lb-title">' + esc(x.title) + '</span>' : '') +
+        ((x.badges || []).length ? ' <span class="lb-badges">' + x.badges.map(function (b) { return '<span title="' + esc(b.name) + '">' + esc(b.icon) + '</span>'; }).join('') + '</span>' : '') + '</div>' +
+        '<div class="lb-bar"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="lb-meta"><span class="chip ' + st[1] + '">' + st[0] + '</span> 進度 ' + x.done + '/' + x.total +
+        (t != null ? '・⏱ ' + fmtDuration(t) : '') + (ago ? '・' + ago : '') + '</div></div>' +
+        '<div class="lb-score"><b>' + x.score + '</b><span>分</span></div></div>';
+    }).join('');
+  }
+
+  /* ---------- 卡牌（自然名角色閃卡／在地景點卡）---------- */
+  var CARD_TYPE_LABEL = {
+    nature: { forest: '森林', water: '溪流', sky: '天空', mountain: '山岳', grass: '草原', ocean: '海洋', night: '夜行', earth: '大地' },
+    place: { forest: '自然景觀', water: '水岸風光', sky: '地標高處', mountain: '山林步道', grass: '田園農特', ocean: '海岸港灣', night: '夜市美食', earth: '古蹟人文' }
+  };
+  var CARD_STAT_LABEL = { nature: ['HP', '攻擊', '防禦'], place: ['人氣', '歷史', '美景'], custom: ['HP', '攻擊', '防禦'] };
+  var RARITY_STARS = { normal: '★', rare: '★★', legend: '★★★' };
+  var RARITY_LABEL = { normal: '普通', rare: '稀有', legend: '傳說' };
+
+  function cardArt(art, fallback) {
+    art = String(art || '');
+    if (/^(https?:|data:image)/i.test(art)) return '<img src="' + esc(art) + '" alt="" onerror="this.replaceWith(document.createTextNode(\'' + (fallback || '🎴') + '\'))">';
+    return esc(art || fallback || '🎴');
+  }
+
+  /**
+   * 一張卡的 HTML。card：{number, name, type, rarity, art, hp, atk, def, skill_name, skill_desc, story}
+   * 沒有 name（尚未收集）時顯示剪影。o：{ kind: nature|place|custom, style: foil|classic|watercolor|pixel, mini, big, tilt }
+   */
+  function cardHtml(card, o) {
+    o = o || {};
+    var kind = o.kind || 'nature', style = o.style || 'foil';
+    var types = CARD_TYPE_LABEL[kind] || CARD_TYPE_LABEL.nature, stats = CARD_STAT_LABEL[kind] || CARD_STAT_LABEL.nature;
+    var locked = !card.name, num = ('00' + (card.number || 0)).slice(-3);
+    var cls = 'tcg s-' + esc(style) + ' t-' + esc(card.type || 'forest') + ' r-' + esc(card.rarity || 'normal') + (locked ? ' locked' : '') + (o.mini ? ' mini' : '') + (o.big ? ' big' : '');
+    var tl = '<span>' + esc(types[card.type] || '') + '</span><span>No.' + num + '　' + (RARITY_STARS[card.rarity] || '★') + '</span>';
+    if (locked) {
+      return '<div class="' + cls + '"><div class="tcg-in"><div class="tcg-head"><b class="tcg-name">？？？</b></div>' +
+        '<div class="tcg-art">' + cardArt(card.art) + '</div><div class="tcg-typeline">' + tl + '</div></div></div>';
+    }
+    return '<div class="' + cls + '"' + (o.tilt ? ' data-tilt="1"' : '') + '><div class="tcg-in">' +
+      '<div class="tcg-head"><b class="tcg-name">' + esc(card.name) + '</b><span class="tcg-hp"><small>' + esc(stats[0]) + '</small>' + esc(card.hp) + '</span></div>' +
+      '<div class="tcg-art">' + cardArt(card.art) + '</div>' +
+      '<div class="tcg-typeline">' + tl + '</div>' +
+      '<div class="tcg-skill">' + (card.skill_name ? '<b>' + esc(card.skill_name) + '</b>' : '') + esc(card.skill_desc || '') + '</div>' +
+      '<div class="tcg-stats"><span>' + esc(stats[1]) + ' ' + esc(card.atk) + '</span><span>' + esc(stats[2]) + ' ' + esc(card.def) + '</span></div>' +
+      (card.story ? '<div class="tcg-story">' + esc(card.story) + '</div>' : '') + '</div></div>';
+  }
+
+  /** 卡片背面（開卡動畫用） */
+  function cardBackHtml(title, o) {
+    o = o || {};
+    return '<div class="tcg tcg-back s-' + esc(o.style || 'foil') + '"><div class="tcg-in"><div class="tcg-back-mark">🎴</div><div class="tcg-back-title">' + esc(title || '圖鑑') + '</div></div></div>';
+  }
+
+  /** 讓卡片跟著手指／滑鼠傾斜，閃光跟著移動 */
+  function bindTilt(root) {
+    $$('.tcg[data-tilt]', root).forEach(function (el) {
+      if (el._tilt) return;
+      el._tilt = true;
+      var move = function (e) {
+        var r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+        el.style.setProperty('--mx', (x * 100).toFixed(1) + '%'); el.style.setProperty('--my', (y * 100).toFixed(1) + '%');
+        el.style.transform = 'perspective(700px) rotateY(' + ((x - .5) * 24).toFixed(1) + 'deg) rotateX(' + ((.5 - y) * 24).toFixed(1) + 'deg)';
+      };
+      var reset = function () { el.style.transform = ''; el.style.setProperty('--mx', '50%'); el.style.setProperty('--my', '50%'); };
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerleave', reset);
+      el.addEventListener('pointercancel', reset);
+    });
+  }
+
   global.Q = {
+    cardHtml: cardHtml, cardBackHtml: cardBackHtml, bindTilt: bindTilt, cardArt: cardArt,
+    CARD_TYPE_LABEL: CARD_TYPE_LABEL, CARD_STAT_LABEL: CARD_STAT_LABEL, RARITY_LABEL: RARITY_LABEL,
+    boardHtml: boardHtml,
     api: api, $: $, $$: $$, esc: esc, linkify: linkify, toast: toast, loading: loading, run: run,
     distM: distM, fmtDist: fmtDist, fmtDuration: fmtDuration, fmtTime: fmtTime, toLocalInput: toLocalInput,
     parseLatLng: parseLatLng, locate: locate, STATUS_LABEL: STATUS_LABEL, TYPE_LABEL: TYPE_LABEL, STATUS_COLOR: STATUS_COLOR

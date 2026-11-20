@@ -6,9 +6,14 @@
   <meta name="theme-color" content="#1d2a2f">
   <title>GPS 實境解謎</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261120h">
+  <link rel="stylesheet" href="css/style.css?v=20261121e">
 </head>
 <body class="quest">
+  <div id="test-banner" class="inapp test hidden" role="status">🧪 <b>試玩模式</b>：這支隊伍不會計入排行榜與正式紀錄。</div>
+  <div id="inapp-banner" class="inapp hidden" role="alert">
+    <div class="grow"><b>建議改用 Safari／Chrome 開啟</b><br><span class="small">你正在用 LINE、Facebook 等內建瀏覽器，定位和指南針可能無法使用。請點右上角選單選「用瀏覽器開啟」，或複製連結貼到瀏覽器。</span></div>
+    <div class="col"><button class="sm" id="inapp-copy" type="button">複製連結</button><button class="sm ghost" id="inapp-x" type="button">知道了</button></div>
+  </div>
   <!-- 選擇專案 -->
   <section id="v-projects" class="page hidden">
     <h1 id="site-name">GPS 實境解謎</h1>
@@ -26,6 +31,7 @@
       </div>
     </div>
     <div class="card stack">
+      <div id="intro-route" class="route-banner hidden"></div>
       <div id="intro-text" class="pre"></div>
       <div class="row wrap" id="intro-meta"></div>
     </div>
@@ -34,10 +40,11 @@
       <div class="field">
         <label for="f-team">隊伍名稱 *</label>
         <input id="f-team" maxlength="30" placeholder="例如：第三小隊" autocomplete="off">
+        <select id="f-team-select" class="hidden"></select>
       </div>
-      <div class="field">
-        <label for="f-members">成員（選填）</label>
-        <input id="f-members" maxlength="200" placeholder="例如：小明、小華、小美" autocomplete="off">
+      <div class="field hidden" id="avatar-field">
+        <label>隊伍造型</label>
+        <div id="avatar-picker" class="avatar-picker"></div>
       </div>
       <div class="field" id="run-field">
         <label for="f-run">場次代碼<span id="run-req"></span></label>
@@ -55,16 +62,21 @@
     <div class="topbar">
       <div class="title" id="g-title"></div>
       <span class="chip" id="g-gps"><span class="gps-dot"></span> 定位</span>
+      <span class="chip hidden" id="offline-chip">📴 離線中</span>
       <span class="chip hidden" id="g-timer">⏱ --:--</span>
+      <button class="icon-btn hidden" id="btn-pack" aria-label="線索背包" title="線索背包（密碼碎片）">🎒</button>
+      <button class="icon-btn" id="btn-font" aria-label="大字模式" title="大字模式">Aa</button>
       <button class="icon-btn" id="btn-sound" aria-label="音效開關" title="音效開關">🔊</button>
     </div>
     <div class="page">
       <div class="card hud">
         <div class="row">
-          <div class="grow hud-team"><b id="g-team"></b> <span class="chip gray" id="g-code" title="隊伍代碼"></span></div>
+          <div class="grow hud-team"><span id="g-avatar" class="hud-avatar"></span><b id="g-team"></b> <span class="chip gray" id="g-code" title="隊伍代碼"></span> <span class="chip hidden" id="g-route"></span></div>
           <div class="hud-score">⭐ <b id="g-score">0</b></div>
           <div class="hud-prog" id="g-progress-text"></div>
+          <button class="sm ghost hidden" id="btn-board" type="button">🏆 排行榜</button>
         </div>
+        <div class="hud-title hidden" id="g-hud-title"></div>
         <div class="progress thin"><i id="g-progress" style="width:0"></i></div>
       </div>
 
@@ -132,8 +144,15 @@
       <div class="stat"><b id="fin-time">—</b><span>花費時間</span></div>
     </div>
     <div class="card pre" id="fin-message" style="margin-top:12px"></div>
+    <div class="card hidden" id="fin-badges-card">
+      <h2>🏅 你們的成就</h2>
+      <div id="fin-title" class="fin-title"></div>
+      <div id="fin-badges" class="fin-badges"></div>
+      <div id="fin-collection" class="item-grid" style="margin-top:10px"></div>
+    </div>
     <div class="card hidden" id="fin-board-card">
       <h2>排行榜</h2>
+      <div class="row hidden" id="fin-board-tabs" style="margin-bottom:8px"><button class="sm" id="tab-board-route">本路線</button><button class="sm ghost" id="tab-board-all">全部隊伍</button></div>
       <div id="fin-board"></div>
     </div>
     <button class="big ghost" id="btn-back-game" style="margin-top:12px">回到關卡列表</button>
@@ -149,12 +168,56 @@
     </div>
   </section>
 
+  <!-- 看卡（大卡片，可傾斜閃光） -->
+  <div id="card-view" class="solved-overlay hidden" role="dialog" aria-modal="true" aria-label="卡片">
+    <div class="card-view-box">
+      <div id="card-view-card"></div>
+      <div class="help" style="color:#fff;text-align:center">用手指在卡片上滑動，可以看到閃光</div>
+      <button class="big ghost" id="card-view-close" style="background:#fff">關閉</button>
+    </div>
+  </div>
+
+  <!-- 線索背包（密碼碎片） -->
+  <div id="pack" class="solved-overlay hidden" role="dialog" aria-modal="true" aria-label="線索背包">
+    <div class="board-card">
+      <div class="sheet-head"><h2 class="grow" style="margin:0">🎒 線索背包</h2><button class="close-x" id="pack-close" aria-label="關閉">✕</button></div>
+      <div class="help" id="pack-note" style="margin:4px 0 8px"></div>
+      <div id="pack-rows" class="pack-rows"></div>
+    </div>
+  </div>
+
+  <!-- 即時排行榜（闖關中） -->
+  <div id="board" class="solved-overlay hidden" role="dialog" aria-modal="true" aria-label="即時排行榜">
+    <div class="board-card">
+      <div class="sheet-head"><h2 class="grow" style="margin:0">🏆 即時排行榜</h2><button class="close-x" id="board-close" aria-label="關閉">✕</button></div>
+      <div class="help" id="board-note" style="margin:4px 0 8px"></div>
+      <div id="board-rows" class="lb"></div>
+    </div>
+  </div>
+
+  <!-- 新手教學 -->
+  <div id="tutorial" class="solved-overlay hidden" role="dialog" aria-modal="true" aria-label="新手教學" style="z-index:2700">
+    <div class="solved-card tut-card">
+      <div class="tut-icon" id="tut-icon">📍</div>
+      <div class="solved-title" id="tut-title"></div>
+      <div class="tut-text pre" id="tut-text"></div>
+      <div class="tut-dots" id="tut-dots"></div>
+      <button class="big" id="tut-next">下一步</button>
+      <button class="big ghost" id="tut-skip">跳過教學</button>
+    </div>
+  </div>
+
+  <!-- 抵達打卡成功 -->
+  <div id="arrive-flash" class="arrive-flash hidden" aria-live="polite"><div><span>📍</span><b>抵達！</b></div></div>
+
   <!-- 過關畫面 -->
   <div id="solved" class="solved-overlay hidden" role="dialog" aria-modal="true">
     <div class="solved-card">
       <div class="solved-badge">✓</div>
       <div class="solved-title" id="solved-title">過關！</div>
       <div class="solved-points">+<span id="solved-points">0</span> 分</div>
+      <div class="item-reward hidden" id="solved-item"></div>
+      <div class="frag-reward hidden" id="solved-reward"></div>
       <div class="solved-msg pre" id="solved-msg"></div>
       <button class="big" id="solved-next">前往下一關</button>
       <button class="big ghost" id="solved-close">回到地圖</button>
@@ -179,8 +242,8 @@
   <div id="retry-bar" class="retry-bar hidden" role="alert"><span class="grow">連線失敗，請確認訊號後再試</span><button class="sm" id="retry-btn">重試</button><button class="sm ghost" id="retry-x" aria-label="關閉">✕</button></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="config.js?v=20261120h"></script>
-  <script src="js/common.js?v=20261120h"></script>
-  <script src="js/player.js?v=20261120h"></script>
+  <script src="config.js?v=20261121e"></script>
+  <script src="js/common.js?v=20261121e"></script>
+  <script src="js/player.js?v=20261121e"></script>
 </body>
 </html>

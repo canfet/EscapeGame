@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex">
   <title>實境解謎 · 管理後台</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261120h">
+  <link rel="stylesheet" href="css/style.css?v=20261121e">
 </head>
 <body>
   <!-- 登入 -->
@@ -26,6 +26,7 @@
       <nav class="tabs">
         <button data-tab="projects" class="on">專案</button>
         <button data-tab="stages">關卡</button>
+        <button data-tab="decks">圖鑑本</button>
         <button data-tab="monitor">闖關紀錄</button>
       </nav>
       <a id="link-sheet" class="chip" target="_blank" rel="noopener" style="text-decoration:none">📊 試算表</a>
@@ -42,14 +43,27 @@
       <div id="project-grid" class="project-grid"></div>
     </div>
 
+    <!-- 圖鑑本 -->
+    <div id="t-decks" class="page wide hidden">
+      <div class="row" style="margin-bottom:12px">
+        <h2 class="grow" style="margin:0">🃏 圖鑑本</h2>
+        <button class="ghost" id="btn-default-deck">⚡ 一鍵建立預設荒野自然名圖鑑</button>
+        <button id="btn-new-deck">＋ 新增圖鑑本</button>
+      </div>
+      <p class="muted small">一本圖鑑＝一組卡牌。輸入多筆名稱（例如荒野自然名、當地的景點或代表物），就能自動產生整本卡牌；可以做很多本，再到「專案設定」決定每個專案使用哪一本。</p>
+      <div id="deck-grid" class="project-grid"></div>
+    </div>
+
     <!-- 關卡 -->
     <div id="t-stages" class="page wide hidden">
       <div class="row wrap" style="margin-bottom:12px">
         <select id="stage-project" style="max-width:320px"></select>
+        <select id="stage-route" class="hidden" style="max-width:220px"></select>
         <div class="grow"></div>
         <button class="ghost" id="btn-preview">👀 開啟前台</button>
         <button id="btn-new-stage">＋ 新增關卡</button>
       </div>
+      <div class="help hidden" id="deck-cover" style="margin:-4px 0 10px"></div>
       <div class="editor-grid">
         <div>
           <div class="table-wrap">
@@ -69,7 +83,9 @@
       <div class="row wrap" style="margin-bottom:12px">
         <select id="mon-project" style="max-width:280px"></select>
         <select id="mon-run" style="max-width:200px"><option value="">全部場次</option></select>
+        <select id="mon-route" class="hidden" style="max-width:200px"></select>
         <button class="ghost" id="btn-mon-refresh">↻ 重新整理</button>
+        <button class="ghost hidden" id="btn-clear-tests">🧪 清除試玩紀錄</button>
         <label class="check small"><input type="checkbox" id="mon-auto" checked> 每 20 秒自動更新</label>
         <div class="grow"></div>
         <span class="small muted" id="mon-updated"></span>
@@ -85,7 +101,7 @@
           <h3>隊伍</h3>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>隊伍</th><th>場次</th><th>進度</th><th>分數</th><th>目前關卡</th><th>最後活動</th><th></th></tr></thead>
+              <thead><tr><th>隊伍</th><th>場次</th><th>路線</th><th>進度</th><th>分數</th><th>目前關卡</th><th>最後活動</th><th></th></tr></thead>
               <tbody id="mon-sessions"></tbody>
             </table>
           </div>
@@ -136,9 +152,30 @@
           <option value="mist">🌫️ 迷霧（深色、冷色調、薄霧）</option>
           <option value="forest">🌲 森林自然（深綠與大地色）</option>
           <option value="neon">🌃 賽博霓虹（深紫與螢光）</option>
+          <option value="campus">🌸 校園清新（馬卡龍色系、圓潤可愛）</option>
+          <option value="ocean">⚓ 海洋航海（藍白條紋與船錨）</option>
         </select>
         <div class="theme-prev" id="mp-theme-prev"></div>
         <div class="help">只影響闖關者看到的畫面（顏色、字體、地圖濾鏡），不影響關卡內容與計分。</div></div>
+      <div class="field"><label>路線（選填）</label>
+        <div id="mp-routes"></div>
+        <button type="button" class="ghost sm" id="mp-route-add">＋ 新增路線</button>
+        <div class="help">同一個專案，讓不同隊伍走不同的關卡。每條路線的「代碼」由系統隨機產生（不好猜），會放進 QR Code 裡，玩家看不到也改不了。沒有設定路線＝所有隊伍走一樣的關卡。</div></div>
+      <div class="field"><label>隊伍名單（選填）</label>
+        <div id="mp-teams"></div>
+        <div class="row wrap">
+          <button type="button" class="ghost sm" id="mp-team-add">＋ 新增隊伍</button>
+          <button type="button" class="ghost sm" id="mp-team-bulk">📋 批次貼上名單</button>
+        </div>
+        <div class="hidden" id="mp-team-bulk-box" style="margin-top:8px">
+          <textarea id="mp-team-bulk-text" placeholder="一行一個隊伍名稱，例如：&#10;第一隊&#10;第二隊&#10;第三隊"></textarea>
+          <button type="button" class="sm" id="mp-team-bulk-ok" style="margin-top:6px">加入名單</button>
+        </div>
+        <div class="help">設定後，玩家建立隊伍時<b>只能從這份名單選</b>，並自動套用該隊的路線（路線由這裡決定，玩家無法自己改）。不設定＝玩家自己輸入隊伍名稱。</div></div>
+      <div class="field"><label>使用的圖鑑本（選填）</label>
+        <select id="mp-deck_id"></select>
+        <div class="help">玩家每過一關可以拿到卡牌，集滿整本圖鑑。到「圖鑑本」頁面建立；在關卡設定裡決定每一關給哪一張，或隨機抽幾張。</div></div>
+      <div class="field"><label>全收集完成訊息（選填）</label><input id="mp-collect_message" maxlength="300" placeholder="例如：恭喜集滿所有收藏品！請到終點領取紀念品"></div>
       <div class="field"><label>簡短說明</label><input id="mp-description"></div>
       <div class="field"><label>開場介紹</label><textarea id="mp-intro" placeholder="任務背景、規則、注意事項…"></textarea></div>
       <div class="field"><label>完成訊息</label><textarea id="mp-finish_message" placeholder="例如：請回到集合點找關主領獎"></textarea></div>
@@ -158,9 +195,14 @@
         <div class="field"><label>限時（分鐘）</label><input type="number" min="0" id="mp-time_limit_min"><div class="help">0 = 不限時，從隊伍按「開始」計算</div></div>
         <div class="field"><label>可接受的定位誤差（公尺）</label><input type="number" min="10" id="mp-gps_max_accuracy"><div class="help">建議 50–100，室內可放寬</div></div>
       </div>
+      <div class="grid2">
+        <div class="field"><label>連續答錯幾次後暫停作答</label><input type="number" min="0" id="mp-wrong_lock_after" placeholder="3"><div class="help">防止亂猜。0 = 不限制；留空 = 3 次。</div></div>
+        <div class="field"><label>暫停秒數（每次加倍，最久 10 分鐘）</label><input type="number" min="0" id="mp-wrong_lock_sec" placeholder="30"><div class="help">答案與現場通關碼都適用；留空 = 30 秒。</div></div>
+      </div>
       <div class="field">
         <label class="check"><input type="checkbox" id="mp-is_default"> 設為首頁預設專案</label>
         <label class="check"><input type="checkbox" id="mp-show_leaderboard"> 完成後顯示排行榜</label>
+        <label class="check"><input type="checkbox" id="mp-leaderboard_live"> 即時排行榜（闖關中也能看各隊進度，並提供大螢幕用的排行榜頁面；排行榜只在上面設定的「開放時間～結束時間」期間可看）</label>
         <label class="check"><input type="checkbox" id="mp-require_run_code"> 必須輸入場次代碼</label>
       </div>
       <div class="row"><div class="grow"></div><button class="ghost" data-close>取消</button><button id="mp-save">儲存</button></div>
@@ -189,12 +231,50 @@
             <input type="file" accept="image/*" id="ms-image_url-file" class="hidden">
             <img id="ms-image_url-prev" class="img-prev hidden" alt="關卡圖片預覽"></div>
 
+          <div class="field hidden" id="ms-routes-wrap">
+            <label>所屬路線</label>
+            <div id="ms-routes"></div>
+            <div class="help">勾選哪些路線會經過這一關；<b>都不勾＝所有路線共用</b>。右邊「順序」可選填：這一關在該路線裡排第幾個（沒填就依關卡列表的順序）。</div>
+          </div>
           <div class="section-title">抵達條件</div>
           <label class="check"><input type="checkbox" id="ms-require_gps"> 需要 GPS 定位打卡</label>
           <label class="check field"><input type="checkbox" id="ms-show_location"> 在地圖上顯示位置（不勾＝只靠線索找）</label>
           <div class="field"><label>現場通關碼（選填）</label><input id="ms-bypass_code" placeholder="例如貼在現場的 4 位數">
             <div class="help">定位不準或室內時可改輸入通關碼。不需要 GPS 時，設了通關碼就必須輸入才能作答。</div></div>
 
+          <div class="field hidden" id="ms-card-wrap">
+            <div class="section-title">過關給的卡牌（此專案使用圖鑑本時）</div>
+            <div class="grid2">
+              <div class="field"><label>固定給一張</label><select id="ms-card_id"></select></div>
+              <div class="field"><label>再隨機抽幾張</label><input type="number" min="0" max="5" id="ms-card_random" placeholder="0"><div class="help">依稀有度機率抽（普通 70％、稀有 25％、傳說 5％），不會重複，也不會抽到其他關卡「固定給」的卡。</div></div>
+            </div>
+          </div>
+          <div class="section-title">收藏品（過關後收進玩家的收藏冊，選填；專案有使用圖鑑本時以卡牌為主）</div>
+          <div class="grid2">
+            <div class="field"><label>收藏品名稱</label><input id="ms-item_name" maxlength="30" placeholder="例如：古燈籠"></div>
+            <div class="field"><label>稀有度</label>
+              <select id="ms-item_rarity"><option value="normal">普通</option><option value="rare">稀有（藍框）</option><option value="legend">傳說（金色發光）</option></select></div>
+          </div>
+          <div class="field"><label>圖示（emoji 或上傳圖片）</label>
+            <div class="row">
+              <input class="grow" id="ms-item_icon" maxlength="300" placeholder="直接輸入 emoji，例如 🏮，或上傳圖片">
+              <button type="button" class="ghost sm" id="ms-item_icon-pick">⬆ 上傳圖片</button>
+              <button type="button" class="ghost sm" id="ms-item_icon-clear">清除</button>
+            </div>
+            <input type="file" accept="image/*" id="ms-item_icon-file" class="hidden">
+            <img id="ms-item_icon-prev" class="img-prev hidden" alt="圖示預覽" style="max-height:80px">
+            <div class="help">玩家過關會看到收藏品與故事，沒收集到的在收藏冊顯示成剪影。每收集一個，地圖上就多一隻跟在玩家後面的夥伴。</div></div>
+          <div class="field"><label>一句小故事（選填）</label><textarea id="ms-item_story" maxlength="300" style="min-height:56px" placeholder="例如：它曾點亮河運夜路的燈火。"></textarea></div>
+
+          <div class="section-title">密碼碎片（關卡連動解謎，選填）</div>
+          <div class="grid2">
+            <div class="field"><label>過關後給玩家的碎片</label><input id="ms-reward_code" maxlength="40" placeholder="例如 7、K、甲"></div>
+            <div class="field"><label>在最終密碼裡排第幾碼</label><input type="number" min="1" step="1" id="ms-reward_order" placeholder="1、2、3…"></div>
+          </div>
+          <label class="check field"><input type="checkbox" id="ms-final_from_fragments"> 這是最後一關：答案由前面關卡的碎片，依「第幾碼」的順序組成（會忽略下方「正確答案」）</label>
+          <label class="check field"><input type="checkbox" id="ms-coop_final"> 這是「合作最後關」：答案＝每條路線各自的碎片，依路線順序接起來。需要和其他路線的隊伍交換密碼（專案至少要有 2 條路線）</label>
+          <div class="help" id="ms-frag-preview" style="margin-bottom:10px"></div>
+          <div class="help" style="margin-bottom:10px">玩家過關才拿到碎片（作答次數用完、未通過的關卡不給），收進前台的「🎒 線索背包」。最後一關要集齊才能作答。若有隊伍因為失敗缺碎片，可到「闖關紀錄」按 🔄 還原失敗關卡。</div>
           <div class="section-title">題目與作答</div>
           <div class="field"><label>題目</label><textarea id="ms-question"></textarea></div>
           <label class="check field"><input type="checkbox" id="ms-show_question_early"> 抵達前就顯示題目（不勾＝抵達後才看得到題目）</label>
@@ -213,6 +293,7 @@
           <div class="field" data-show="choice"><label>選項（用 | 分隔）</label><input id="ms-choices" placeholder="選項A|選項B|選項C"></div>
           <div class="field" data-show="text number choice"><label>正確答案（多個可接受答案用 | 分隔）</label><input id="ms-answer" placeholder="例如：台北|臺北|Taipei">
             <div class="help">不分大小寫、全半形，會忽略空白與標點。留空＝開放式作答，送出就過關。</div></div>
+          <label class="check field" data-show="text number choice"><input type="checkbox" id="ms-require_photo"> 同時要求上傳照片（作答時要附一張照片才能送出，照片會存到雲端硬碟）</label>
           <div class="field" data-show="text number choice"><label>最多作答次數</label><input type="number" min="0" id="ms-max_attempts"><div class="help">0 = 不限次數</div></div>
           <div class="field" data-show="form"><label>Google 表單網址</label><input id="ms-form_url" placeholder="https://docs.google.com/forms/d/e/…/viewform?usp=pp_url&entry.123={code}">
             <div class="help">可用 {code} 隊伍代碼、{team} 隊名、{run} 場次、{project} 專案代碼，會自動替換。</div></div>
@@ -250,21 +331,125 @@
   </div>
 
   <!-- 分享連結 -->
+  <!-- 活動前檢查 -->
+  <div id="m-check" class="modal hidden">
+    <div class="modal-body narrow">
+      <div class="sheet-head"><h2 id="ck-title">活動前檢查</h2><button class="close-x" data-close>✕</button></div>
+      <div id="ck-summary" class="row wrap" style="margin-bottom:10px"></div>
+      <div id="ck-list" class="ck-list"></div>
+      <div class="row" style="margin-top:12px"><button class="ghost" id="ck-rerun">↻ 重新檢查</button><div class="grow"></div><button data-close>關閉</button></div>
+    </div>
+  </div>
+
+  <!-- 圖鑑本編輯 -->
+  <div id="m-deck" class="modal hidden">
+    <div class="modal-body">
+      <div class="sheet-head"><h2 id="dk-heading">圖鑑本</h2><button class="close-x" data-close>✕</button></div>
+      <div class="editor-grid">
+        <div>
+          <div class="grid2">
+            <div class="field"><label>圖鑑名稱 *</label><input id="dk-title" maxlength="40" placeholder="例如：荒野自然名圖鑑"></div>
+            <div class="field"><label>類型</label>
+              <select id="dk-kind">
+                <option value="nature">🌿 荒野自然名角色（屬性、技能、HP）</option>
+                <option value="place">🏯 在地景點／代表物（人氣、歷史、美景）</option>
+                <option value="custom">✏️ 自訂</option>
+              </select></div>
+          </div>
+          <div class="field"><label>卡面畫風</label>
+            <select id="dk-style">
+              <option value="foil">✨ 閃卡（稀有、傳說會閃光，像寶可夢卡牌）</option>
+              <option value="classic">📜 古典標本圖鑑（羊皮紙、襯線字、金邊）</option>
+              <option value="watercolor">🎨 水彩手繪（柔和暈染、大圓角）</option>
+              <option value="pixel">👾 像素遊戲（8-bit 方塊風）</option>
+            </select></div>
+          <div class="field"><label>貼上多筆名稱，一次產生卡牌</label>
+            <textarea id="dk-names" style="min-height:96px" placeholder="一行一個，或用逗號、頓號分隔，例如：&#10;小水鹿&#10;藍腹鷴&#10;山椒魚"></textarea>
+            <div class="row wrap" style="margin-top:6px">
+              <button type="button" id="dk-gen">⚡ 產生卡牌</button>
+              <button type="button" class="ghost" id="dk-load-default">📋 填入預設荒野自然名</button>
+              <button type="button" class="ghost" id="dk-reroll-all">🎲 全部重新隨機屬性</button>
+            </div>
+            <div class="help">系統會依名稱自動決定屬性、稀有度、數值、技能和故事（同一個名字每次產生的結果一樣）。產生後可以逐張修改，也可以上傳自己畫的圖。已經有的名稱不會重複產生。</div></div>
+          <div class="section-title" id="dk-count">卡牌</div>
+          <div id="dk-list" class="dk-list"></div>
+        </div>
+        <div>
+          <div class="section-title">編輯這張卡</div>
+          <div id="dk-editor" class="hidden">
+            <div class="grid2">
+              <div class="field"><label>名稱</label><input id="dk-name" maxlength="20"></div>
+              <div class="field"><label>稀有度</label>
+                <select id="dk-rarity"><option value="normal">普通 ★</option><option value="rare">稀有 ★★</option><option value="legend">傳說 ★★★</option></select></div>
+            </div>
+            <div class="grid2">
+              <div class="field"><label>屬性／分類</label><select id="dk-type"></select></div>
+              <div class="field"><label>圖（emoji 或上傳圖片）</label>
+                <div class="row"><input class="grow" id="dk-art" maxlength="300" placeholder="🦌 或上傳">
+                  <button type="button" class="ghost sm" id="dk-art-pick">⬆</button><button type="button" class="ghost sm" id="dk-art-clear">✕</button></div>
+                <input type="file" accept="image/*" id="dk-art-file" class="hidden"><img id="dk-art-prev" class="img-prev hidden" alt="" style="max-height:60px"></div>
+            </div>
+            <div class="grid3">
+              <div class="field"><label id="dk-l-hp">HP</label><input type="number" min="0" max="999" id="dk-hp"></div>
+              <div class="field"><label id="dk-l-atk">攻擊</label><input type="number" min="0" max="999" id="dk-atk"></div>
+              <div class="field"><label id="dk-l-def">防禦</label><input type="number" min="0" max="999" id="dk-def"></div>
+            </div>
+            <div class="field"><label>技能名稱</label><input id="dk-skill_name" maxlength="16"></div>
+            <div class="field"><label>技能說明</label><input id="dk-skill_desc" maxlength="80"></div>
+            <div class="field"><label>小故事</label><textarea id="dk-story" maxlength="200" style="min-height:64px"></textarea></div>
+            <div class="row wrap">
+              <button type="button" class="ghost sm" id="dk-up">⬆ 往前</button>
+              <button type="button" class="ghost sm" id="dk-down">⬇ 往後</button>
+              <button type="button" class="ghost sm" id="dk-reroll">🎲 重新隨機這張</button>
+              <button type="button" class="danger sm" id="dk-del">刪除這張</button>
+            </div>
+          </div>
+          <div class="center" style="margin-top:14px"><div id="dk-preview"></div></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="danger hidden" id="dk-delete-deck">刪除這本圖鑑</button><div class="grow"></div><button class="ghost" data-close>取消</button><button id="dk-save">儲存圖鑑</button></div>
+    </div>
+  </div>
+
   <div id="m-link" class="modal hidden">
     <div class="modal-body narrow">
       <div class="sheet-head"><h2>闖關連結</h2><button class="close-x" data-close>✕</button></div>
       <div class="field"><label>場次代碼（選填）</label><input id="ml-run" placeholder="例如 2026-11-25-AM 或 三年二班"><div class="help">加在連結裡，學生就不用自己輸入，紀錄也會自動分場次。</div></div>
+      <div class="field hidden" id="ml-team-wrap">
+        <label>隊伍</label>
+        <select id="ml-team-select"></select>
+        <input id="ml-team-input" placeholder="選填：預先帶入隊伍名稱">
+        <div class="help" id="ml-team-help"></div>
+      </div>
+      <div class="field hidden" id="ml-route-wrap">
+        <label>路線</label>
+        <select id="ml-route"></select>
+        <div class="help">QR Code 會帶入這條路線的隨機代碼，掃的人就自動走這條路線。</div>
+      </div>
       <div class="field"><label>連結</label><div class="row"><input id="ml-url" readonly class="grow"><button id="ml-copy">複製</button></div></div>
       <div class="center"><div id="ml-qr" style="display:inline-block;padding:12px;background:#fff;border-radius:12px"></div></div>
       <p class="help center">把 QR Code 印出來或投影，學生用手機相機掃描就能進入。</p>
-      <div class="row"><a class="btn ghost grow" id="ml-open" target="_blank" rel="noopener">開啟前台</a></div>
+      <div class="row wrap"><a class="btn ghost grow" id="ml-open" target="_blank" rel="noopener">開啟前台</a><button class="ghost grow" id="ml-sheet">🖨 一次產生全部 QR（可列印）</button></div>
+    </div>
+  </div>
+
+  <!-- 全部 QR Code（列印用） -->
+  <div id="m-qrsheet" class="modal hidden">
+    <div class="modal-body">
+      <div class="sheet-head no-print"><h2 id="qs-title">QR Code</h2>
+        <button class="close-x" data-close>✕</button></div>
+      <div class="row wrap no-print" style="margin-bottom:12px">
+        <span class="small muted grow" id="qs-note"></span>
+        <button id="qs-print">🖨 列印</button>
+      </div>
+      <div id="qs-grid" class="qs-grid"></div>
     </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="config.js?v=20261120h"></script>
-  <script src="js/common.js?v=20261120h"></script>
-  <script src="js/admin.js?v=20261120h"></script>
+  <script src="config.js?v=20261121e"></script>
+  <script src="js/common.js?v=20261121e"></script>
+  <script src="js/admin.js?v=20261121e"></script>
 </body>
 </html>

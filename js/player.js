@@ -31,7 +31,38 @@
     var q = new URLSearchParams(location.search);
     P.projectId = q.get('p') || '';
     P.runCode = q.get('run') || '';
+    P.urlRoute = (q.get('route') || '').trim();   // 專屬 QR Code 帶的路線代碼
+    P.urlTeam = (q.get('team') || '').trim().slice(0, 30);
+    P.test = q.get('test') === '1'; P.tt = (q.get('tt') || '').trim();   // 後台「試玩」連結：不計入排行榜與正式紀錄
+    if (P.test) $('#test-banner').classList.remove('hidden');   // 專屬 QR Code 可預填隊伍名稱
 
+    // LINE／Facebook／Instagram 等內建瀏覽器常常拿不到定位與指南針：提醒改用 Safari／Chrome
+    try {
+      var inApp = /Line\/|FBAN|FBAV|Instagram|MicroMessenger|; wv\)/i.test(navigator.userAgent);
+      if (inApp && sessionStorage.getItem('gpsquest:inapp-ok') !== '1') $('#inapp-banner').classList.remove('hidden');
+    } catch (e) { /* */ }
+    $('#inapp-x').onclick = function () { $('#inapp-banner').classList.add('hidden'); try { sessionStorage.setItem('gpsquest:inapp-ok', '1'); } catch (e) { /* */ } };
+    $('#inapp-copy').onclick = function () {
+      var url = location.href;
+      (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { Q.toast('已複製連結，請貼到 Safari／Chrome 開啟', 'ok', 5000); })
+        .catch(function () { window.prompt('請複製這個連結，貼到 Safari／Chrome 開啟：', url); });
+    };
+    // 離線提示：山區訊號不穩時，頂部顯示「離線中」，輸入的答案會自動暫存
+    var syncOnline = function () { $('#offline-chip').classList.toggle('hidden', navigator.onLine !== false); };
+    window.addEventListener('offline', syncOnline); window.addEventListener('online', syncOnline); syncOnline();
+    // 大字模式（長輩友善）：整體字放大，設定會記住
+    try { if (localStorage.getItem('gpsquest:bigtext') === '1') document.documentElement.classList.add('big-text'); } catch (e) { /* */ }
+    $('#btn-font').onclick = function () {
+      var on = document.documentElement.classList.toggle('big-text');
+      try { localStorage.setItem('gpsquest:bigtext', on ? '1' : '0'); } catch (e) { /* */ }
+      Q.toast(on ? '已開啟大字模式' : '已關閉大字模式', 'ok', 1800);
+    };
+    // 答案輸入草稿：一輸入就暫存，重畫或斷線重連後還在
+    $('#sheet-body').addEventListener('input', function (e) {
+      var id = e.target.id;
+      if (P.sid && P.openId && ['s-ans', 's-caption', 's-code'].indexOf(id) >= 0) { try { localStorage.setItem(draftKey(P.openId, id), e.target.value); } catch (x) { /* */ } }
+    });
+    $('#tut-next').onclick = tutNext; $('#tut-skip').onclick = tutEnd;
     $('#btn-start').onclick = startSession;
     $('#btn-retry').onclick = function () { location.reload(); };
     $('#link-back-projects').onclick = function (e) { e.preventDefault(); location.href = location.pathname; };
@@ -51,6 +82,11 @@
     $('#next-step').onclick = function () { var st = nextStage(); if (st) openStage(st.stage_id); };
     $('#solved-next').onclick = goNextStage;
     $('#solved-close').onclick = hideSolved;
+    $('#btn-board').onclick = openBoard;
+    $('#btn-pack').onclick = openPack;
+    $('#card-view-close').onclick = closeCardView;
+    $('#pack-close').onclick = closePack;
+    $('#board-close').onclick = closeBoard;
     $('#btn-locate').onclick = function () { if (P.pos && P.map) P.map.setView([P.pos.lat, P.pos.lng], 17); else toastGps(); };
     $('#sheet').addEventListener('click', function (e) { if (e.target.id === 'sheet') closeStage(); });
 
@@ -103,7 +139,7 @@
 
   async function showIntro(pid) {
     try {
-      var r = await Q.run(function () { return api('getProject', { projectId: pid }); }, { noToast: true });
+      var r = await Q.run(function () { return api('getProject', { projectId: pid, route: P.urlRoute, team: P.urlTeam, tt: P.tt }); }, { noToast: true });
       var p = P.project = r.project;
       applyTheme(p.theme);
       document.title = p.name;
@@ -118,6 +154,34 @@
       if (p.time_limit_min) meta.push('<span class="chip amber">⏱ 限時 ' + p.time_limit_min + ' 分鐘</span>');
       $('#intro-meta').innerHTML = meta.join('');
       $('#f-run').value = P.runCode;
+      // 隊伍名稱：專案有「預設隊伍名單」就只能從名單選（路線由名單決定）；否則自由輸入
+      var restrict = !!p.restrict_teams, tms = p.teams || [];
+      var sel = $('#f-team-select'), inp = $('#f-team'), rb = $('#intro-route'), info = r.link_info;
+      sel.classList.toggle('hidden', !restrict);
+      inp.classList.toggle('hidden', restrict);
+      var showRoute = function (t) {
+        if (t && t.route_name) { rb.textContent = '🧭 你們的路線：' + t.route_name; rb.classList.remove('hidden', 'bad'); rb.style.borderColor = t.color || ''; }
+        else rb.classList.add('hidden');
+      };
+      if (restrict) {
+        sel.innerHTML = '<option value="">請選擇你們的隊伍</option>' + tms.map(function (t) {
+          return '<option value="' + esc(t.name) + '">' + esc(t.name) + (t.route_name ? '（' + esc(t.route_name) + '）' : '') + '</option>';
+        }).join('');
+        var preset = P.urlTeam && tms.filter(function (t) { return t.name === P.urlTeam; })[0];
+        sel.disabled = !!preset;          // 專屬 QR Code 進來：隊伍已鎖定
+        sel.value = preset ? preset.name : '';
+        sel.onchange = function () { var tt = tms.filter(function (t) { return t.name === sel.value; })[0]; showRoute(tt); renderAvatarPicker(p, tt); };
+        showRoute(preset || null);
+        renderAvatarPicker(p, preset || null);
+      } else {
+        if (P.urlTeam && !inp.value) inp.value = P.urlTeam;
+        showRoute(info && !info.bad ? info : null);
+        renderAvatarPicker(p, null);
+      }
+      if (info && info.bad) {
+        rb.textContent = info.bad === 'team' ? '⚠️ 連結裡的隊伍名稱不在名單內，請從下方選擇，或向關主確認 QR Code。' : '⚠️ 連結裡的路線代碼不正確，請向關主確認 QR Code。';
+        rb.classList.remove('hidden'); rb.classList.add('bad'); rb.style.borderColor = '';
+      }
       $('#run-req').textContent = p.require_run_code ? ' *' : '（選填）';
       // 網址已帶場次代碼就不用再填
       $('#run-field').classList.toggle('hidden', !!P.runCode);
@@ -125,9 +189,26 @@
     } catch (e) { showError(e.message); }
   }
 
+  /** 隊伍造型挑選；名單指定了造型的隊伍就固定，不能改 */
+  function renderAvatarPicker(proj, team) {
+    var list = proj.avatars || [], box = $('#avatar-picker'), field = $('#avatar-field');
+    field.classList.toggle('hidden', !list.length);
+    if (!list.length) return;
+    var fixed = team && team.avatar;
+    if (fixed) P.avatar = fixed;
+    else if (!P.avatar || list.indexOf(P.avatar) < 0) P.avatar = list[Math.floor(Math.random() * list.length)];
+    box.innerHTML = list.map(function (a) {
+      return '<button type="button" class="avatar-opt' + (a === P.avatar ? ' sel' : '') + '" data-av="' + esc(a) + '"' + (fixed ? ' disabled' : '') + '>' + esc(a) + '</button>';
+    }).join('');
+    Q.$$('#avatar-picker [data-av]').forEach(function (b) {
+      b.onclick = function () { P.avatar = b.dataset.av; renderAvatarPicker(proj, team); };
+    });
+  }
+
   async function startSession() {
-    var team = $('#f-team').value.trim();
-    if (!team) { Q.toast('請輸入隊伍名稱', 'warn'); $('#f-team').focus(); return; }
+    var restrict = !!(P.project && P.project.restrict_teams);
+    var team = restrict ? $('#f-team-select').value : $('#f-team').value.trim();
+    if (!team) { Q.toast(restrict ? '請先選擇你們的隊伍' : '請輸入隊伍名稱', 'warn'); (restrict ? $('#f-team-select') : $('#f-team')).focus(); return; }
     var run = $('#f-run').value.trim();
     if (P.project && P.project.require_run_code && !run) { Q.toast('請輸入場次代碼', 'warn'); return; }
     // 在使用者按下按鈕時要定位權限（iOS 比較穩）
@@ -136,14 +217,14 @@
     try {
       var r = await Q.run(function () {
         return api('startSession', {
-          projectId: P.projectId, teamName: team, members: $('#f-members').value.trim(),
+          projectId: P.projectId, teamName: team, route: P.urlRoute, avatar: P.avatar || '', test: P.test, tt: P.tt,
           runCode: run, userAgent: navigator.userAgent
         });
       });
       P.sid = r.state.session.session_id;
       try { localStorage.setItem(LS(P.projectId), P.sid); } catch (e) { /* */ }
       startGame(r.state);
-      Q.toast('隊伍建立成功，出發吧！', 'ok');
+      Q.toast(r.resumed ? '這支隊伍已經開始過了，已接續原本的進度' : '隊伍建立成功，出發吧！', 'ok', r.resumed ? 5000 : 3000);
     } catch (e) { /* toast 已顯示 */ }
   }
 
@@ -156,8 +237,19 @@
 
   /* ---------- 遊戲 ---------- */
   function startGame(state) {
+    var sr = state.session.route;
+    var diffRoute = P.urlRoute && sr && P.urlRoute !== sr;
+    var diffTeam = P.urlTeam && P.urlTeam !== state.session.team_name;
+    if (diffRoute || diffTeam) {
+      var rn = sr ? routeName(state, sr) : '';
+      setTimeout(function () {
+        Q.toast('這支隊伍「' + state.session.team_name + '」已經在' + (rn ? ' ' + rn + ' ' : '') + '闖關中，已為你接續原本的進度。要換隊伍的話，請按頁面最下方的「重新開始」，再掃一次 QR Code。', 'warn', 9000);
+      }, 600);
+    }
     show('v-game');
     applyState(state);
+    if (state.session.test) $('#test-banner').classList.remove('hidden');
+    setTimeout(function () { maybeTutorial(state); }, 400);
     initMap();
     startWatch();
     clearInterval(P.timer);
@@ -166,6 +258,10 @@
   }
 
   function applyState(state) {
+    P.locks = P.locks || {};
+    state.stages.forEach(function (x) {
+      if (x.wait_sec > 0) P.locks[x.stage_id] = Date.now() + x.wait_sec * 1000; else delete P.locks[x.stage_id];
+    });
     var prevFinished = P.state && P.state.session.status === 'finished';
     P.state = state;
     renderGame();
@@ -186,6 +282,24 @@
     $('#g-title').textContent = s.project.name;
     $('#g-team').textContent = se.team_name;
     $('#g-code').textContent = se.code;
+    $('#btn-board').classList.toggle('hidden', !s.project.leaderboard_live);
+    var frs = s.fragments || [], gotN = frs.filter(function (f) { return f.got; }).length;
+    var col = s.collection || [], colGot = col.filter(function (x) { return x.got; }).length, bds = s.badges || [];
+    $('#btn-pack').classList.toggle('hidden', !(frs.length || col.length || bds.length));
+    $('#btn-pack').textContent = '🎒' + (col.length ? ' ' + colGot + '/' + col.length : frs.length ? ' ' + gotN + '/' + frs.length : '');
+    $('#g-avatar').textContent = se.avatar ? se.avatar + ' ' : '';
+    updatePackDot();
+    var ht = $('#g-hud-title');
+    ht.classList.toggle('hidden', !s.title);
+    ht.textContent = s.title ? '🏷 ' + s.title + (bds.length ? '・' + bds.length + ' 枚徽章' : '') : '';
+    updateCompanions();
+    if (P.packOpen) renderPack();
+    var rtEl = $('#g-route'), myRoute = se.route ? routeOf(s, se.route) : null;
+    rtEl.classList.toggle('hidden', !myRoute);
+    if (myRoute) {
+      rtEl.textContent = '🧭 ' + myRoute.name;
+      rtEl.style.background = myRoute.color || ''; rtEl.style.color = myRoute.color ? '#fff' : '';
+    }
     $('#g-score').textContent = se.score;
     $('#g-progress-text').textContent = s.summary.done + ' / ' + s.summary.total;
     $('#g-progress').style.width = (s.summary.total ? s.summary.done / s.summary.total * 100 : 0) + '%';
@@ -224,11 +338,98 @@
     if (se.status === 'playing') keepAwake();
   }
 
+  function routeOf(state, id) {
+    var rts = (state && state.project && state.project.routes) || [];
+    return rts.filter(function (r) { return r.id === id; })[0] || null;
+  }
+  function routeName(state, id) { var r = routeOf(state, id); return r ? r.name : id; }
+
+  /** 收藏品圖示：emoji 直接顯示；http(s) / data 開頭視為圖片網址 */
+  function iconHtml(icon) {
+    icon = String(icon || '');
+    if (/^(https?:|data:image)/i.test(icon)) return '<img src="' + esc(icon) + '" alt="" onerror="this.replaceWith(document.createTextNode(\'🎁\'))">';
+    return esc(icon || '🎁');
+  }
+  function deckOpts(extra) {
+    var pj = (P.state && P.state.project) || {};
+    return Object.assign({ kind: pj.deck_kind || 'nature', style: pj.deck_style || 'foil' }, extra || {});
+  }
+  function openCardView(card) {
+    $('#card-view-card').innerHTML = Q.cardHtml(card, deckOpts({ big: true, tilt: true }));
+    Q.bindTilt($('#card-view-card'));
+    $('#card-view').classList.remove('hidden');
+    layerOpen('cardview');
+  }
+  function closeCardView() { $('#card-view').classList.add('hidden'); layerClose('cardview'); }
+  var RARITY_TXT = { normal: '普通', rare: '稀有', legend: '傳說' };
+
+  function draftKey(stageId, field) { return 'gpsquest:draft:' + P.sid + ':' + stageId + ':' + field; }
+  function clearDrafts(stageId) { ['s-ans', 's-caption', 's-code'].forEach(function (f) { try { localStorage.removeItem(draftKey(stageId, f)); } catch (e) { /* */ } }); }
+
+  /* ---------- 新手教學（第一次進來才顯示，可跳過） ---------- */
+  var TUT = [];
+  function maybeTutorial(state) {
+    try { if (localStorage.getItem('gpsquest:tut') === '1') return; } catch (e) { return; }
+    var pj = state.project || {}, hasColl = (state.collection || []).length, hasFrag = (state.fragments || []).length;
+    TUT = [
+      { icon: '📍', title: '跟著指示找地點', text: '地圖上的「下一站」會告訴你方向和距離。\n走到地點附近，按「我到了，定位打卡」。' },
+      { icon: '✏️', title: '答題過關', text: '打卡後就能作答。需要幫忙時可以按「需要提示」，\n但看提示會讓這一關可得的分數變少。' }
+    ];
+    if (hasColl) TUT.push({ icon: '🃏', title: '收集卡牌與收藏品', text: '每過一關都能收進圖鑑。點右上角的 🎒 看收集進度，\n集滿整本會有驚喜。你的小夥伴也會越來越多！' });
+    if (hasFrag) TUT.push({ icon: '🧩', title: '收集密碼碎片', text: '過關會得到密碼碎片，全部收集起來，\n就能在最後一關解開最終密碼。' });
+    if (pj.leaderboard_live) TUT.push({ icon: '🏆', title: '看看其他隊伍', text: '點上方的「🏆 排行榜」，隨時看各隊的進度。' });
+    P.tutI = 0;
+    renderTut();
+    $('#tutorial').classList.remove('hidden');
+  }
+  function renderTut() {
+    var s = TUT[P.tutI];
+    $('#tut-icon').textContent = s.icon; $('#tut-title').textContent = s.title; $('#tut-text').textContent = s.text;
+    $('#tut-dots').innerHTML = TUT.map(function (x, i) { return '<i class="' + (i === P.tutI ? 'on' : '') + '"></i>'; }).join('');
+    $('#tut-next').textContent = P.tutI === TUT.length - 1 ? '開始闖關！' : '下一步';
+    $('#tut-skip').classList.toggle('hidden', P.tutI === TUT.length - 1);
+  }
+  function tutNext() { if (P.tutI >= TUT.length - 1) return tutEnd(); P.tutI++; renderTut(); }
+  function tutEnd() {
+    $('#tutorial').classList.add('hidden');
+    try { localStorage.setItem('gpsquest:tut', '1'); } catch (e) { /* */ }
+  }
+
+  /* ---------- 抵達成功的明顯回饋 ---------- */
+  function arriveFlash() {
+    var el = $('#arrive-flash');
+    el.classList.remove('hidden');
+    el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+    try { if (Snd.on && navigator.vibrate) navigator.vibrate([90, 50, 90, 50, 160]); } catch (e) { /* */ }
+    setTimeout(function () { el.classList.add('hidden'); }, 1500);
+  }
+
+  /* ---------- 🎒 紅點：有新收集的東西 ---------- */
+  function seenKey() { return 'gpsquest:seen:' + P.sid; }
+  function currentOwned() {
+    var s = P.state || {}, ids = [];
+    (s.collection || []).forEach(function (x) { if (x.got) ids.push('c:' + (x.id || x.stage_id)); });
+    (s.badges || []).forEach(function (b) { ids.push('b:' + b.id); });
+    (s.fragments || []).forEach(function (f) { if (f.got) ids.push('f:' + f.stage_id); });
+    return ids;
+  }
+  function seenSet() {
+    try { var raw = localStorage.getItem(seenKey()); return raw === null ? null : JSON.parse(raw); } catch (e) { return []; }
+  }
+  function newOwned() {
+    var seen = seenSet(), cur = currentOwned();
+    if (seen === null) { try { localStorage.setItem(seenKey(), JSON.stringify(cur)); } catch (e) { /* */ } return []; }   // 第一次：不要整排都算新的
+    return cur.filter(function (id) { return seen.indexOf(id) < 0; });
+  }
+  function markSeen() { try { localStorage.setItem(seenKey(), JSON.stringify(currentOwned())); } catch (e) { /* */ } updatePackDot(); }
+  function updatePackDot() { var b = $('#btn-pack'); if (b) b.classList.toggle('has-new', newOwned().length > 0 && !P.packOpen); }
+
   function findStage(id) {
     return P.state.stages.filter(function (x) { return x.stage_id === id; })[0];
   }
 
   function tick() {
+    updateLock();
     var se = P.state && P.state.session;
     var el = $('#g-timer');
     if (!se || !se.deadline || se.status !== 'playing') { el.classList.add('hidden'); return; }
@@ -254,11 +455,13 @@
     if (P.watchId != null) return;
     if (!('geolocation' in navigator)) { setGps('none'); return; }
     P.watchId = navigator.geolocation.watchPosition(function (p) {
+      var prevPos = P.pos;
       P.pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
       // 走路時 GPS 會提供移動方向，沒有指南針的手機可以拿來用
       if (p.coords.heading != null && !isNaN(p.coords.heading) && p.coords.speed > 0.7) {
         P.gpsHeading = p.coords.heading; P.gpsHeadingT = Date.now();
       }
+      if (prevPos && Q.distM(prevPos.lat, prevPos.lng, P.pos.lat, P.pos.lng) > 3) P.moveBearing = bearing(prevPos.lat, prevPos.lng, P.pos.lat, P.pos.lng);
       setGps('ok');
       updateMe();
       updateDistances();
@@ -451,7 +654,7 @@
   }
 
   /* ---------- 前台主題（後台「前台畫面風格」） ---------- */
-  var THEMES = ['retro', 'history', 'sport', 'mist', 'forest', 'neon'];
+  var THEMES = ['retro', 'history', 'sport', 'mist', 'forest', 'neon', 'campus', 'ocean'];
   function themeVar(name, fallback) {
     var v = getComputedStyle(document.body).getPropertyValue(name);
     return (v && v.trim()) || fallback;
@@ -512,13 +715,35 @@
     $('#map-card').classList.remove('hidden');
     var ll = [P.pos.lat, P.pos.lng];
     if (!P.me) {
-      P.meAcc = L.circle(ll, { radius: P.pos.acc, color: '#2f6690', weight: 1, fillOpacity: .1 }).addTo(P.map);
-      P.me = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#2f6690', fillOpacity: 1 }).addTo(P.map);
+      P.meAcc = L.circle(ll, { radius: P.pos.acc, color: '#2f6690', weight: 1, fillOpacity: .1, interactive: false }).addTo(P.map);
+      var av = (P.state && P.state.session && P.state.session.avatar) || '🙂';
+      P.me = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me-pin">' + esc(av) + '</div>', iconSize: [38, 38], iconAnchor: [19, 19] }), interactive: false, zIndexOffset: 900 }).addTo(P.map);
       if (!P.fitted) { P.map.setView(ll, 17); }
     } else {
       P.me.setLatLng(ll); P.meAcc.setLatLng(ll).setRadius(P.pos.acc);
     }
+    updateCompanions();
     updateLink();
+  }
+
+  /** 隨行夥伴：每收集一個收藏品，就多一隻跟在你後面（在移動方向的反側排成一列） */
+  function updateCompanions() {
+    if (!P.map || !P.pos) return;
+    var items = ((P.state && P.state.collection) || []).filter(function (x) { return x.got; }).slice(-10);
+    var key = items.map(function (x) { return x.stage_id; }).join(',');
+    if (P.compKey !== key) {
+      (P.comp || []).forEach(function (m) { P.map.removeLayer(m); });
+      P.comp = items.map(function (it) {
+        return L.marker([P.pos.lat, P.pos.lng], { icon: L.divIcon({ className: '', html: '<div class="comp">' + iconHtml(it.icon) + '</div>', iconSize: [28, 28], iconAnchor: [14, 14] }), interactive: false, zIndexOffset: 700 }).addTo(P.map);
+      });
+      P.compKey = key;
+    }
+    var back = ((P.moveBearing != null ? P.moveBearing : 0) + 180) * Math.PI / 180;
+    (P.comp || []).forEach(function (m, i) {
+      m.setLatLng([P.pos.lat, P.pos.lng]);
+      var d = 28 + i * 17, el = m.getElement();
+      if (el && el.firstChild) el.firstChild.style.transform = 'translate(' + (Math.sin(back) * d).toFixed(1) + 'px,' + (-Math.cos(back) * d).toFixed(1) + 'px)';
+    });
   }
 
   /** 目前關注的目標：已打開的關卡，否則是離我最近、尚未完成的關卡 */
@@ -623,10 +848,16 @@
     h.push('<div class="sheet-content stack">');
 
     // 1) 線索 → 2) 題目 → 3) 提示（可收合）
+    var contentStart = h.length;
     if (st.clue) h.push('<div class="clue">' + Q.linkify(st.clue) + '</div>');
     // 題目：抵達後一定顯示；前往中則看關卡是否設定「抵達前就顯示題目」
     if (st.question) {
       h.push('<div class="question">' + (st.status === 'open' ? '<div class="q-label">📝 題目（抵達地點後才能作答）</div>' : '') + Q.linkify(st.question) + '</div>');
+    }
+    // 已完成／未通過的關卡：線索與題目收合起來，面板只留結果，比較精簡
+    if (st.status === 'solved' || st.status === 'failed') {
+      var chunk = h.splice(contentStart).join('');
+      if (chunk) h.push('<details class="stage-more"><summary>📄 查看關卡內容</summary><div class="stack" style="margin-top:10px">' + chunk + '</div></details>');
     }
     // 關卡完成（或結束）後，提示就不再顯示
     if (st.hints && st.hints.length && st.status !== 'solved' && st.status !== 'failed') {
@@ -637,12 +868,15 @@
       });
     }
 
+    // 最後一關（答案由碎片組成）：顯示碎片列
+    if (st.uses_fragments && st.status !== 'solved' && st.status !== 'failed') h.push(fragStripHtml(st));
+
     // 4) 前往中：指南針／通關碼；打卡按鈕固定在底部
     if (st.status === 'open') {
       if (st.lat != null && st.require_gps) h.push(compassHtml(st)); // 不需要 GPS 的關卡不顯示方向與距離
       if (playing) {
         // 需要 GPS 打卡、又要輸入文字／數字答案：到了現場可以直接填答案，一次完成「定位＋送答案」
-        var combo = st.require_gps && st.question && (st.answer_type === 'text' || st.answer_type === 'number');
+        var combo = st.require_gps && st.question && !st.require_photo && !st.uses_fragments && (st.answer_type === 'text' || st.answer_type === 'number');
         if (combo) h.push(answerUI(st).body);
         if (st.require_gps) acts.push('<button class="big" id="s-arrive">' + (combo ? '📍 我到了，定位打卡' : '📍 我到了，定位打卡') + '</button>');
         if (st.has_bypass) {
@@ -681,8 +915,47 @@
     body.scrollTop = same ? keep : 0;
     P.renderedId = st.stage_id;
     Object.keys(saved).forEach(function (id) { var el = document.getElementById(id); if (el && saved[id]) el.value = saved[id]; });
+    ['s-ans', 's-caption', 's-code'].forEach(function (id) {   // 沒有現成內容就用暫存的草稿（斷線、重新整理後還在）
+      var el = document.getElementById(id);
+      if (el && !el.value) { try { var d = localStorage.getItem(draftKey(st.stage_id, id)); if (d) el.value = d; } catch (e) { /* */ } }
+    });
     if (same && saved[focusId] !== undefined) { var fe = document.getElementById(focusId); if (fe) { try { fe.focus({ preventScroll: true }); } catch (e) { /* */ } } }
     bindStage(st);
+  }
+
+  /** 照片挑選區：可以直接拍照，也可以從相簿選（相簿不會強制開相機） */
+  function photoPickerHtml(withCaption) {
+    return '<div class="photo-picker">' +
+      '<div class="row"><label class="btn ghost grow" for="s-file-cam">📷 拍照</label><label class="btn ghost grow" for="s-file">🖼 從相簿選擇</label></div>' +
+      '<input type="file" id="s-file-cam" accept="image/*" capture="environment" class="hidden">' +
+      '<input type="file" id="s-file" accept="image/*" class="hidden">' +
+      (P.photo ? '<div class="photo-wrap"><img class="photo-preview" src="' + P.photo + '" alt="已選的照片"><button type="button" class="sm ghost" id="s-photo-clear">移除照片</button></div>'
+        : '<div class="help">還沒有選擇照片</div>') +
+      (withCaption ? '<input id="s-caption" placeholder="照片說明（選填）" maxlength="200">' : '') + '</div>';
+  }
+
+  /** 還要等幾秒才能再作答（猜題冷卻） */
+  function waitLeft(st) {
+    var t = P.locks && P.locks[st.stage_id];
+    return t ? Math.max(0, Math.ceil((t - Date.now()) / 1000)) : 0;
+  }
+
+  /** 送出答案按鈕：缺碎片或冷卻中時停用並說明原因 */
+  function submitBtn(st) {
+    var miss = st.uses_fragments ? (st.fragments_missing || 0) : 0, w = waitLeft(st);
+    if (miss > 0) return '<button class="big" id="s-submit" disabled>還差 ' + miss + ' 個碎片</button>';
+    if (w > 0) return '<button class="big" id="s-submit" disabled>答錯太多次，請等 <span id="wait-n">' + w + '</span> 秒</button>';
+    return '<button class="big" id="s-submit">送出答案</button>';
+  }
+
+  /** 每秒更新冷卻倒數，時間到就重畫讓按鈕恢復 */
+  function updateLock() {
+    if (!P.openId) return;
+    var st = findStage(P.openId), el = document.getElementById('wait-n');
+    if (!st || !el) return;
+    var w = waitLeft(st);
+    if (w <= 0) { renderStage(); return; }
+    el.textContent = w;
   }
 
   /** 回傳 { body: 作答區 HTML, btn: 固定在底部的主按鈕 HTML } */
@@ -691,24 +964,24 @@
     switch (st.answer_type) {
       case 'text':
       case 'number':
+        if (st.uses_fragments && (st.fragments_missing || 0) > 0) return { body: '', btn: submitBtn(st) };
         return {
           body: '<div class="card"><label for="s-ans">你的答案</label>' +
-            '<input id="s-ans" ' + (st.answer_type === 'number' ? 'inputmode="decimal"' : '') + ' autocomplete="off" placeholder="輸入答案">' + left + '</div>',
-          btn: '<button class="big" id="s-submit">送出答案</button>'
+            '<input id="s-ans" ' + (st.answer_type === 'number' ? 'inputmode="decimal"' : '') + ' autocomplete="off" placeholder="輸入答案">' + left + '</div>' +
+            (st.require_photo ? '<div class="card"><label>附上照片（必填）</label>' + photoPickerHtml(false) + '</div>' : ''),
+          btn: submitBtn(st)
         };
       case 'choice':
         return {
           body: '<div class="card"><div class="choice-list">' + (st.choices || []).map(function (c, i) {
             return '<button data-choice="' + i + '" class="' + (P.choice === c ? 'sel' : '') + '">' + String.fromCharCode(65 + i) + '. ' + esc(c) + '</button>';
-          }).join('') + '</div>' + left + '</div>',
-          btn: '<button class="big" id="s-submit">送出答案</button>'
+          }).join('') + '</div>' + left + '</div>' +
+            (st.require_photo ? '<div class="card"><label>附上照片（必填）</label>' + photoPickerHtml(false) + '</div>' : ''),
+          btn: submitBtn(st)
         };
       case 'photo':
         return {
-          body: '<div class="card stack"><label class="btn ghost" style="width:100%;padding:14px" for="s-file">📷 拍照或選擇照片</label>' +
-            '<input type="file" id="s-file" accept="image/*" capture="environment" class="hidden">' +
-            (P.photo ? '<img class="photo-preview" src="' + P.photo + '">' : '') +
-            '<input id="s-caption" placeholder="照片說明（選填）" maxlength="200"></div>',
+          body: '<div class="card"><label>上傳照片</label>' + photoPickerHtml(true) + '</div>',
           btn: '<button class="big" id="s-upload" ' + (P.photo ? '' : 'disabled') + '>上傳照片</button>'
         };
       case 'form':
@@ -731,6 +1004,19 @@
       d.querySelector('summary').addEventListener('click', function () { P.hintOpen[d.dataset.hk] = !d.open; });
     });
     on('btn-compass', function () { startCompass(true, true); });
+    Q.$$('[data-frag]').forEach(function (b) {
+      b.onclick = function () {
+        var el = document.getElementById('s-ans');
+        if (!el) return Q.toast('抵達關卡後才能輸入答案', 'warn');
+        el.value += b.dataset.frag; el.dispatchEvent(new Event('input'));
+      };
+    });
+    on('s-frag-all', function () {
+      var el = document.getElementById('s-ans');
+      if (!el) return Q.toast('抵達關卡後才能輸入答案', 'warn');
+      el.value = ((P.state.fragments || []).map(function (f) { return f.code; })).join('');
+    });
+    on('s-frag-clear', function () { var el = document.getElementById('s-ans'); if (el) { el.value = ''; el.focus(); } });
     updateCompass();
     var arriveBtn = document.getElementById('s-arrive'), ansEl = document.getElementById('s-ans');
     var arriveLabel = function () { return ansEl && st.status === 'open' && ansEl.value.trim() ? '📍 定位打卡並送出答案' : '📍 我到了，定位打卡'; };
@@ -757,19 +1043,25 @@
     on('s-submit', function () {
       var ans = st.answer_type === 'choice' ? P.choice : ($('#s-ans') && $('#s-ans').value.trim());
       if (!ans) return Q.toast(st.answer_type === 'choice' ? '請選擇一個答案' : '請輸入答案', 'warn');
-      act('submitAnswer', { stageId: st.stage_id, answer: ans });
+      if (st.require_photo && !P.photo) return Q.toast('這一關要附上一張照片才能送出', 'warn');
+      act('submitAnswer', st.require_photo ? { stageId: st.stage_id, answer: ans, dataUrl: P.photo } : { stageId: st.stage_id, answer: ans })
+        .then(function (r) { if (r && r.correct) P.photo = null; });
     });
     Q.$$('[data-choice]').forEach(function (b) {
       b.onclick = function () { P.choice = st.choices[+b.dataset.choice]; renderStage(); };
     });
     var input = $('#s-ans');
     if (input) input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { var go = $('#s-submit') || $('#s-arrive'); if (go) go.click(); } });
-    var file = $('#s-file');
-    if (file) file.onchange = async function () {
-      if (!file.files[0]) return;
-      try { P.photo = await Q.run(function () { return compressImage(file.files[0]); }); renderStage(); }
-      catch (e) { /* */ }
-    };
+    ['s-file', 's-file-cam'].forEach(function (id) {
+      var file = document.getElementById(id);
+      if (!file) return;
+      file.onchange = async function () {
+        if (!file.files[0]) return;
+        try { P.photo = await Q.run(function () { return compressImage(file.files[0]); }); renderStage(); }
+        catch (e) { /* */ }
+      };
+    });
+    on('s-photo-clear', function () { P.photo = null; renderStage(); });
     on('s-upload', function () {
       if (!P.photo) return;
       act('uploadPhoto', { stageId: st.stage_id, dataUrl: P.photo, caption: ($('#s-caption') || {}).value || '' })
@@ -806,9 +1098,15 @@
         P.hintOpen = P.hintOpen || {};
         r.state.stages.forEach(function (x) { if (x.stage_id === payload.stageId && x.hints && x.hints.length) P.hintOpen[x.stage_id + ':' + (x.hints.length - 1)] = true; });
       }
+      var beforeBadges = ((P.state && P.state.badges) || []).map(function (x) { return x.id; });
       applyState(r.state);
+      (r.state.badges || []).filter(function (x) { return beforeBadges.indexOf(x.id) < 0; }).forEach(function (bd, i) {
+        setTimeout(function () { Q.toast('🏅 獲得徽章：' + bd.icon + ' ' + bd.name + '（' + bd.desc + '）', 'ok', 5500); }, 900 + i * 1400);
+      });
       var solved = r.state.stages.filter(function (x) { return x.status === 'solved' && before[x.stage_id] && before[x.stage_id] !== 'solved'; })[0];
       var type = (r.correct === false || r.arrived === false) ? 'warn' : 'ok';
+      if (action === 'arrive' && r.arrived !== false && type !== 'warn') arriveFlash();
+      if (r.correct && payload && payload.stageId) clearDrafts(payload.stageId);
       if (solved) sfx('win');
       else if (type === 'warn') sfx('bad');
       else if (action === 'arrive') sfx('arrive');
@@ -939,6 +1237,30 @@
     $('#solved-title').textContent = '第 ' + no + ' 關完成！';
     $('#solved-msg').innerHTML = st.success_message ? Q.linkify(st.success_message) : '';
     countUp($('#solved-points'), st.earned || 0);
+    var ib = $('#solved-item'), colAll = P.state.collection || [], colGot = colAll.filter(function (x) { return x.got; }).length;
+    if (st.cards_new && st.cards_new.length) {
+      var dn = colAll.length ? colAll.length : 0;
+      ib.innerHTML = '<div class="item-reward-title">🎴 獲得卡牌！</div><div class="pack-open">' + st.cards_new.map(function (cd, ci) {
+        return '<div class="flipper" data-fi="' + ci + '"><div class="face back">' + Q.cardBackHtml((P.state.project || {}).deck_title, deckOpts()) + '</div>' +
+          '<div class="face front">' + Q.cardHtml(cd, deckOpts({ big: true, tilt: true })) + '</div></div>';
+      }).join('') + '</div><div class="help">已收進圖鑑　' + colGot + ' / ' + dn + '（點🎒可以看全部）</div>' +
+        (dn && colGot === dn ? '<div class="collect-done">🎊 圖鑑全收集完成！' + (P.state.project.collect_message ? '<br>' + esc(P.state.project.collect_message) : '') + '</div>' : '');
+      ib.classList.remove('hidden');
+      Q.bindTilt(ib);
+      Q.$$('#solved-item .flipper').forEach(function (fl, i) { setTimeout(function () { fl.classList.add('open'); }, 700 + i * 450); });
+    } else if (st.item) {
+      ib.innerHTML = '<div class="item-reward-title">✨ 獲得收藏品</div><div class="item-big rar-' + esc(st.item.rarity) + '"><span class="item-icon">' + iconHtml(st.item.icon) + '</span></div>' +
+        '<div class="item-reward-name">' + esc(st.item.name) + ' <span class="chip">' + RARITY_TXT[st.item.rarity] + '</span></div>' +
+        (st.item.story ? '<div class="small">' + esc(st.item.story) + '</div>' : '') +
+        '<div class="help">已收進收藏冊　' + colGot + ' / ' + colAll.length + '</div>' +
+        (colAll.length && colGot === colAll.length ? '<div class="collect-done">🎊 全收集完成！' + (P.project && P.project.collect_message ? '<br>' + esc(P.project.collect_message) : (P.state.project.collect_message ? '<br>' + esc(P.state.project.collect_message) : '')) + '</div>' : '');
+      ib.classList.remove('hidden');
+    } else { ib.classList.add('hidden'); ib.innerHTML = ''; }
+    var rw = $('#solved-reward'), fr = (P.state.fragments || []).filter(function (f) { return f.stage_id === st.stage_id; })[0];
+    if (st.reward_code && fr) {
+      rw.innerHTML = '<div class="frag-reward-title">🎉 獲得密碼碎片</div><div class="frag-reward-code"><small>第 ' + fr.order + ' 碼</small><b>' + esc(st.reward_code) + '</b></div><div class="help">已收進 🎒 線索背包</div>';
+      rw.classList.remove('hidden');
+    } else { rw.classList.add('hidden'); rw.innerHTML = ''; }
     var nb = $('#solved-next');
     nb.classList.toggle('hidden', !next);
     if (next) nb.textContent = '前往第 ' + (stages.indexOf(next) + 1) + ' 關：' + next.title;
@@ -1009,6 +1331,9 @@
     else if (n === 'solved') hideSolved();
     else if (n === 'fs') setFullscreen(false);
     else if (n === 'confirm' && P.cfDone) P.cfDone(false);
+    else if (n === 'board') closeBoard();
+    else if (n === 'pack') closePack();
+    else if (n === 'cardview') closeCardView();
   }
   window.addEventListener('popstate', function () {
     if (P.skipPop) { P.skipPop = false; return; }
@@ -1060,13 +1385,129 @@
     $('#retry-x').onclick = function () { bar.classList.add('hidden'); };
   }
 
+  /* ---------- 線索背包（密碼碎片） ---------- */
+  function fragRowsHtml(frs) {
+    return frs.map(function (f) {
+      return '<div class="pack-row' + (f.got ? ' got' : '') + '"><div class="pack-no">第 ' + f.order + ' 碼</div>' +
+        '<div class="pack-code">' + (f.got ? esc(f.code) : '❓') + '</div>' +
+        '<div class="pack-from">' + (f.got ? '✅ ' : '') + '第 ' + f.stage_no + ' 關・' + esc(f.stage_title) + '</div></div>';
+    }).join('');
+  }
+  function itemCellHtml(it, i) {
+    return '<button type="button" class="item-cell rar-' + esc(it.rarity) + (it.got ? ' got' : ' locked') + '" data-ci="' + i + '">' +
+      '<span class="item-icon">' + iconHtml(it.icon) + '</span>' +
+      '<span class="item-name">' + (it.got ? esc(it.name) : '？？？') + '</span>' +
+      '<small>第 ' + it.stage_no + ' 關</small></button>';
+  }
+
+  function renderPack() {
+    P.newNow = P.packOpen ? (P.newNow || newOwned()) : [];
+    var s = P.state, col = s.collection || [], frs = s.fragments || [], bds = s.badges || [], h = [];
+    var colGot = col.filter(function (x) { return x.got; }).length, gotN = frs.filter(function (f) { return f.got; }).length;
+    var isDeck = col.length && col[0].kind === 'card';
+    if (isDeck) {
+      var pj = s.project || {};
+      h.push('<h3 class="pack-h">🃏 ' + esc(pj.deck_title || '圖鑑') + '　' + colGot + ' / ' + col.length + (colGot === col.length ? ' 🎊 全收集！' : '') + '</h3>');
+      h.push('<div class="progress" style="margin:-2px 0 10px"><i style="width:' + Math.round(colGot / col.length * 100) + '%"></i></div>');
+      h.push('<div class="deck-grid">' + col.map(function (it, i) {
+        var isNew = (P.newNow || []).indexOf('c:' + it.id) >= 0;
+        return '<button type="button" class="deck-cell' + (isNew ? ' is-new' : '') + '" data-ci="' + i + '">' + Q.cardHtml(it.card, deckOpts({ mini: true })) + '</button>';
+      }).join('') + '</div>');
+    } else if (col.length) {
+      h.push('<h3 class="pack-h">📖 收藏冊　' + colGot + ' / ' + col.length + (colGot === col.length ? ' 🎊 全收集！' : '') + '</h3>');
+      h.push('<div class="item-grid">' + col.map(itemCellHtml).join('') + '</div>');
+    }
+    if (bds.length) {
+      h.push('<h3 class="pack-h">🏅 成就徽章' + (s.title ? '　<small>稱號：' + esc(s.title) + '</small>' : '') + '</h3>');
+      h.push('<div class="badge-list">' + bds.map(function (b) { return '<div class="badge-row"><span class="badge-ic">' + esc(b.icon) + '</span><div><b>' + esc(b.name) + '</b><small>' + esc(b.desc) + '</small></div></div>'; }).join('') + '</div>');
+    }
+    if (frs.length) {
+      h.push('<h3 class="pack-h">🧩 密碼碎片　' + gotN + ' / ' + frs.length + '</h3>');
+      h.push('<div class="pack-rows">' + fragRowsHtml(frs) + '</div>');
+      h.push('<div class="help">最後一關要把所有碎片「依第 1 碼 → 第 ' + frs.length + ' 碼」的順序組成密碼。</div>');
+    }
+    $('#pack-rows').innerHTML = h.join('') || '<div class="lb-empty">還沒有收集到任何東西</div>';
+    $('#pack-note').textContent = '';
+    Q.$$('#pack-rows [data-ci]').forEach(function (b) {
+      b.onclick = function () {
+        var it = col[+b.dataset.ci];
+        if (isDeck) return it.got ? openCardView(it.card) : Q.toast('這張卡還沒收集到，繼續挑戰關卡吧！', 'warn');
+        if (!it.got) return Q.toast('通過第 ' + it.stage_no + ' 關「' + it.stage_title + '」就能獲得', 'warn');
+        askConfirm((it.icon && !/^(https?:|data:)/i.test(it.icon) ? it.icon + ' ' : '') + it.name + '（' + RARITY_TXT[it.rarity] + '）', it.story || '收藏成功！', '關閉', true);
+      };
+    });
+  }
+  function openPack() {
+    P.packOpen = true;
+    P.newNow = newOwned();
+    renderPack();
+    markSeen();
+    $('#pack').classList.remove('hidden');
+    layerOpen('pack');
+  }
+  function closePack() {
+    P.packOpen = false;
+    P.newNow = [];
+    $('#pack').classList.add('hidden');
+    layerClose('pack');
+  }
+
+  /** 最後一關：把碎片排在答案欄上方（點一下碎片帶入答案欄） */
+  function fragStripHtml(st) {
+    var frs = (P.state && P.state.fragments) || [];
+    var miss = st.fragments_missing || 0;
+    var chip = function (f) {
+      return f.got ? '<button type="button" class="frag-chip got" data-frag="' + esc(f.code) + '"><small>第 ' + f.order + ' 碼</small><b>' + esc(f.code) + '</b></button>'
+        : '<div class="frag-chip"><small>第 ' + f.order + ' 碼</small><b>❓</b><em>第 ' + f.stage_no + ' 關</em></div>';
+    };
+    // 合作任務：每條路線各一段，別條路線的碼要和其他隊伍交換
+    if (st.coop && (st.coop_parts || []).length > 1) {
+      return '<div class="card frag-card"><label>🤝 合作任務：和其他路線的隊伍一起解開</label>' +
+        '<div class="help" style="margin:0 0 6px">每條路線的隊伍只拿得到自己那一段密碼。請找到走其他路線的隊伍，交換你們的碼，再依下面的路線順序組合起來。</div>' +
+        st.coop_parts.map(function (part) {
+          return '<div class="coop-part"><span class="chip" style="background:' + esc(part.color || '#e6e3dc') + ';color:' + (part.color ? '#fff' : 'inherit') + '">' + esc(part.route_name) + (part.own ? '（你們）' : '') + '</span>' +
+            '<div class="frag-strip">' + (part.own ? frs.map(chip).join('') : new Array(part.count + 1).join('<div class="frag-chip"><b>❓</b><em>向對方問</em></div>')) + '</div></div>';
+        }).join('') +
+        (miss > 0 ? '<div class="help" style="color:var(--red)">你們自己還差 ' + miss + ' 個碎片，請先完成其他關卡。</div>'
+          : '<div class="row" style="margin-top:8px"><button type="button" class="sm ghost" id="s-frag-clear">清除答案欄</button></div><div class="help">點自己的碎片可以加進答案欄，其他路線的碼請自己輸入。</div>') + '</div>';
+    }
+    if (!frs.length) return '';
+    return '<div class="card frag-card"><label>🎒 你的密碼碎片（依順序組成最終密碼）</label><div class="frag-strip">' +
+      frs.map(chip).join('') + '</div>' +
+      (miss > 0 ? '<div class="help" style="color:var(--red)">還差 ' + miss + ' 個碎片，請先完成其他關卡。</div>'
+        : '<div class="row" style="margin-top:8px"><button type="button" class="sm ghost" id="s-frag-all">依順序帶入</button><button type="button" class="sm ghost" id="s-frag-clear">清除</button></div>' +
+          '<div class="help">點碎片可以加進答案欄，也可以自己輸入。</div>') + '</div>';
+  }
+
+  /* ---------- 即時排行榜（闖關中） ---------- */
+  async function openBoard() {
+    $('#board').classList.remove('hidden');
+    layerOpen('board');
+    var load = async function () {
+      try {
+        var r = await api('leaderboard', { projectId: P.projectId, runCode: P.state.session.run_code, board: true });
+        $('#board-rows').innerHTML = Q.boardHtml(r.leaderboard, { me: P.state.session.team_name, now: r.server_time });
+        $('#board-note').textContent = '每 15 秒自動更新・更新於 ' + Q.fmtTime(new Date());
+      } catch (e) { $('#board-note').textContent = e.message; }
+    };
+    await load();
+    clearInterval(P.boardTimer);
+    P.boardTimer = setInterval(load, 15000);
+  }
+  function closeBoard() {
+    clearInterval(P.boardTimer);
+    $('#board').classList.add('hidden');
+    layerClose('board');
+  }
+
   /** 頁面內的確認視窗，回傳 Promise<boolean>；返回鍵／Esc 等於取消 */
-  function askConfirm(title, msg, okText) {
+  function askConfirm(title, msg, okText, noCancel) {
     return new Promise(function (resolve) {
       var box = $('#confirm'), ok = $('#cf-ok'), cancel = $('#cf-cancel');
       $('#cf-title').textContent = title;
       $('#cf-msg').textContent = msg;
       ok.textContent = okText || '確定';
+      cancel.classList.toggle('hidden', !!noCancel);
       box.classList.remove('hidden');
       function done(v) {
         if (!P.cfDone) return;
@@ -1091,17 +1532,37 @@
     $('#fin-solved').textContent = s.summary.solved + '/' + s.summary.total;
     $('#fin-time').textContent = se.finished_at ? Q.fmtDuration((new Date(se.finished_at) - new Date(se.started_at)) / 1000) : '—';
     $('#fin-message').innerHTML = Q.linkify(s.finish_message || '恭喜完成所有關卡！');
+    var fb = s.badges || [], fcol = s.collection || [];
+    $('#fin-badges-card').classList.toggle('hidden', !fb.length && !fcol.length);
+    $('#fin-title').textContent = s.title ? (se.avatar ? se.avatar + ' ' : '') + '稱號：' + s.title : '';
+    $('#fin-badges').innerHTML = fb.map(function (b) { return '<div class="badge-row"><span class="badge-ic">' + esc(b.icon) + '</span><div><b>' + esc(b.name) + '</b><small>' + esc(b.desc) + '</small></div></div>'; }).join('');
+    $('#fin-collection').innerHTML = fcol.map(function (it) {
+      if (it.kind === 'card') return '<div class="deck-cell">' + Q.cardHtml(it.card, deckOpts({ mini: true })) + '</div>';
+      return '<div class="item-cell rar-' + esc(it.rarity) + (it.got ? ' got' : ' locked') + '"><span class="item-icon">' + iconHtml(it.icon) + '</span><span class="item-name">' + (it.got ? esc(it.name) : '？？？') + '</span></div>';
+    }).join('');
     show('v-finish');
     if (!s.project.show_leaderboard) return;
-    try {
-      var r = await api('leaderboard', { projectId: P.projectId, runCode: se.run_code });
-      $('#fin-board-card').classList.remove('hidden');
-      $('#fin-board').innerHTML = '<div class="table-wrap"><table><thead><tr><th>#</th><th>隊伍</th><th>分數</th><th>完成</th><th>時間</th></tr></thead><tbody>' +
-        r.leaderboard.map(function (x, i) {
-          var me = x.team_name === se.team_name ? ' style="background:#eaf4ee;font-weight:700"' : '';
-          return '<tr' + me + '><td>' + (i + 1) + '</td><td>' + esc(x.team_name) + '</td><td>' + x.score + '</td><td>' + x.solved + '/' + x.total +
-            '</td><td>' + (x.duration_sec != null ? Q.fmtDuration(x.duration_sec) : '進行中') + '</td></tr>';
-        }).join('') + '</tbody></table></div>';
-    } catch (e) { /* 排行榜失敗不影響 */ }
+    var hasRoutes = !!(se.route && (s.project.routes || []).length > 1);
+    $('#fin-board-tabs').classList.toggle('hidden', !hasRoutes);
+    var scope = hasRoutes ? 'route' : 'all';
+    var load = async function () {
+      try {
+        var r = await api('leaderboard', { projectId: P.projectId, runCode: se.run_code, route: scope === 'route' ? se.route : '' });
+        $('#fin-board-card').classList.remove('hidden');
+        $('#tab-board-route').classList.toggle('ghost', scope !== 'route');
+        $('#tab-board-all').classList.toggle('ghost', scope !== 'all');
+        var showRoute = hasRoutes && scope === 'all';
+        $('#fin-board').innerHTML = '<div class="table-wrap"><table><thead><tr><th>#</th><th>隊伍</th><th>分數</th><th>完成</th><th>時間</th></tr></thead><tbody>' +
+          r.leaderboard.map(function (x, i) {
+            var me = x.team_name === se.team_name ? ' style="background:#eaf4ee;font-weight:700"' : '';
+            var rt = showRoute && x.route_name ? ' <span class="chip gray">' + esc(x.route_name) + '</span>' : '';
+            return '<tr' + me + '><td>' + (i + 1) + '</td><td>' + esc(x.team_name) + rt + '</td><td>' + x.score + '</td><td>' + x.solved + '/' + x.total +
+              '</td><td>' + (x.duration_sec != null ? Q.fmtDuration(x.duration_sec) : '進行中') + '</td></tr>';
+          }).join('') + '</tbody></table></div>';
+      } catch (e) { /* 排行榜失敗不影響 */ }
+    };
+    $('#tab-board-route').onclick = function () { scope = 'route'; load(); };
+    $('#tab-board-all').onclick = function () { scope = 'all'; load(); };
+    load();
   }
 })();

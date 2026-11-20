@@ -75,7 +75,7 @@ GitHub 公開的 repo 誰都看得到，所以：
 
 1. **選擇專案**：網址沒有 `?p=` 時，列出狀態為 `active` 的專案；只有一個時直接進入。
 2. **開場介紹**：顯示專案封面、介紹、關卡數、限時等資訊。
-3. **建立隊伍**：輸入隊伍名稱、成員（選填）、場次代碼（網址帶 `&run=` 時自動填入並隱藏）。
+3. **建立隊伍**：輸入隊伍名稱、場次代碼（網址帶 `&run=` 時自動填入並隱藏）。
 4. **關卡列表＋地圖**：顯示進度、分數、剩餘時間、自己的位置、已公開位置的關卡範圍圈，以及每關的方位與距離（例如「東北 230 公尺」）。
 5. **關卡面板**：
    - 抵達前：線索、圖片、指南針（即時距離、方位、指向目標的箭頭）、「我到了，定位打卡」、現場通關碼輸入框、提示按鈕。
@@ -159,7 +159,7 @@ GitHub 公開的 repo 誰都看得到，所以：
 | session_id | UUID，存在學生手機，等同這支隊伍的「鑰匙」 |
 | code | 6 碼隊伍代碼 |
 | project_id / run_code | 專案與場次 |
-| team_name / members | 隊名、成員 |
+| team_name | 隊名 |
 | status | `playing` 進行中／`finished` 完成／`timeup` 超時 |
 | score | 目前分數 |
 | started_at / last_active_at / finished_at | 時間 |
@@ -364,7 +364,7 @@ sequenceDiagram
 |---|---|---|
 | `listProjects` | — | `projects[]` |
 | `getProject` | `projectId` | `project` |
-| `startSession` | `projectId, teamName, members?, runCode?, userAgent?` | `state` |
+| `startSession` | `projectId, teamName, runCode?, userAgent?` | `state` |
 | `getSession` | `sessionId` | `state` |
 | `arrive` | `sessionId, stageId, lat, lng, accuracy` 或 `code` | `state, arrived, distance_m?, message` |
 | `submitAnswer` | `sessionId, stageId, answer` | `state, correct, message` |
@@ -480,3 +480,63 @@ gps-quest/
 ├── DESIGN.md           本文件
 └── README.md           部署步驟
 ```
+
+
+## 路線與隊伍名單（同一專案、不同隊伍走不同關卡）
+
+- Projects 新增欄位：`routes`（JSON：`[{id, name, color}]`，`id` 是系統隨機產生的 4–20 碼代碼）、`teams`（JSON：`[{name, route}]`）。
+- Stages 新增 `routes`：`"代碼|代碼:順序"`；空白＝所有路線共用；冒號後的數字是該路線內的順序。
+- Sessions／Submissions 新增 `route`。
+- 有 `teams`：玩家只能從名單選隊伍，路線由名單決定（網址上的 `route` 不採用）；同場次同隊伍名稱再次開始＝接續原進度。
+- 沒有 `teams` 但有 `routes`：用網址 `route`（專屬 QR Code）；沒帶就平均分配到人數最少的路線；代碼不存在回 `BAD_ROUTE`。
+- 前台 API 不回傳路線代碼：`getProject` 只回隊伍名單與路線名稱（`link_info`），闖關中的 `state.project.routes` 只含自己的路線。
+- 新增 API：`adminSetRoute`（`sessionId, route`）更換某隊路線；`leaderboard` 可帶 `route` 篩選，回傳 `route_name`。
+- 連結參數：`?p=專案&run=場次&team=隊伍名稱&route=路線代碼`。
+
+## 排行榜與各隊進度
+
+- 專案設定 `leaderboard_live`（即時排行榜）：開啟後，闖關頁頂部出現「🏆 排行榜」，並可用 `board.html?p=專案代碼[&run=場次]` 在大螢幕顯示（每 15 秒自動更新）。
+- `leaderboard` API：`board:true` 需要 `leaderboard_live`；一般（完成頁）需要 `show_leaderboard`。回傳每隊的分數、完成關數／總關數、狀態、已用時間、最近活動時間、路線名稱與顏色；不回傳路線代碼，也不透露目前關卡名稱或位置。
+
+## 密碼碎片（連動解謎）
+
+- Stages 新增：`reward_code`（過關給的碎片）、`reward_order`（在最終密碼裡排第幾碼）、`final_from_fragments`（最後一關：答案＝本路線所有碎片依 `reward_order` 接起來，忽略 `answer`）。
+- 只有「過關」的關卡給碎片；作答次數用完（未通過）不給。沒取得的碎片內容不會傳到前台，標準答案也不會傳到前台。
+- 最後一關沒集齊碎片 → `submitAnswer` 回 `NEED_FRAGMENTS`（不計作答次數）。
+- 多路線：碎片依該隊路線內的關卡計算，各路線各自組成自己的最終密碼。
+- `state.fragments`：`[{order, stage_id, stage_title, stage_no, got, code}]`；最後一關帶 `uses_fragments`、`fragments_missing`。
+- `adminResetFailed`（`sessionId`）：把這隊未通過的關卡還原成可重新挑戰，補救缺碎片而卡關的隊伍。
+
+## 防亂猜與排行榜開放時間
+
+- 專案設定 `wrong_lock_after`（連續答錯幾次後暫停，預設 3，0＝不限制）與 `wrong_lock_sec`（暫停秒數，預設 30，每鎖定一次加倍，最久 600 秒）。答案與「現場通關碼」都適用；冷卻中連正確答案也不能送，且不計作答次數。`publicStage_` 帶 `wait_sec`，前台顯示倒數。
+- 排行榜（即時／完成頁）只在專案的 `start_at`～`end_at` 期間回傳資料；未開始回 `NOT_OPEN`、已結束回 `CLOSED`；沒設定時間＝不限制。
+- 最後一關（`final_from_fragments`）沒集齊碎片時，後端不接受作答，前台連答案欄都不顯示。
+
+## 收藏冊、隊伍造型、成就徽章、合作任務
+
+- Stages 新增：`item_name`、`item_icon`（emoji 或圖片網址）、`item_rarity`（normal／rare／legend）、`item_story`；`coop_final`（合作最後關）。Projects 新增 `collect_message`；Sessions 新增 `avatar`；隊伍名單 `teams[].avatar`（可指定造型）。
+- 收藏冊：過關才算收集。`state.collection`：沒收集到的只回傳圖示（前台顯示剪影），名稱與故事不外洩；過關當下 `stages[].item` 帶完整收藏品資料。
+- 隨行夥伴（前台）：每收集一個收藏品，地圖上自己的造型標記後方多一個夥伴，排在移動方向的反側。
+- 隊伍造型：玩家建立隊伍時從 16 個 emoji 選一個（名單指定的優先、不可改）；顯示在地圖、頂部列、排行榜、後台紀錄。
+- 成就徽章與稱號：由進度即時算出，不另外儲存（初試啼聲、一擊必中、不靠提示、越挫越勇、收藏家、全收集、合作達人、完賽、閃電隊）；稱號依徽章數量：0–1 新手、2–3 熟練、4–5 傳奇、6 以上探險大師。`state.badges`、`state.title`；排行榜每列也帶造型、稱號與徽章。
+- 合作任務：`coop_final` 的答案＝專案內每條路線各自的碎片字串，依路線順序接起來。前台只告知每條路線有幾個碎片，不給別條路線的內容；玩家必須和其他路線的隊伍交換密碼。自己的碎片沒集齊時不能作答。專案少於 2 條路線時，當作一般最後一關。
+
+## 圖鑑本（卡牌製作）
+
+- 圖鑑本是獨立資源（Decks 工作表：`deck_id, title, kind, style, cards`），專案用 `deck_id` 決定使用哪一本；可以做很多本，不同專案可用不同的本，或不使用。
+- `kind`：`nature`（荒野自然名角色：屬性、HP、攻擊、防禦、技能）、`place`（在地景點／代表物：人氣、歷史、美景）、`custom`。
+- `style`（卡面畫風）：`foil` 閃卡（稀有、傳說會閃光）、`classic` 古典標本、`watercolor` 水彩、`pixel` 像素。
+- 後台「圖鑑本」頁：貼上多筆名稱（換行、逗號、頓號分隔）就依名稱自動產生屬性、稀有度、數值、技能、故事（同名同結果，可重新隨機）；可逐張修改、換成 emoji 或上傳的圖、調整順序。
+- 關卡設定：`card_id`（固定給一張）、`card_random`（再隨機抽 N 張，依稀有度 70／25／5，不重複，不會抽到其他關卡固定給的卡）。過關時抽卡並記在隊伍進度，後台關卡列表會顯示「最多可給幾張，是否能全收集」。
+- 前台：`state.collection` 在有圖鑑時就是整本圖鑑；沒拿到的卡只給編號、屬性、稀有度與圖（剪影），名稱與數值不外洩。過關有開卡翻面動畫；🎒 內可看整本、點卡片放大傾斜看閃光。
+
+## 體驗調整：教學、試玩、活動前檢查
+
+- 新手教學：第一次進入闖關畫面顯示 2–5 張教學（依專案有沒有收藏／碎片／即時排行榜調整內容），可跳過，`localStorage` 記住。
+- 抵達打卡成功：全螢幕「📍 抵達！」動畫加震動；🎒 有新收集（卡牌、徽章、碎片）時顯示紅點，開啟後圖鑑中新卡標示 NEW；背包圖鑑上方有收集進度條。
+- 已完成／未通過的關卡面板只留結果，線索與題目收合。
+- 離線時頂部顯示「📴 離線中」；答案、說明、通關碼輸入會即時暫存到 `localStorage`（斷線、重新整理後還在，答對後清除）。
+- 大字模式（頂部 `Aa`）：整體文字放大 18%，設定會記住。
+- 試玩模式：後台專案卡片「🧪 試玩」開啟帶 `test=1&tt=<試玩金鑰>` 的連結（金鑰存在 Script Properties `TEST_TOKEN`，只有後台能取得）。試玩隊伍可進入「準備中」或不在開放時間的專案，**不計入排行榜、專案隊伍數、路線平均分配**；後台「闖關紀錄」標示 🧪，可一鍵清除試玩隊伍與其作答紀錄（`adminClearTests`）。
+- 活動前檢查（`adminCheckProject`）：回傳 error／warn／info 清單，包含缺座標、範圍太小、選擇題沒選項、缺答案、碎片順序重複、有碎片但作答次數有限、路線沒有關卡、圖鑑無法全收集、結束時間早於開放時間等，並可「前往」該項設定。
