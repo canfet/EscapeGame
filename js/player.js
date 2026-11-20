@@ -139,8 +139,15 @@
     if (sid) {
       try {
         var r = await Q.run(function () { return api('getSession', { sessionId: sid }); }, { noToast: true });
-        P.sid = sid;
-        return startGame(r.state);
+        var ss = r.state.session;
+        // 網址（專屬 QR Code）指定的隊伍／路線和這支手機上次的進度不同：以網址為準，不要偷偷接續舊隊伍
+        var otherTeam = P.urlTeam && P.urlTeam !== ss.team_name;
+        var otherRoute = !P.urlTeam && P.urlRoute && ss.route && P.urlRoute !== ss.route;
+        if (!otherTeam && !otherRoute) {
+          P.sid = sid;
+          return startGame(r.state);
+        }
+        P.prevTeam = ss.team_name;   // 舊進度仍保留在手機上，直到新隊伍開始才會被取代
       } catch (e) {
         if (e.code === 'SESSION_NOT_FOUND') { try { localStorage.removeItem(LS(pid)); } catch (x) { /* */ } }
         else return showError(e.message);

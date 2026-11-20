@@ -763,6 +763,12 @@ function ctx_(b, mutate) {
   var p = findProject_(s.project_id);
   if (!p) throw appError_('這個闖關專案已被移除', 'NOT_FOUND');
   var c = { s: s, p: p, stages: routeStages_(p, stages_(p.project_id), s.route), now: new Date() };
+  // 隊伍已「完賽」之後，後台又新增了還沒完成的關卡：重新開放闖關（否則新關卡無法作答）
+  if (s.status === 'finished' && c.stages.length) {
+    var sts0 = stageStatuses_(c);
+    var pending0 = c.stages.some(function (x) { return sts0[x.stage_id] !== 'solved' && sts0[x.stage_id] !== 'failed'; });
+    if (pending0) { s.status = 'playing'; s.finished_at = ''; }
+  }
   if (mutate) {
     checkPlayable_(p, bool_(s.test));
     if (s.status === 'finished') throw appError_('你們已經完成全部關卡囉！', 'FINISHED');
