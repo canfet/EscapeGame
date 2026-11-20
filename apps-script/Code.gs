@@ -261,7 +261,7 @@ function getHint_(b) {
     g.hints = used + 1;
     saveSession_(c);
     log_(c, st, 'hint', { input: String(g.hints), note: hints[used] });
-    return buildState_(c, { hint: hints[used], message: st.hint_penalty ? '已使用提示（本關扣 ' + st.hint_penalty + ' 分）' : '' });
+    return buildState_(c, { hint: hints[used], message: st.hint_penalty ? '已使用提示：這一關答對可得 ' + Math.max(0, st.points - g.hints * st.hint_penalty) + ' 分（每則提示少 ' + st.hint_penalty + ' 分）' : '' });
   });
 }
 

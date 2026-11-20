@@ -361,3 +361,8 @@ body.quest { background: #f3ead4; }
 
 /* 任務列表的卡片：直向滿版（進度表卡片是橫向小卡） */
 #project-list .stage-card { display: flex; align-items: center; gap: 12px; width: 100%; flex: none; }
+
+#s-hint { flex-direction: column; gap: 2px; line-height: 1.3; }
+.hint-cost { font-size: .8rem; font-weight: 500; color: var(--muted); }
+details.hint .hint-tag { margin-left: 8px; font-size: .78rem; font-weight: 500; color: var(--muted); }
+details.hint[open] .hint-tag { display: none; }

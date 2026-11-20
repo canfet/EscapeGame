@@ -588,8 +588,15 @@
     if (st.image_url) h.push('<div class="sheet-hero"><img class="hero-img" src="' + esc(st.image_url) + '" alt="" onerror="this.parentNode.remove()"></div>');
     var no = P.state.stages.indexOf(st) + 1;
     h.push('<div class="sheet-head"><div class="grow"><div class="sheet-sub">第 ' + no + ' 關</div><h2 class="sheet-title">' + esc(st.title) + '</h2></div><button class="close-x" id="s-close" aria-label="關閉">✕</button></div>');
+    var pen = st.hint_penalty || 0, used = (st.hints || []).length;
+    var avail = Math.max(0, st.points - used * pen);   // 目前這一關答對可得的分數
+    var ptsChip = st.status === 'solved' ? '<span class="chip green">本關得 ' + st.earned + ' 分</span>'
+      : st.status === 'failed' ? '<span class="chip gray">本關 ' + st.points + ' 分</span>'
+      : used * pen > 0 ? '<span class="chip amber">本關可得 ' + avail + ' 分（原 ' + st.points + ' 分）</span>'
+      : '<span class="chip">本關 ' + st.points + ' 分</span>';
     h.push('<div class="row wrap" style="margin-bottom:12px"><span class="chip ' + lab[1] + '">' + lab[0] + '</span>' +
-      '<span class="chip">' + Q.TYPE_LABEL[st.answer_type] + '</span><span class="chip">' + st.points + ' 分</span></div>');
+      '<span class="chip">' + Q.TYPE_LABEL[st.answer_type] + '</span>' + ptsChip +
+      '<span class="chip blue">⭐ 目前總分 ' + se.score + '</span></div>');
     h.push('<div class="sheet-content stack">');
 
     // 1) 線索 → 2) 題目 → 3) 提示（可收合）
@@ -602,8 +609,8 @@
     if (st.hints && st.hints.length && st.status !== 'solved' && st.status !== 'failed') {
       st.hints.forEach(function (t, i) {
         var key = st.stage_id + ':' + i;
-        var open = key in P.hintOpen ? P.hintOpen[key] : (i === st.hints.length - 1);
-        h.push('<details class="hint" data-hk="' + esc(key) + '"' + (open ? ' open' : '') + '><summary>💡 提示 ' + (i + 1) + '</summary><div class="hint-body">' + Q.linkify(t) + '</div></details>');
+        var open = key in P.hintOpen ? P.hintOpen[key] : false; // 重新打開關卡時，已解鎖的提示預設收合
+        h.push('<details class="hint" data-hk="' + esc(key) + '"' + (open ? ' open' : '') + '><summary>💡 提示 ' + (i + 1) + '<span class="hint-tag">已解鎖・點開查看</span></summary><div class="hint-body">' + Q.linkify(t) + '</div></details>');
       });
     }
 
@@ -634,8 +641,9 @@
 
     // 提示按鈕（次要）
     if (playing && (st.status === 'open' || st.status === 'arrived') && st.hints.length < st.hints_total) {
-      h.push('<button class="ghost big" id="s-hint">💡 看提示（' + (st.hints.length + 1) + '/' + st.hints_total + '）' +
-        (st.hint_penalty ? '・扣 ' + st.hint_penalty + ' 分' : '') + '</button>');
+      var nextAvail = Math.max(0, st.points - (used + 1) * pen);
+      h.push('<button class="ghost big" id="s-hint">💡 需要提示？（' + (used + 1) + '/' + st.hints_total + '）' +
+        (pen ? '<span class="hint-cost">本關可得 ' + avail + ' → ' + nextAvail + ' 分</span>' : '<span class="hint-cost">不扣分</span>') + '</button>');
     }
     if (!playing && st.status !== 'solved') h.push('<p class="muted center">' + (se.status === 'timeup' ? '闖關時間已到' : '闖關已結束') + '</p>');
     h.push('</div>');
@@ -705,7 +713,12 @@
       act('arrive', { stageId: st.stage_id, code: code });
     });
     on('s-hint', function () {
-      if (st.hint_penalty && !confirm('使用提示會扣 ' + st.hint_penalty + ' 分，確定嗎？')) return;
+      if (st.hint_penalty) {
+        var u = st.hints.length, a0 = Math.max(0, st.points - u * st.hint_penalty), a1 = Math.max(0, st.points - (u + 1) * st.hint_penalty);
+        var msg = '要看提示嗎？\n\n看了之後，這一關答對可得的分數會從 ' + a0 + ' 分降為 ' + a1 + ' 分（每則提示少 ' + st.hint_penalty + ' 分）。\n' +
+          '你們目前總分 ' + P.state.session.score + ' 分，不會馬上被扣，只會影響這一關的得分。';
+        if (!confirm(msg)) return;
+      }
       act('getHint', { stageId: st.stage_id });
     });
     on('s-submit', function () {
@@ -754,6 +767,10 @@
       var r = await Q.run(function () { return api(action, Object.assign({ sessionId: P.sid }, payload)); });
       var before = {};
       if (P.state) P.state.stages.forEach(function (x) { before[x.stage_id] = x.status; });
+      if (action === 'getHint') {   // 剛按下「需要提示」解鎖的那則，自動展開
+        P.hintOpen = P.hintOpen || {};
+        r.state.stages.forEach(function (x) { if (x.stage_id === payload.stageId && x.hints && x.hints.length) P.hintOpen[x.stage_id + ':' + (x.hints.length - 1)] = true; });
+      }
       applyState(r.state);
       var solved = r.state.stages.filter(function (x) { return x.status === 'solved' && before[x.stage_id] && before[x.stage_id] !== 'solved'; })[0];
       var type = (r.correct === false || r.arrived === false) ? 'warn' : 'ok';
