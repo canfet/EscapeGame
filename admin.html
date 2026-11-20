@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>實境解謎 · 管理後台</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261121e">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css?v=20261121h">
 </head>
 <body>
   <!-- 登入 -->
@@ -331,6 +331,17 @@
   </div>
 
   <!-- 分享連結 -->
+  <!-- 搜尋圖片（維基共享資源） -->
+  <div id="m-imgsearch" class="modal hidden" style="z-index:1600">
+    <div class="modal-body">
+      <div class="sheet-head"><h2>🔍 搜尋圖片</h2><button class="close-x" data-close>✕</button></div>
+      <div class="row" style="margin-bottom:6px"><input class="grow" id="is-q" placeholder="輸入名稱，例如：山羌（找不到可以改用英文或學名）"><button id="is-go">搜尋</button></div>
+      <div class="help">圖片來自「維基共享資源」，只收錄可以自由使用的授權（例如 CC BY、CC BY-SA、公有領域），使用時需要標示作者與授權；系統會自動記在這張卡上，並顯示在玩家的卡片檢視裡。名稱如果是人的自然名（例如天狼星、隨風），搜到的圖可能和角色無關，請自行挑選或改用自己的圖。</div>
+      <div id="is-status" class="small muted" style="margin:6px 0"></div>
+      <div id="is-grid" class="is-grid"></div>
+    </div>
+  </div>
+
   <!-- 活動前檢查 -->
   <div id="m-check" class="modal hidden">
     <div class="modal-body narrow">
@@ -370,6 +381,10 @@
               <button type="button" class="ghost" id="dk-load-default">📋 填入預設荒野自然名</button>
               <button type="button" class="ghost" id="dk-reroll-all">🎲 全部重新隨機屬性</button>
             </div>
+            <div class="row wrap" style="margin-top:6px">
+              <button type="button" class="ghost" id="dk-auto-img">🖼 自動找圖（還沒有圖的卡）</button>
+              <button type="button" class="ghost" id="dk-mirror">🗄 圖片存到雲端硬碟</button>
+            </div>
             <div class="help">系統會依名稱自動決定屬性、稀有度、數值、技能和故事（同一個名字每次產生的結果一樣）。產生後可以逐張修改，也可以上傳自己畫的圖。已經有的名稱不會重複產生。</div></div>
           <div class="section-title" id="dk-count">卡牌</div>
           <div id="dk-list" class="dk-list"></div>
@@ -386,7 +401,7 @@
               <div class="field"><label>屬性／分類</label><select id="dk-type"></select></div>
               <div class="field"><label>圖（emoji 或上傳圖片）</label>
                 <div class="row"><input class="grow" id="dk-art" maxlength="300" placeholder="🦌 或上傳">
-                  <button type="button" class="ghost sm" id="dk-art-pick">⬆</button><button type="button" class="ghost sm" id="dk-art-clear">✕</button></div>
+                  <button type="button" class="ghost sm" id="dk-art-search" title="用名稱搜尋圖片">🔍</button><button type="button" class="ghost sm" id="dk-art-pick">⬆</button><button type="button" class="ghost sm" id="dk-art-clear">✕</button></div>
                 <input type="file" accept="image/*" id="dk-art-file" class="hidden"><img id="dk-art-prev" class="img-prev hidden" alt="" style="max-height:60px"></div>
             </div>
             <div class="grid3">
@@ -394,6 +409,7 @@
               <div class="field"><label id="dk-l-atk">攻擊</label><input type="number" min="0" max="999" id="dk-atk"></div>
               <div class="field"><label id="dk-l-def">防禦</label><input type="number" min="0" max="999" id="dk-def"></div>
             </div>
+            <div class="help" id="dk-credit" style="margin:-6px 0 8px"></div>
             <div class="field"><label>技能名稱</label><input id="dk-skill_name" maxlength="16"></div>
             <div class="field"><label>技能說明</label><input id="dk-skill_desc" maxlength="80"></div>
             <div class="field"><label>小故事</label><textarea id="dk-story" maxlength="200" style="min-height:64px"></textarea></div>
@@ -446,10 +462,10 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="config.js?v=20261121e"></script>
-  <script src="js/common.js?v=20261121e"></script>
-  <script src="js/admin.js?v=20261121e"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/qrcode.min.js"></script>
+  <script src="config.js?v=20261121h"></script>
+  <script src="js/common.js?v=20261121h"></script>
+  <script src="js/admin.js?v=20261121h"></script>
 </body>
 </html>

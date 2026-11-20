@@ -42,11 +42,17 @@ var SCHEMA = {
 
 /* 要強制為「純文字」格式的欄位（避免 007 變成 7） */
 var TEXT_COLUMNS = {
-  Projects: ['project_id'],
-  Decks: ['deck_id'],
-  Stages: ['project_id', 'stage_id', 'bypass_code', 'answer', 'choices'],
-  Sessions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'avatar', 'route'],
-  Submissions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'stage_id', 'input']
+  Projects: ['project_id', 'name', 'description', 'intro', 'finish_message', 'cover_url', 'collect_message', 'deck_id', 'routes', 'teams'],
+  Decks: ['deck_id', 'title', 'cards'],
+  Stages: ['project_id', 'stage_id', 'title', 'clue', 'image_url', 'bypass_code', 'question', 'answer', 'choices', 'hint1', 'hint2', 'hint3',
+    'success_message', 'form_url', 'form_verify_sheet', 'reward_code', 'item_name', 'item_icon', 'item_story', 'card_id', 'routes'],
+  Sessions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'avatar', 'route', 'user_agent'],
+  Submissions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'stage_id', 'stage_title', 'input', 'result', 'note']
+};
+/* 要強制成「數字」格式的欄位（避免試算表把 1、2 當成日期或時間） */
+var NUMBER_COLUMNS = {
+  Projects: ['time_limit_min', 'gps_max_accuracy', 'wrong_lock_after', 'wrong_lock_sec'],
+  Stages: ['order', 'lat', 'lng', 'radius_m', 'points', 'max_attempts', 'hint_penalty', 'reward_order', 'card_random']
 };
 var BOOL_COLUMNS = {
   Projects: ['is_default', 'show_leaderboard', 'leaderboard_live', 'require_run_code'],
@@ -61,6 +67,7 @@ var ROUTES = {
   getProject: getProject_,
   startSession: startSession_,
   getSession: getSession_,
+  resumeSession: resumeSession_,
   arrive: arrive_,
   submitAnswer: submitAnswer_,
   getHint: getHint_,
@@ -84,6 +91,7 @@ var ROUTES = {
   adminSetRoute: admin_(adminSetRoute_),
   adminResetFailed: admin_(adminResetFailed_),
   adminSaveDeck: admin_(adminSaveDeck_),
+  adminImportImage: admin_(adminImportImage_),
   adminGetTestToken: admin_(adminGetTestToken_),
   adminClearTests: admin_(adminClearTests_),
   adminCheckProject: admin_(adminCheckProject_),
@@ -144,8 +152,8 @@ function startSession_(b) {
     var p = findProject_(b.projectId);
     var isTest = bool_(b.test) && isTestToken_(b.tt);   // 試玩：需要後台給的金鑰，不會計入排行榜與正式人數
     checkPlayable_(p, isTest);
-    var team = str_(b.teamName).slice(0, 30);
-    if (!team) throw appError_('請輸入隊伍名稱', 'BAD_INPUT');
+    var team = noFormula_(b.teamName).trim().slice(0, 30);
+    if (!team) throw appError_('請輸入隊伍名稱（不能以 = + - @ 開頭）', 'BAD_INPUT');
     var run = str_(b.runCode).slice(0, 30);
     if (p.require_run_code && !run) throw appError_('請輸入場次代碼（請向關主索取）', 'NEED_RUN_CODE');
     var now = new Date();
@@ -186,7 +194,7 @@ function startSession_(b) {
     var avatar = AVATARS.indexOf(avatarWant) >= 0 ? avatarWant : AVATARS[readRows_('Sessions').filter(function (r) { return str_(r.project_id) === p.project_id; }).length % AVATARS.length];
     var s = {
       session_id: Utilities.getUuid(),
-      code: genCode_(),
+      code: uniqueCode_(p.project_id),
       project_id: p.project_id,
       run_code: run,
       team_name: team,
@@ -199,7 +207,7 @@ function startSession_(b) {
       last_active_at: now,
       finished_at: '',
       progress_json: '{}',
-      user_agent: str_(b.userAgent).slice(0, 200)
+      user_agent: noFormula_(b.userAgent).slice(0, 200)
     };
     writeRow_('Sessions', null, s);
     var saved = loadSession_(s.session_id);
@@ -207,6 +215,18 @@ function startSession_(b) {
     log_(c, null, 'start', {});
     return buildState_(c);
   });
+}
+
+/** 用隊伍代碼接續進度：瀏覽器資料被清掉、換手機時用 */
+function resumeSession_(b) {
+  var p = findProject_(b.projectId);
+  if (!p) throw appError_('找不到這個闖關專案', 'NOT_FOUND');
+  var code = str_(b.code).toUpperCase().replace(/\s+/g, '');
+  var row = code ? find_(readRows_('Sessions'), function (r) {
+    return str_(r.project_id) === p.project_id && str_(r.code).toUpperCase() === code && (!bool_(r.test) || isTestToken_(b.tt));
+  }) : null;
+  if (!row) { Utilities.sleep(600); throw appError_('找不到這個隊伍代碼，請確認有沒有輸入正確', 'NO_CODE'); }
+  return buildState_(ctx_({ sessionId: str_(row.session_id) }, false));
 }
 
 function getSession_(b) {
@@ -397,6 +417,27 @@ function adminUploadImage_(b) {
   var parent = folder_(pid), it = parent.getFoldersByName('_images');
   var dir = it.hasNext() ? it.next() : parent.createFolder('_images');
   var file = dir.createFile(Utilities.newBlob(bytes, m[1], name));
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return { url: 'https://lh3.googleusercontent.com/d/' + file.getId(), file_id: file.getId() };
+}
+
+/**
+ * 後台：把網路上的圖片（只允許維基媒體 upload.wikimedia.org）下載後存到雲端硬碟，回傳雲端硬碟網址。
+ * 這樣活動當天不用依賴外部網站，也不會因為很多人同時看圖而被擋。
+ */
+function adminImportImage_(b) {
+  var url = str_(b.url);
+  if (!/^https:\/\/upload\.wikimedia\.org\/[A-Za-z0-9_\-.\/%()~,+:;@!'*]+$/.test(url)) throw appError_('只能匯入維基媒體（upload.wikimedia.org）的圖片', 'BAD_INPUT');
+  var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'GPS-Quest-Deck/1.0 (educational event tool)' } });
+  if (res.getResponseCode() !== 200) throw appError_('下載圖片失敗（' + res.getResponseCode() + '）', 'FETCH_FAILED');
+  var type = String(res.getHeaders()['Content-Type'] || res.getHeaders()['content-type'] || '');
+  if (!/^image\/(jpeg|png|webp|gif)/.test(type)) throw appError_('下載到的不是圖片', 'FETCH_FAILED');
+  var bytes = res.getContent();
+  if (bytes.length > 5 * 1024 * 1024) throw appError_('圖片太大（上限 5 MB）', 'TOO_LARGE');
+  var ext = type.split('/')[1].split(';')[0].replace('jpeg', 'jpg');
+  var parent = folder_('decks'), it = parent.getFoldersByName('_images');
+  var dir = it.hasNext() ? it.next() : parent.createFolder('_images');
+  var file = dir.createFile(Utilities.newBlob(bytes, type.split(';')[0], 'wm_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + rand_(4, 'abcdefghjkmnpqrstuvwxyz23456789') + '.' + ext));
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return { url: 'https://lh3.googleusercontent.com/d/' + file.getId(), file_id: file.getId() };
 }
@@ -695,7 +736,7 @@ function adminSessions_(b) {
 
 function adminSubmissions_(b) {
   var pid = str_(b.projectId), run = str_(b.runCode), limit = Math.min(num_(b.limit, 200), 1000);
-  var rows = readRows_('Submissions').filter(function (r) {
+  var rows = readTailRows_('Submissions', 3000).filter(function (r) {
     return str_(r.project_id) === pid && (!run || str_(r.run_code) === run);
   });
   return {
@@ -996,6 +1037,9 @@ function adminCheckProject_(b) {
 
 /* ===================== 卡牌圖鑑（自然名角色閃卡） ===================== */
 
+/** 碎片順序只接受 0–9999，其餘（例如被誤讀成日期的大數字）視為沒設定 */
+function saneOrder_(n) { return n !== null && isFinite(n) && n >= 0 && n <= 9999 ? n : null; }
+
 function clampStat_(v) { var n = Math.round(num_(v, 0)); return Math.max(0, Math.min(999, n)); }
 
 /** 專案的卡牌清單：[{id, name, type, rarity, art, hp, atk, def, skill_name, skill_desc, story}]，最多 80 張 */
@@ -1013,7 +1057,7 @@ function parseDeck_(s) {
       id: id, name: name,
       type: CARD_TYPES.indexOf(str_(x.type)) >= 0 ? str_(x.type) : 'forest',
       rarity: RARITIES.indexOf(str_(x.rarity)) >= 0 ? str_(x.rarity) : 'normal',
-      art: str_(x.art).slice(0, 300), hp: clampStat_(x.hp), atk: clampStat_(x.atk), def: clampStat_(x.def),
+      art: str_(x.art).slice(0, 300), art_credit: str_(x.art_credit).slice(0, 160), hp: clampStat_(x.hp), atk: clampStat_(x.atk), def: clampStat_(x.def),
       skill_name: str_(x.skill_name).slice(0, 16), skill_desc: str_(x.skill_desc).slice(0, 80), story: str_(x.story).slice(0, 200)
     });
   });
@@ -1021,7 +1065,7 @@ function parseDeck_(s) {
 }
 
 function cardFull_(d, number) {
-  return { id: d.id, number: number, name: d.name, type: d.type, rarity: d.rarity, art: d.art, hp: d.hp, atk: d.atk, def: d.def, skill_name: d.skill_name, skill_desc: d.skill_desc, story: d.story };
+  return { id: d.id, number: number, name: d.name, type: d.type, rarity: d.rarity, art: d.art, art_credit: d.art_credit || '', hp: d.hp, atk: d.atk, def: d.def, skill_name: d.skill_name, skill_desc: d.skill_desc, story: d.story };
 }
 
 /** 所有圖鑑本 */
@@ -1054,6 +1098,7 @@ function adminSaveDeck_(b) {
     var ex = id ? find_(rows, function (r) { return str_(r.deck_id) === id; }) : null;
     if (!ex) id = 'd' + rand_(5, 'abcdefghjkmnpqrstuvwxyz23456789');
     var deck = parseDeck_(b.cards);
+    if (JSON.stringify(deck).length > 45000) throw appError_('圖鑑資料太大（試算表一格最多 5 萬字）。請減少卡牌張數，或縮短技能說明、故事與圖片授權文字。', 'TOO_LARGE');
     var kind = DECK_KINDS.indexOf(str_(b.kind)) >= 0 ? str_(b.kind) : 'nature', style = DECK_STYLES.indexOf(str_(b.style)) >= 0 ? str_(b.style) : 'foil';
     writeRow_('Decks', ex ? ex._row : null, { deck_id: id, title: title, kind: kind, style: style, cards: deck.length ? JSON.stringify(deck) : '', updated_at: new Date() });
     bumpCache_();
@@ -1380,17 +1425,27 @@ function adminSetRoute_(b) {
 /* ===================== 資料讀取（含快取） ===================== */
 
 function projects_() {
-  return cached_('projects', function () {
-    var decks = {};
-    readRows_('Decks').forEach(function (r) { decks[str_(r.deck_id)] = r; });
-    return readRows_('Projects').map(cleanProject_).filter(function (p) { return p.project_id; }).map(function (p) {
-      var d = p.deck_id ? decks[p.deck_id] : null;   // 專案使用的那一本圖鑑
-      p.cards = d ? parseDeck_(d.cards) : [];
-      p.deck_title = d ? str_(d.title) : '';
-      p.deck_kind = d && DECK_KINDS.indexOf(str_(d.kind)) >= 0 ? str_(d.kind) : 'nature';
-      p.deck_style = d && DECK_STYLES.indexOf(str_(d.style)) >= 0 ? str_(d.style) : 'foil';
-      return p;
-    });
+  var list = cached_('projects', function () {
+    return readRows_('Projects').map(cleanProject_).filter(function (p) { return p.project_id; });
+  });
+  return list.map(function (p) {
+    var d = p.deck_id ? deckById_(p.deck_id) : null;   // 專案使用的那一本圖鑑（每本各自快取）
+    p.cards = d ? d.cards : [];
+    p.deck_title = d ? d.title : '';
+    p.deck_kind = d ? d.kind : 'nature';
+    p.deck_style = d ? d.style : 'foil';
+    return p;
+  });
+}
+
+function deckById_(id) {
+  return cached_('deck_' + id, function () {
+    var r = find_(readRows_('Decks'), function (x) { return str_(x.deck_id) === id; });
+    if (!r) return null;
+    return {
+      title: str_(r.title), cards: parseDeck_(r.cards),
+      kind: DECK_KINDS.indexOf(str_(r.kind)) >= 0 ? str_(r.kind) : 'nature', style: DECK_STYLES.indexOf(str_(r.style)) >= 0 ? str_(r.style) : 'foil'
+    };
   });
 }
 
@@ -1436,7 +1491,7 @@ function cleanStage_(r) {
     show_location: defBool_(r.show_location, true), require_gps: defBool_(r.require_gps, true),
     bypass_code: str_(r.bypass_code), question: str_(r.question),
     show_question_early: defBool_(r.show_question_early, true), require_photo: bool_(r.require_photo), routes: str_(r.routes),
-    reward_code: str_(r.reward_code).slice(0, 40), reward_order: num_(r.reward_order, null), final_from_fragments: bool_(r.final_from_fragments), coop_final: bool_(r.coop_final),
+    reward_code: str_(r.reward_code).slice(0, 40), reward_order: saneOrder_(num_(r.reward_order, null)), final_from_fragments: bool_(r.final_from_fragments), coop_final: bool_(r.coop_final),
     card_id: str_(r.card_id).slice(0, 12), card_random: Math.max(0, Math.min(5, num_(r.card_random, 0))),
     item_name: str_(r.item_name).slice(0, 30), item_icon: str_(r.item_icon).slice(0, 300),
     item_rarity: RARITIES.indexOf(str_(r.item_rarity).toLowerCase()) >= 0 ? str_(r.item_rarity).toLowerCase() : 'normal', item_story: str_(r.item_story).slice(0, 300),
@@ -1511,7 +1566,14 @@ function headers_(sh) {
 function ensureHeaders_(name) {
   var sh = sheet_(name), h = headers_(sh);
   var missing = SCHEMA[name].filter(function (k) { return h.indexOf(k) < 0; });
-  if (missing.length) sh.getRange(1, h.length + 1, 1, missing.length).setValues([missing]);
+  if (missing.length) {
+    sh.getRange(1, h.length + 1, 1, missing.length).setValues([missing]);
+    // 新加的數字欄位，立刻設成數字格式（否則可能繼承左邊「更新時間」欄的日期格式）
+    missing.forEach(function (k, i) {
+      var fmt = (NUMBER_COLUMNS[name] || []).indexOf(k) >= 0 ? '0.########' : ((TEXT_COLUMNS[name] || []).indexOf(k) >= 0 ? '@' : '');
+      if (fmt) sh.getRange(2, h.length + 1 + i, Math.max(sh.getMaxRows() - 1, 1), 1).setNumberFormat(fmt);
+    });
+  }
   return sh;
 }
 
@@ -1554,6 +1616,21 @@ function deleteRows_(name, pred) {
     i = j + 1;
   }
   return rows.length;
+}
+
+/** 只讀最後 n 列（含 _row），給很大的工作表（作答紀錄）用 */
+function readTailRows_(name, n) {
+  var sh = sheet_(name), lr = sh.getLastRow(), lc = sh.getLastColumn();
+  if (lr < 2) return [];
+  var h = sh.getRange(1, 1, 1, lc).getValues()[0].map(function (x) { return String(x).trim(); });
+  var start = Math.max(2, lr - n + 1), vals = sh.getRange(start, 1, lr - start + 1, lc).getValues(), out = [];
+  vals.forEach(function (r, i) {
+    if (r.every(function (v) { return v === '' || v === null; })) return;
+    var o = { _row: start + i };
+    h.forEach(function (k, j) { if (k) o[k] = r[j]; });
+    out.push(o);
+  });
+  return out;
 }
 
 function findRowByValue_(name, col, value) {
@@ -1617,13 +1694,27 @@ function norm_(s) {
     .replace(/[\s.,!?'"`~\-_:;()\[\]{}<>\/\\，。、！？「」『』（）《》〈〉：；…‧·]/g, '');
 }
 
+/** 玩家自己輸入的文字：去掉開頭的 = + - @（避免被試算表當成公式） */
+function noFormula_(s) { return String(s == null ? '' : s).replace(/^[=+\-@\t\r\n ]+/, ''); }
+
 function str_(v) {
   if (v === null || v === undefined) return '';
   if (v instanceof Date) return v.toISOString();
   return String(v).trim();
 }
 function isNum_(v) { return typeof v === 'number' && isFinite(v); }
-function num_(v, d) { if (v === '' || v === null || v === undefined) return d; var n = Number(v); return isFinite(n) ? n : d; }
+/** 試算表日期（Date）轉回它原本的「序列值」：1899-12-30 為 0，隔天為 1…（儲存格被誤設成日期格式時，數字會被讀成 Date） */
+function dateToSerial_(d) {
+  var tz = Session.getScriptTimeZone();
+  var ymd = Utilities.formatDate(d, tz, 'yyyy-MM-dd').split('-'), hms = Utilities.formatDate(d, tz, 'HH:mm:ss').split(':');
+  var days = (Date.UTC(+ymd[0], +ymd[1] - 1, +ymd[2]) - Date.UTC(1899, 11, 30)) / 86400000;
+  return days + (+hms[0] * 3600 + +hms[1] * 60 + +hms[2]) / 86400;
+}
+function num_(v, d) {
+  if (v === '' || v === null || v === undefined) return d;
+  if (v instanceof Date) { try { var s = dateToSerial_(v); return isFinite(s) ? Math.round(s * 1e6) / 1e6 : d; } catch (e) { return d; } }
+  var n = Number(v); return isFinite(n) ? n : d;
+}
 function bool_(v) {
   if (typeof v === 'boolean') return v;
   return ['true', '1', 'yes', 'y', '是', 'v', 'o', '✓', '✔'].indexOf(String(v).trim().toLowerCase()) >= 0;
@@ -1646,6 +1737,13 @@ function rand_(n, chars) {
   return s;
 }
 /** 隊伍代碼：第一碼一定是英文字母，避免被試算表當成數字 */
+function uniqueCode_(pid) {
+  var used = {};
+  readRows_('Sessions').forEach(function (r) { if (str_(r.project_id) === pid) used[str_(r.code).toUpperCase()] = 1; });
+  var c = genCode_();
+  for (var i = 0; i < 20 && used[c]; i++) c = genCode_();
+  return c;
+}
 function genCode_() { return rand_(1, 'ABCDFGHJKLMNPQRSTUVWXYZ') + rand_(5); }
 
 /* ===================== 試算表選單與初始化 ===================== */
@@ -1715,6 +1813,10 @@ function applyFormats_() {
     (TEXT_COLUMNS[name] || []).forEach(function (col) {
       var ci = h.indexOf(col) + 1;
       if (ci) sh.getRange(2, ci, maxRows - 1, 1).setNumberFormat('@');
+    });
+    (NUMBER_COLUMNS[name] || []).forEach(function (col) {
+      var ci = h.indexOf(col) + 1;
+      if (ci) sh.getRange(2, ci, maxRows - 1, 1).setNumberFormat('0.########');
     });
     (BOOL_COLUMNS[name] || []).forEach(function (col) {
       var ci = h.indexOf(col) + 1;

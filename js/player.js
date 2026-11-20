@@ -63,6 +63,18 @@
       if (P.sid && P.openId && ['s-ans', 's-caption', 's-code'].indexOf(id) >= 0) { try { localStorage.setItem(draftKey(P.openId, id), e.target.value); } catch (x) { /* */ } }
     });
     $('#tut-next').onclick = tutNext; $('#tut-skip').onclick = tutEnd;
+    $('#link-resume').onclick = async function (e) {
+      e.preventDefault();
+      var code = prompt('請輸入你們的隊伍代碼\n（闖關畫面頂部、隊伍名稱旁邊的英數字，例如 AB12CD）：');
+      if (!code || !code.trim()) return;
+      try {
+        var r = await Q.run(function () { return api('resumeSession', { projectId: P.projectId, code: code.trim(), tt: P.tt }); });
+        P.sid = r.state.session.session_id;
+        try { localStorage.setItem(LS(P.projectId), P.sid); } catch (x) { /* */ }
+        startGame(r.state);
+        Q.toast('已接續「' + r.state.session.team_name + '」的進度', 'ok');
+      } catch (x) { /* toast 已顯示 */ }
+    };
     $('#btn-start').onclick = startSession;
     $('#btn-retry').onclick = function () { location.reload(); };
     $('#link-back-projects').onclick = function (e) { e.preventDefault(); location.href = location.pathname; };
@@ -355,7 +367,7 @@
     return Object.assign({ kind: pj.deck_kind || 'nature', style: pj.deck_style || 'foil' }, extra || {});
   }
   function openCardView(card) {
-    $('#card-view-card').innerHTML = Q.cardHtml(card, deckOpts({ big: true, tilt: true }));
+    $('#card-view-card').innerHTML = Q.cardHtml(card, deckOpts({ big: true, tilt: true })) + (card.art_credit ? '<div class="card-credit">圖片：' + esc(card.art_credit) + '</div>' : '');
     Q.bindTilt($('#card-view-card'));
     $('#card-view').classList.remove('hidden');
     layerOpen('cardview');

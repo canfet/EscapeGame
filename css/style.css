@@ -954,3 +954,12 @@ body { font-size: 1rem; }
 .ck-item.warn { border-color: #f59e0b; background: #fffbeb; }
 .ck-item.info { background: #f0f9ff; border-color: #bae6fd; }
 .ck-ic { font-size: 1.3rem; }
+
+/* 搜尋圖片 */
+.is-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; max-height: 60vh; overflow-y: auto; }
+.is-item { display: grid; gap: 2px; padding: 6px; background: #fff; color: var(--ink); border: 2px solid var(--line); border-radius: 12px; text-align: left; font-weight: 400; min-height: 0; }
+.is-item:hover { border-color: var(--forest); }
+.is-item img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; }
+.is-item small { font-size: .72rem; color: var(--muted); }
+.is-by { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-credit { color: #fff; font-size: .72rem; text-align: center; opacity: .85; margin-top: 4px; max-width: 320px; }

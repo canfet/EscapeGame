@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1d2a2f">
   <title>GPS 實境解謎</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261121e">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css?v=20261121h">
 </head>
 <body class="quest">
   <div id="test-banner" class="inapp test hidden" role="status">🧪 <b>試玩模式</b>：這支隊伍不會計入排行榜與正式紀錄。</div>
@@ -53,6 +53,7 @@
       </div>
       <button id="btn-start" class="big">開始闖關</button>
       <p class="help center" style="margin-top:10px">開始後會詢問定位權限，請按「允許」。不需要登入帳號。</p>
+      <p class="center small" style="margin-top:6px"><a href="#" id="link-resume">已經開始過了？用隊伍代碼接續</a></p>
     </div>
     <p class="center"><a href="#" id="link-back-projects" class="small">← 看其他任務</a></p>
   </section>
@@ -241,9 +242,9 @@
 
   <div id="retry-bar" class="retry-bar hidden" role="alert"><span class="grow">連線失敗，請確認訊號後再試</span><button class="sm" id="retry-btn">重試</button><button class="sm ghost" id="retry-x" aria-label="關閉">✕</button></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="config.js?v=20261121e"></script>
-  <script src="js/common.js?v=20261121e"></script>
-  <script src="js/player.js?v=20261121e"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="config.js?v=20261121h"></script>
+  <script src="js/common.js?v=20261121h"></script>
+  <script src="js/player.js?v=20261121h"></script>
 </body>
 </html>

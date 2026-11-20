@@ -3,32 +3,46 @@
   'use strict';
 
   /** 呼叫 Apps Script API（text/plain 可避免 CORS 預檢） */
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  /**
+   * 呼叫 Apps Script API（text/plain 可避免 CORS 預檢）。
+   * ‧ 30 秒沒回應就視為連線失敗（NETWORK），前台會出現「重試」。
+   * ‧ 後端回「BUSY」（很多人同時操作、排隊太久）代表這個動作還沒執行，自動等一下再試，最多 3 次。
+   */
   async function api(action, payload) {
     var url = global.APP_CONFIG && global.APP_CONFIG.API_URL;
     if (!url || url.indexOf('PASTE_') === 0) throw new Error('尚未設定 API 網址，請編輯 config.js');
-    var res;
-    try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(Object.assign({ action: action }, payload || {})),
-        redirect: 'follow'
-      });
-    } catch (e) {
-      var ne = new Error('連線失敗，請檢查網路後再試一次');
-      ne.code = 'NETWORK';
-      throw ne;
+    for (var attempt = 0; ; attempt++) {
+      var res, ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timer = ctl ? setTimeout(function () { ctl.abort(); }, 30000) : null;
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+          redirect: 'follow',
+          signal: ctl ? ctl.signal : undefined
+        });
+      } catch (e) {
+        if (timer) clearTimeout(timer);
+        var ne = new Error('連線失敗，請檢查網路後再試一次');
+        ne.code = 'NETWORK';
+        throw ne;
+      }
+      if (timer) clearTimeout(timer);
+      var text = await res.text(), data;
+      try { data = JSON.parse(text); } catch (e) {
+        throw new Error('伺服器回應格式錯誤。請確認 Apps Script 部署時「誰可以存取」選擇「所有人」。');
+      }
+      if (!data.ok) {
+        if (data.code === 'BUSY' && attempt < 3) { await sleep(1500 * (attempt + 1)); continue; }
+        var err = new Error(data.error || '發生錯誤');
+        err.code = data.code;
+        throw err;
+      }
+      return data;
     }
-    var text = await res.text(), data;
-    try { data = JSON.parse(text); } catch (e) {
-      throw new Error('伺服器回應格式錯誤。請確認 Apps Script 部署時「誰可以存取」選擇「所有人」。');
-    }
-    if (!data.ok) {
-      var err = new Error(data.error || '發生錯誤');
-      err.code = data.code;
-      throw err;
-    }
-    return data;
   }
 
   function $(sel, root) { return (root || document).querySelector(sel); }

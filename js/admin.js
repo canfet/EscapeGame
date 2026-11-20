@@ -273,6 +273,7 @@
       $('#dk-hp').value = c.hp; $('#dk-atk').value = c.atk; $('#dk-def').value = c.def;
       $('#dk-skill_name').value = c.skill_name || ''; $('#dk-skill_desc').value = c.skill_desc || ''; $('#dk-story').value = c.story || '';
       refreshImgPrev('dk-art');
+      $('#dk-credit').textContent = c.art_credit ? '圖片來源：' + c.art_credit : '';
     }
     renderDeckPreview();
   }
@@ -310,7 +311,7 @@
   function rerollCard(i) {
     var dk = A.editDeck, c = dk.cards[i];
     var n = genCard(c.name, dk.kind, Math.floor(Math.random() * 1e6) + 1);
-    n.id = c.id; n.art = /^(https?:|data:)/i.test(c.art || '') ? c.art : n.art;   // 上傳的圖保留
+    n.id = c.id; n.art = /^(https?:|data:)/i.test(c.art || '') ? c.art : n.art; n.art_credit = n.art === c.art ? (c.art_credit || '') : '';   // 上傳的圖保留
     dk.cards[i] = n;
   }
 
@@ -342,8 +343,136 @@
     } catch (e) { /* */ }
   }
 
+  /* ---------- 搜尋圖片（維基共享資源，只收可自由使用的授權） ---------- */
+  function stripHtml(x) { var d = document.createElement('div'); d.innerHTML = x || ''; return (d.textContent || '').replace(/\s+/g, ' ').trim(); }
+
+  async function searchCommons(q, limit) {
+    var url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=' + (limit || 24) +
+      '&gsrsearch=' + encodeURIComponent(q + ' filetype:bitmap') + '&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiurlwidth=400&iiextmetadatafilter=LicenseShortName|Artist|Credit';
+    var res = await fetch(url);
+    if (!res.ok) throw new Error('搜尋失敗（' + res.status + '）');
+    var data = await res.json(), pages = (data.query && data.query.pages) || {};
+    return Object.keys(pages).map(function (k) { return pages[k]; }).sort(function (a, b) { return a.index - b.index; }).map(function (pg) {
+      var ii = (pg.imageinfo || [])[0];
+      if (!ii || !/^image\/(jpeg|png|webp)/.test(ii.mime || '') || (ii.width || 0) < 300) return null;
+      var md = ii.extmetadata || {}, lic = stripHtml((md.LicenseShortName || {}).value);
+      if (!lic || /fair use|non-free/i.test(lic)) return null;
+      var artist = stripHtml((md.Artist || {}).value) || stripHtml((md.Credit || {}).value) || '作者不詳';
+      return { title: String(pg.title || '').replace(/^File:/, ''), thumb: ii.thumburl || ii.url, license: lic, artist: artist.slice(0, 60), page: ii.descriptionurl };
+    }).filter(function (x) { return x; });
+  }
+
+  /** 用中文維基百科找出這個名稱對應的英文條目名稱（物種通常有），拿來補充搜尋，中文名稱圖片少時很有用 */
+  async function resolveEnglishName(q) {
+    try {
+      var url = 'https://zh.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrlimit=1&gsrsearch=' + encodeURIComponent(q) + '&prop=langlinks&lllang=en&lllimit=1';
+      var res = await fetch(url), data = await res.json(), pages = (data.query && data.query.pages) || {}, k = Object.keys(pages)[0];
+      var ll = k && pages[k].langlinks && pages[k].langlinks[0];
+      return ll ? (ll['*'] || ll.title || '') : '';
+    } catch (e) { return ''; }
+  }
+
+  /** 先用原名稱搜；結果太少就再用對應的英文名稱補充搜尋 */
+  async function searchSmart(q, limit) {
+    var res = await searchCommons(q, limit), via = '';
+    if (res.length < 4) {
+      var eng = await resolveEnglishName(q);
+      if (eng && eng.toLowerCase() !== q.toLowerCase()) {
+        var more = await searchCommons(eng, limit), seen = {};
+        res.forEach(function (r) { seen[r.title] = 1; });
+        more.forEach(function (r) { if (!seen[r.title]) res.push(r); });
+        via = eng;
+      }
+    }
+    res.via = via;
+    return res;
+  }
+
+  function creditOf(r) { return (r.artist + '／' + r.license + '／維基共享資源').slice(0, 160); }
+
+  /** 把遠端圖片存到雲端硬碟；失敗就沿用原網址 */
+  async function mirrorUrl(url) {
+    if (!/^https:\/\/upload\.wikimedia\.org\//.test(url)) return url;
+    try { var r = await Q.api('adminImportImage', { adminKey: A.key, url: url }); return r.url || url; } catch (e) { return url; }
+  }
+
+  function openImgSearch() {
+    var c = A.editDeck.cards[A.deckSel];
+    if (!c) return;
+    $('#is-q').value = c.name; $('#is-grid').innerHTML = ''; $('#is-status').textContent = '';
+    $('#m-imgsearch').classList.remove('hidden');
+    runImgSearch();
+  }
+
+  async function runImgSearch() {
+    var q = $('#is-q').value.trim();
+    if (!q) return;
+    $('#is-status').textContent = '搜尋中…'; $('#is-grid').innerHTML = '';
+    try {
+      var list = await searchSmart(q, 30);
+      $('#is-status').textContent = list.length ? '找到 ' + list.length + ' 張可自由使用的圖片' + (list.via ? '（已用英文名稱「' + list.via + '」補充搜尋）' : '') + '，點一張就會套用到這張卡。' : '沒有找到合適的圖片，可以換個關鍵字（英文、學名、更完整的名稱）。';
+      $('#is-grid').innerHTML = list.map(function (r, i) {
+        return '<button type="button" class="is-item" data-i="' + i + '"><img src="' + esc(r.thumb) + '" alt="" loading="lazy"><small>' + esc(r.license) + '</small><small class="is-by">' + esc(r.artist) + '</small></button>';
+      }).join('');
+      $$('#is-grid [data-i]').forEach(function (b) {
+        b.onclick = async function () {
+          var r = list[+b.dataset.i], c = A.editDeck.cards[A.deckSel];
+          if (!c) return;
+          $('#is-status').textContent = '套用中，並存到雲端硬碟…';
+          c.art = await mirrorUrl(r.thumb); c.art_credit = creditOf(r);
+          $('#m-imgsearch').classList.add('hidden');
+          renderDeckEditor();
+          Q.toast('已套用圖片，授權資訊已記在卡片上', 'ok');
+        };
+      });
+    } catch (e) { $('#is-status').textContent = e.message || '搜尋失敗，請檢查網路'; }
+  }
+
+  /** 為還沒有圖片（只有 emoji）的卡牌自動找第一張合適的圖，之後可再逐張更換 */
+  async function autoFindImages() {
+    var cards = A.editDeck.cards.filter(function (c) { return !/^(https?:|data:image)/i.test(c.art || ''); });
+    if (!cards.length) return Q.toast('每張卡都已經有圖片了', 'ok');
+    if (!confirm('要為 ' + cards.length + ' 張還沒有圖片的卡，自動搜尋第一張合適的圖嗎？\n\n• 依名稱搜尋，找到的圖不一定符合，完成後請逐張檢查、不滿意的可以按 🔍 換圖。\n• 名稱如果是人的自然名（例如天狼星、隨風），搜到的圖可能和角色無關。\n• 約需 ' + Math.ceil(cards.length * 0.7 / 60 * 10) / 10 + ' 分鐘，可以隨時關閉視窗中斷。')) return;
+    var btn = $('#dk-auto-img'), old = btn.textContent, found = 0, i = 0;
+    btn.disabled = true;
+    A.stopAuto = false;
+    for (; i < cards.length && !A.stopAuto && !$('#m-deck').classList.contains('hidden'); i++) {
+      btn.textContent = '搜尋中 ' + (i + 1) + ' / ' + cards.length + '…';
+      try {
+        var list = await searchSmart(cards[i].name, 8);
+        if (list.length) { cards[i].art = list[0].thumb; cards[i].art_credit = creditOf(list[0]); found++; }
+      } catch (e) { /* 這張找不到就略過 */ }
+      await new Promise(function (r) { setTimeout(r, 350); });
+    }
+    btn.disabled = false; btn.textContent = old;
+    renderDeckEditor();
+    Q.toast('完成：' + found + ' / ' + cards.length + ' 張找到圖片。請逐張檢查，再按「圖片存到雲端硬碟」與「儲存圖鑑」。', found ? 'ok' : 'warn', 7000);
+  }
+
+  /** 把圖鑑裡所有維基媒體的遠端圖片，存到自己的雲端硬碟（活動當天比較穩定） */
+  async function mirrorAllImages() {
+    var cards = A.editDeck.cards.filter(function (c) { return /^https:\/\/upload\.wikimedia\.org\//.test(c.art || ''); });
+    if (!cards.length) return Q.toast('沒有需要存到雲端硬碟的圖片', 'ok');
+    if (!confirm('把 ' + cards.length + ' 張圖片存到你的雲端硬碟？（約 ' + Math.ceil(cards.length * 2.5 / 60) + ' 分鐘，過程中請不要關閉視窗）')) return;
+    var btn = $('#dk-mirror'), old = btn.textContent, ok = 0;
+    btn.disabled = true;
+    for (var i = 0; i < cards.length && !$('#m-deck').classList.contains('hidden'); i++) {
+      btn.textContent = '存檔中 ' + (i + 1) + ' / ' + cards.length + '…';
+      var u = await mirrorUrl(cards[i].art);
+      if (u !== cards[i].art) { cards[i].art = u; ok++; }
+    }
+    btn.disabled = false; btn.textContent = old;
+    renderDeckEditor();
+    Q.toast('已存到雲端硬碟 ' + ok + ' / ' + cards.length + ' 張。記得按「儲存圖鑑」。', ok ? 'ok' : 'warn', 6000);
+  }
+
   function bindDeckUi() {
     $('#btn-new-deck').onclick = function () { openDeck(null); };
+    $('#dk-art-search').onclick = function () { readDeckForm(); openImgSearch(); };
+    $('#is-go').onclick = runImgSearch;
+    $('#is-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') runImgSearch(); });
+    $('#dk-auto-img').onclick = function () { readDeckForm(); autoFindImages(); };
+    $('#dk-mirror').onclick = mirrorAllImages;
     $('#btn-default-deck').onclick = createDefaultDeck;
     $('#dk-load-default').onclick = function () { $('#dk-names').value = DEFAULT_NATURE_NAMES.join('\n'); Q.toast('已填入 ' + DEFAULT_NATURE_NAMES.length + ' 個預設自然名，按「產生卡牌」就會建立', 'ok'); };
     $('#dk-gen').onclick = genDeckFromNames;
@@ -381,7 +510,7 @@
       };
       $(sel).addEventListener('input', ev); $(sel).addEventListener('change', ev);
     });
-    $('#dk-art').addEventListener('input', function () { refreshImgPrev('dk-art'); });
+    $('#dk-art').addEventListener('input', function () { refreshImgPrev('dk-art'); var c = A.editDeck.cards[A.deckSel]; if (c && c.art_credit && c.art !== $('#dk-art').value.trim()) { c.art_credit = ''; $('#dk-credit').textContent = ''; } });
     bindImageField('dk-art', 'stage', function () { return 'decks'; });
   }
 
