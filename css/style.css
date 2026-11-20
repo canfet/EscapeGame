@@ -971,3 +971,7 @@ body { font-size: 1rem; }
 .tcg-art.fit-contain img { object-fit: contain; }
 .tcg-art.fit-cover img { object-fit: cover; }
 .tcg.locked .tcg-art.has-img::before { display: none; }
+
+/* 浮層的上下順序：看卡要蓋在背包、排行榜、過關畫面之上 */
+#card-view { z-index: 2400; }
+#pack, #board { z-index: 2100; }
