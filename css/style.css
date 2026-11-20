@@ -975,3 +975,22 @@ body { font-size: 1rem; }
 /* 浮層的上下順序：看卡要蓋在背包、排行榜、過關畫面之上 */
 #card-view { z-index: 2400; }
 #pack, #board { z-index: 2100; }
+
+/* 卡片內容固定高度的區塊不被壓縮，空間不夠時只縮技能說明區，避免底部故事文字被裁掉 */
+.tcg-head, .tcg-typeline, .tcg-stats, .tcg-story { flex-shrink: 0; }
+.tcg-art { flex-shrink: 0; }
+.tcg-skill { flex: 1 1 0; min-height: 0; }
+.tcg-story { max-height: none; overflow: visible; }
+.tcg.big .tcg-story { font-size: .66em; }
+
+/* 閃卡的彩虹閃光改輕：不再用 color-dodge 把整張卡洗白，圖片與文字要看得清楚 */
+.s-foil.r-rare::after, .s-foil.r-legend::after { mix-blend-mode: soft-light; opacity: .45;
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, .55), transparent 28%),
+    linear-gradient(115deg, transparent 30%, rgba(255, 0, 150, .35) 42%, rgba(0, 255, 230, .35) 50%, rgba(255, 230, 0, .35) 58%, transparent 70%);
+  background-size: 100% 100%, 220% 220%; }
+.s-foil.r-legend::after { opacity: .6; }
+/* 放大檢視、開卡翻面時閃光更淡，以看清楚內容為主 */
+.tcg.big.s-foil.r-rare::after, .tcg.big.s-foil.r-legend::after { opacity: .3; }
+.tcg.big.s-foil.r-legend::after { opacity: .4; }
+.tcg-in { background: rgba(255, 255, 255, .96); }
+.tcg.locked .tcg-in { background: rgba(255, 255, 255, .55); }
