@@ -128,9 +128,9 @@ input[type=checkbox] { width: auto; transform: scale(1.2); margin-right: 6px; }
 .map.tall { height: 420px; }
 .img-prev { display: block; max-width: 100%; max-height: 160px; margin-top: 8px; border-radius: 10px; border: 1px solid var(--line); object-fit: cover; }
 /* 前台封面橫幅／關卡大圖 */
-.hero-img { width: 100%; max-height: 260px; aspect-ratio: 16 / 9; background: linear-gradient(135deg, #e6dcc9, #d8ccb3); object-fit: cover; display: block; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.hero-img { width: 100%; height: auto; min-height: 120px; max-height: 70vh; max-height: 70dvh; background: linear-gradient(135deg, #e6dcc9, #d8ccb3); object-fit: contain; display: block; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .sheet-hero { margin: -4px -4px 12px; }
-.sheet-hero .hero-img { border-radius: 12px; max-height: 220px; }
+.sheet-hero .hero-img { border-radius: 12px; max-height: 60vh; max-height: 60dvh; }
 .sheet-sub { font-size: .82rem; color: var(--muted); letter-spacing: .02em; }
 .sheet-title { font-family: Georgia, "Noto Serif TC", "PMingLiU", serif; }
 /* 古地圖風格（只套用在玩家地圖，GPS 功能不受影響） */
@@ -192,7 +192,7 @@ input[type=checkbox] { width: auto; transform: scale(1.2); margin-right: 6px; }
 
 /* ----- 首頁大圖 ----- */
 .hero { border-radius: var(--radius); overflow: hidden; margin-bottom: 14px; background: var(--ink); color: #fff; }
-.hero img { width: 100%; max-height: 220px; object-fit: cover; }
+.hero img { width: 100%; }
 .hero .inner { padding: 18px 16px; }
 .hero h1 { margin: 0; }
 .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -353,7 +353,7 @@ body.quest { background: #f3ead4; }
 .quest h1, .quest h2, .quest h3 { font-family: Georgia, "Noto Serif TC", "PMingLiU", serif; }
 .quest .card, .quest .stat { border-color: #d9c9a3; }
 .quest .hero { background: linear-gradient(135deg, #3b2d17, #5a4527); border: 2px solid #8a6d3b; box-shadow: var(--shadow); }
-.quest .hero .hero-img { border: 0; border-radius: 0; box-shadow: none; max-height: 240px; }
+.quest .hero .hero-img { border: 0; border-radius: 0; box-shadow: none; max-height: 70vh; max-height: 70dvh; }
 .quest .topbar { background: #3b2d17; border-bottom: 2px solid #8a6d3b; }
 .quest .sheet-body { background: #f3ead4; }
 .quest .sheet-actions { background: linear-gradient(to bottom, rgba(243,234,212,0), #f3ead4 28%); }
@@ -366,3 +366,4 @@ body.quest { background: #f3ead4; }
 .hint-cost { font-size: .8rem; font-weight: 500; color: var(--muted); }
 details.hint .hint-tag { margin-left: 8px; font-size: .78rem; font-weight: 500; color: var(--muted); }
 details.hint[open] .hint-tag { display: none; }
+

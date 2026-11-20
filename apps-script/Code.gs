@@ -458,6 +458,7 @@ function adminSaveStage_(b) {
     var s = b.stage || {};
     var pid = str_(s.project_id);
     if (!findProject_(pid)) throw appError_('找不到專案', 'NOT_FOUND');
+    ensureHeaders_('Stages');   // 舊的試算表若缺新欄位（例如 show_question_early），先補上，否則設定不會被存下來
     var id = str_(s.stage_id) || ('st' + rand_(5, 'abcdefghjkmnpqrstuvwxyz23456789'));
     if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) throw appError_('關卡代碼格式不正確', 'BAD_INPUT');
     if (!str_(s.title)) throw appError_('請輸入關卡名稱', 'BAD_INPUT');

@@ -170,6 +170,8 @@
     renderGame();
     if (P.openId) renderStage();
     if (state.just_finished || (!prevFinished && state.session.status === 'finished' && P.stateLoadedOnce)) {
+      if (P.cfDone) P.cfDone(false);
+      setFullscreen(false);
       closeStage();
       setTimeout(showFinish, 400);
     }
@@ -189,7 +191,8 @@
     $('#g-finished').classList.toggle('hidden', se.status !== 'finished');
     $('#g-timeup').classList.toggle('hidden', se.status !== 'timeup');
 
-    $('#g-stages').innerHTML = s.stages.map(function (st, i) {
+    var stageList = $('#g-stages'), keepLeft = stageList.scrollLeft;
+    stageList.innerHTML = s.stages.map(function (st, i) {
       var dist = '';
       if (st.lat != null && st.require_gps && P.pos && (st.status === 'open')) dist = distText(st);
       var state = st.status === 'solved' ? '✓ 已完成 +' + st.earned
@@ -202,7 +205,8 @@
         '<div class="meta">' + Q.TYPE_LABEL[st.answer_type] + '・' + st.points + ' 分<span data-dist="' + esc(st.stage_id) + '">' + dist + '</span></div>' +
         '</button>';
     }).join('');
-    // 進行中的那一關捲到可見位置
+    // 重畫後保留橫向捲動位置；第一次才把進行中的那一關捲到可見位置
+    stageList.scrollLeft = keepLeft;
     var cur = document.querySelector('#g-stages .stage-card.open, #g-stages .stage-card.arrived');
     if (cur && cur.scrollIntoView && !P.scrolledCur) { P.scrolledCur = true; cur.scrollIntoView({ block: 'nearest', inline: 'center' }); }
     Q.$$('#g-stages [data-id]').forEach(function (b) {
@@ -561,7 +565,7 @@
     $('#sheet').classList.remove('hidden');
     layerOpen('sheet');
     fitSheet();
-    P.prevFocus = document.activeElement;
+    if (!P.prevFocus) P.prevFocus = document.activeElement;
     var sb = $('#sheet-body');
     sb.setAttribute('tabindex', '-1');
     try { sb.focus({ preventScroll: true }); } catch (e) { /* */ }
@@ -712,14 +716,15 @@
       if (!code) return Q.toast('請輸入通關碼', 'warn');
       act('arrive', { stageId: st.stage_id, code: code });
     });
-    on('s-hint', function () {
-      if (st.hint_penalty) {
-        var u = st.hints.length, a0 = Math.max(0, st.points - u * st.hint_penalty), a1 = Math.max(0, st.points - (u + 1) * st.hint_penalty);
-        var msg = '要看提示嗎？\n\n看了之後，這一關答對可得的分數會從 ' + a0 + ' 分降為 ' + a1 + ' 分（每則提示少 ' + st.hint_penalty + ' 分）。\n' +
-          '你們目前總分 ' + P.state.session.score + ' 分，不會馬上被扣，只會影響這一關的得分。';
-        if (!confirm(msg)) return;
-      }
-      act('getHint', { stageId: st.stage_id });
+    on('s-hint', async function () {
+      // 一律先跳出頁面內的確認視窗（不用瀏覽器內建 confirm，LINE 等內建瀏覽器常會直接擋掉）
+      var pen = st.hint_penalty || 0, u = st.hints.length;
+      var a0 = Math.max(0, st.points - u * pen), a1 = Math.max(0, st.points - (u + 1) * pen);
+      var msg = pen
+        ? '⚠️ 看提示會扣分！\n\n這一關答對可得的分數：' + a0 + ' 分 → ' + a1 + ' 分（每則提示少 ' + pen + ' 分）。\n\n你們目前總分 ' + P.state.session.score + ' 分，不會馬上被扣，會在這一關過關時少算。'
+        : '這則提示不會扣分，可以放心使用。\n\n（你們目前總分 ' + P.state.session.score + ' 分）';
+      var ok = await askConfirm('要看提示嗎？', msg, pen ? '看提示（少 ' + pen + ' 分）' : '看提示');
+      if (ok) act('getHint', { stageId: st.stage_id });
     });
     on('s-submit', function () {
       var ans = st.answer_type === 'choice' ? P.choice : ($('#s-ans') && $('#s-ans').value.trim());
@@ -973,6 +978,7 @@
     if (n === 'sheet') closeStage();
     else if (n === 'solved') hideSolved();
     else if (n === 'fs') setFullscreen(false);
+    else if (n === 'confirm' && P.cfDone) P.cfDone(false);
   }
   window.addEventListener('popstate', function () {
     if (P.skipPop) { P.skipPop = false; return; }
@@ -1022,6 +1028,29 @@
     bar.classList.remove('hidden');
     $('#retry-btn').onclick = function () { bar.classList.add('hidden'); fn(); };
     $('#retry-x').onclick = function () { bar.classList.add('hidden'); };
+  }
+
+  /** 頁面內的確認視窗，回傳 Promise<boolean>；返回鍵／Esc 等於取消 */
+  function askConfirm(title, msg, okText) {
+    return new Promise(function (resolve) {
+      var box = $('#confirm'), ok = $('#cf-ok'), cancel = $('#cf-cancel');
+      $('#cf-title').textContent = title;
+      $('#cf-msg').textContent = msg;
+      ok.textContent = okText || '確定';
+      box.classList.remove('hidden');
+      function done(v) {
+        if (!P.cfDone) return;
+        P.cfDone = null;
+        box.classList.add('hidden');
+        ok.onclick = cancel.onclick = null;
+        layerClose('confirm');
+        resolve(v);
+      }
+      P.cfDone = done;
+      ok.onclick = function () { done(true); };
+      cancel.onclick = function () { done(false); };
+      layerOpen('confirm');
+    });
   }
 
   /* ---------- 完成 ---------- */
