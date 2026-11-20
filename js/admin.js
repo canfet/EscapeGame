@@ -5,7 +5,7 @@
   var KEY_STORE = 'gpsquest-admin-key';
   var PROJECT_FIELDS = ['project_id', 'name', 'status', 'unlock_mode', 'description', 'intro', 'finish_message', 'cover_url',
     'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy', 'is_default', 'show_leaderboard', 'require_run_code'];
-  var STAGE_FIELDS = ['stage_id', 'enabled', 'clue', 'image_url', 'require_gps', 'show_location', 'bypass_code', 'question',
+  var STAGE_FIELDS = ['stage_id', 'enabled', 'clue', 'image_url', 'require_gps', 'show_location', 'bypass_code', 'question', 'show_question_early',
     'answer_type', 'points', 'choices', 'answer', 'max_attempts', 'form_url', 'form_verify_sheet', 'success_message',
     'hint1', 'hint2', 'hint3', 'hint_penalty', 'lat', 'lng', 'radius_m'];
   var STATUS_TXT = { active: ['開放中', 'green'], hidden: ['連結可玩', 'blue'], draft: ['準備中', 'gray'], closed: ['已結束', 'red'] };
@@ -80,7 +80,10 @@
         URL.revokeObjectURL(url);
         resolve(c.toDataURL('image/jpeg', quality));
       };
-      img.onerror = function () { reject(new Error('無法讀取這張圖片，請換一張')); };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error(/heic|heif/i.test(file.type + file.name) ? '這個瀏覽器無法處理 HEIC 圖片。iPhone 請到「設定 → 相機 → 格式」改選「最相容」，或改用 JPG／PNG。' : '無法讀取這張圖片，請換一張'));
+      };
       img.src = url;
     });
   }
@@ -351,7 +354,7 @@
   function openStage(s) {
     if (!A.pid) return Q.toast('請先選擇專案', 'warn');
     A.editStage = s;
-    var d = s || { enabled: true, require_gps: true, show_location: true, answer_type: 'text', points: 10, radius_m: 40, max_attempts: 0, hint_penalty: 0 };
+    var d = s || { enabled: true, require_gps: true, show_location: true, show_question_early: true, answer_type: 'text', points: 10, radius_m: 40, max_attempts: 0, hint_penalty: 0 };
     $('#ms-title').textContent = s ? '編輯關卡' : '新增關卡';
     $('#ms-title-input').value = d.title || '';
     STAGE_FIELDS.forEach(function (f) {

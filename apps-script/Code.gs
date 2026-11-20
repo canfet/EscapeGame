@@ -23,7 +23,7 @@ var SCHEMA = {
     'finish_message', 'cover_url', 'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy',
     'show_leaderboard', 'require_run_code', 'updated_at'],
   Stages: ['project_id', 'stage_id', 'order', 'enabled', 'title', 'clue', 'image_url', 'lat', 'lng',
-    'radius_m', 'show_location', 'require_gps', 'bypass_code', 'question', 'answer_type', 'choices',
+    'radius_m', 'show_location', 'require_gps', 'bypass_code', 'question', 'show_question_early', 'answer_type', 'choices',
     'answer', 'points', 'max_attempts', 'hint1', 'hint2', 'hint3', 'hint_penalty', 'success_message',
     'form_url', 'form_verify_sheet', 'updated_at'],
   Sessions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'members', 'status', 'score',
@@ -42,7 +42,7 @@ var TEXT_COLUMNS = {
 };
 var BOOL_COLUMNS = {
   Projects: ['is_default', 'show_leaderboard', 'require_run_code'],
-  Stages: ['enabled', 'show_location', 'require_gps']
+  Stages: ['enabled', 'show_location', 'require_gps', 'show_question_early']
 };
 
 /* ===================== API 路由 ===================== */
@@ -685,6 +685,8 @@ function publicStage_(st, status, g, c) {
   if (st.show_location && isNum_(st.lat) && isNum_(st.lng)) {
     o.lat = st.lat; o.lng = st.lng; o.radius_m = st.radius_m;
   }
+  // 「抵達前先顯示題目」：前往中就能先看題目，但仍要抵達後才能作答
+  if (status === 'open' && st.show_question_early) o.question = st.question;
   if (status === 'arrived' || status === 'solved' || status === 'failed') {
     o.question = st.question;
     o.choices = st.choices ? st.choices.split('|').map(function (x) { return x.trim(); }).filter(String) : [];
@@ -763,6 +765,7 @@ function cleanStage_(r) {
     lat: num_(r.lat, null), lng: num_(r.lng, null), radius_m: Math.max(5, num_(r.radius_m, 30)),
     show_location: defBool_(r.show_location, true), require_gps: defBool_(r.require_gps, true),
     bypass_code: str_(r.bypass_code), question: str_(r.question),
+    show_question_early: defBool_(r.show_question_early, true),
     answer_type: ANSWER_TYPES.indexOf(type) >= 0 ? type : 'text', choices: str_(r.choices), answer: str_(r.answer),
     points: num_(r.points, 10), max_attempts: num_(r.max_attempts, 0),
     hint1: str_(r.hint1), hint2: str_(r.hint2), hint3: str_(r.hint3), hint_penalty: num_(r.hint_penalty, 0),

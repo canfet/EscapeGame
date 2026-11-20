@@ -15,7 +15,9 @@
         redirect: 'follow'
       });
     } catch (e) {
-      throw new Error('連線失敗，請檢查網路後再試一次');
+      var ne = new Error('連線失敗，請檢查網路後再試一次');
+      ne.code = 'NETWORK';
+      throw ne;
     }
     var text = await res.text(), data;
     try { data = JSON.parse(text); } catch (e) {

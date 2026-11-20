@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="quest">
   <!-- 選擇專案 -->
   <section id="v-projects" class="page hidden">
     <h1 id="site-name">GPS 實境解謎</h1>
@@ -56,24 +56,24 @@
       <div class="title" id="g-title"></div>
       <span class="chip" id="g-gps"><span class="gps-dot"></span> 定位</span>
       <span class="chip hidden" id="g-timer">⏱ --:--</span>
+      <button class="icon-btn" id="btn-sound" aria-label="音效開關" title="音效開關">🔊</button>
     </div>
     <div class="page">
-      <div class="card">
+      <div class="card hud">
         <div class="row">
-          <div class="grow">
-            <div class="small muted">隊伍</div>
-            <div><b id="g-team"></b> <span class="chip gray" id="g-code" title="隊伍代碼"></span></div>
-          </div>
-          <div class="center">
-            <div class="small muted">分數</div>
-            <div style="font-size:1.4rem;font-weight:800" id="g-score">0</div>
-          </div>
+          <div class="grow hud-team"><b id="g-team"></b> <span class="chip gray" id="g-code" title="隊伍代碼"></span></div>
+          <div class="hud-score">⭐ <b id="g-score">0</b></div>
+          <div class="hud-prog" id="g-progress-text"></div>
         </div>
-        <div class="row small muted" style="margin:10px 0 4px">
-          <span class="grow">進度</span><span id="g-progress-text"></span>
-        </div>
-        <div class="progress"><i id="g-progress" style="width:0"></i></div>
+        <div class="progress thin"><i id="g-progress" style="width:0"></i></div>
       </div>
+
+      <button class="next-step hidden" id="next-step" type="button">
+        <span class="ns-label">下一站</span>
+        <span class="ns-main" id="ns-main"></span>
+        <span class="ns-sub" id="ns-sub"></span>
+        <span class="ns-go">›</span>
+      </button>
 
       <div id="g-finished" class="card hidden" style="border-color:var(--forest)">
         <div class="row">
@@ -86,9 +86,12 @@
         <div class="small muted">紀錄已保存，請回到集合點。</div>
       </div>
 
-      <div class="card" id="map-card" style="padding:8px">
+      <div class="card" id="map-card">
         <div class="map-wrap">
           <div id="g-map" class="map"></div>
+          <div class="gps-pill" id="gps-pill"><span class="gps-dot"></span><span id="gps-pill-text">定位中…</span></div>
+          <button class="map-fs" id="btn-fs" type="button" aria-label="全螢幕地圖">⛶</button>
+          <div class="map-hint hidden" id="map-hint">單指捲動頁面・雙指縮放地圖・點 ⛶ 全螢幕後可拖曳</div>
           <svg class="compass-rose" viewBox="0 0 100 100" aria-hidden="true">
             <circle cx="50" cy="50" r="46" fill="rgba(245,236,214,.85)" stroke="#6b5636" stroke-width="2"/>
             <path d="M50 8 L58 50 L50 92 L42 50 Z" fill="#8a6d3b" opacity=".55"/>
@@ -100,15 +103,15 @@
             <text x="88" y="54" text-anchor="middle" font-size="11" fill="#3b2d17">E</text>
           </svg>
         </div>
-        <div class="row small muted" style="padding:6px 4px 0">
-          <span class="grow" id="g-gps-text">正在取得定位…</span>
-          <button class="sm ghost" id="btn-both">🎯 我與目標</button>
-          <button class="sm ghost" id="btn-locate">📍 回到我的位置</button>
+        <div class="gps-help hidden" id="g-gps-text"></div>
+        <div class="map-actions">
+          <button class="ghost" id="btn-both">🎯 我與目標</button>
+          <button class="ghost" id="btn-locate">📍 我的位置</button>
         </div>
       </div>
 
       <div class="row" style="margin:18px 0 10px;align-items:baseline"><h2 class="grow" style="margin:0">探險關卡進度表</h2><span class="small muted" id="g-unlock-mode"></span></div>
-      <div id="g-stages" class="stage-list"></div>
+      <div class="stage-wrap" id="stage-wrap"><div id="g-stages" class="stage-list"></div></div>
 
       <p class="center small" style="margin-top:24px">
         <a href="#" id="link-reset">換一支隊伍／重新開始</a>
@@ -146,10 +149,24 @@
     </div>
   </section>
 
+  <!-- 過關畫面 -->
+  <div id="solved" class="solved-overlay hidden" role="dialog" aria-modal="true">
+    <div class="solved-card">
+      <div class="solved-badge">✓</div>
+      <div class="solved-title" id="solved-title">過關！</div>
+      <div class="solved-points">+<span id="solved-points">0</span> 分</div>
+      <div class="solved-msg pre" id="solved-msg"></div>
+      <button class="big" id="solved-next">前往下一關</button>
+      <button class="big ghost" id="solved-close">回到地圖</button>
+    </div>
+  </div>
+
   <!-- 關卡詳細面板 -->
-  <div id="sheet" class="sheet hidden">
+  <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-label="關卡內容">
     <div class="sheet-body" id="sheet-body"></div>
   </div>
+
+  <div id="retry-bar" class="retry-bar hidden" role="alert"><span class="grow">連線失敗，請確認訊號後再試</span><button class="sm" id="retry-btn">重試</button><button class="sm ghost" id="retry-x" aria-label="關閉">✕</button></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js"></script>
