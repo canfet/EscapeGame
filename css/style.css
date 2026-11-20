@@ -994,3 +994,22 @@ body { font-size: 1rem; }
 .tcg.big.s-foil.r-legend::after { opacity: .4; }
 .tcg-in { background: rgba(255, 255, 255, .96); }
 .tcg.locked .tcg-in { background: rgba(255, 255, 255, .55); }
+
+/* 放大檢視／開卡：卡片維持比例的「最小高度」，內容（手機字體較大、說明較長）多時整張往下長高，絕不裁掉文字 */
+.tcg.big, .flipper .tcg { aspect-ratio: auto; height: auto; min-height: calc(16em * 88 / 63); }
+.tcg.big .tcg-in, .flipper .tcg .tcg-in { height: auto; min-height: calc(16em * 88 / 63 - 1.4em); overflow: visible; }
+.tcg.big .tcg-art, .flipper .tcg .tcg-art { flex: 0 0 auto; height: calc(9.6em / 4.6); }   /* 圖片區 font-size 是 4.6em，這裡換算成約 9.6 個卡片字高 */
+.tcg.big .tcg-skill, .flipper .tcg .tcg-skill { flex: 1 0 auto; overflow: visible; }
+.flipper { aspect-ratio: auto; min-height: calc(205px * 88 / 63); }
+
+/* 開卡翻面：正反兩面疊在同一格，外框高度跟著較高的那一面（說明很長時不會溢出去疊到別的字） */
+.flipper { display: grid; }
+.flipper .face { position: relative; inset: auto; grid-area: 1 / 1; }
+
+/* 放大檢視再精簡：技能說明依文字高度，不再撐出一大塊空白；整張卡只需要「剛好放得下」的高度 */
+.tcg.big, .flipper .tcg { min-height: 0; }
+.tcg.big .tcg-in, .flipper .tcg .tcg-in { min-height: 0; gap: .45em; }
+.tcg.big .tcg-skill, .flipper .tcg .tcg-skill { flex: 0 0 auto; min-height: 5.2em; }
+.tcg.big .tcg-story, .flipper .tcg .tcg-story { padding-bottom: .2em; }
+.tcg.big .tcg-art, .flipper .tcg .tcg-art { height: calc(8.6em / 4.6); }
+.flipper { min-height: 0; }

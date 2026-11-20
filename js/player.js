@@ -1424,18 +1424,6 @@
     var s = P.state, col = s.collection || [], frs = s.fragments || [], bds = s.badges || [], h = [];
     var colGot = col.filter(function (x) { return x.got; }).length, gotN = frs.filter(function (f) { return f.got; }).length;
     var isDeck = col.length && col[0].kind === 'card';
-    if (isDeck) {
-      var pj = s.project || {};
-      h.push('<h3 class="pack-h">🃏 ' + esc(pj.deck_title || '圖鑑') + '　' + colGot + ' / ' + col.length + (colGot === col.length ? ' 🎊 全收集！' : '') + '</h3>');
-      h.push('<div class="progress" style="margin:-2px 0 10px"><i style="width:' + Math.round(colGot / col.length * 100) + '%"></i></div>');
-      h.push('<div class="deck-grid">' + col.map(function (it, i) {
-        var isNew = (P.newNow || []).indexOf('c:' + it.id) >= 0;
-        return '<button type="button" class="deck-cell' + (isNew ? ' is-new' : '') + '" data-ci="' + i + '">' + Q.cardHtml(it.card, deckOpts({ mini: true })) + '</button>';
-      }).join('') + '</div>');
-    } else if (col.length) {
-      h.push('<h3 class="pack-h">📖 收藏冊　' + colGot + ' / ' + col.length + (colGot === col.length ? ' 🎊 全收集！' : '') + '</h3>');
-      h.push('<div class="item-grid">' + col.map(itemCellHtml).join('') + '</div>');
-    }
     if (bds.length) {
       h.push('<h3 class="pack-h">🏅 成就徽章' + (s.title ? '　<small>稱號：' + esc(s.title) + '</small>' : '') + '</h3>');
       h.push('<div class="badge-list">' + bds.map(function (b) { return '<div class="badge-row"><span class="badge-ic">' + esc(b.icon) + '</span><div><b>' + esc(b.name) + '</b><small>' + esc(b.desc) + '</small></div></div>'; }).join('') + '</div>');
@@ -1445,6 +1433,20 @@
       h.push('<div class="pack-rows">' + fragRowsHtml(frs) + '</div>');
       h.push('<div class="help">最後一關要把所有碎片「依第 1 碼 → 第 ' + frs.length + ' 碼」的順序組成密碼。</div>');
     }
+    var colH = [];
+    if (isDeck) {
+      var pj = s.project || {};
+      colH.push('<h3 class="pack-h">🃏 ' + esc(pj.deck_title || '圖鑑') + '　' + colGot + ' / ' + col.length + (colGot === col.length ? ' 🎊 全收集！' : '') + '</h3>');
+      colH.push('<div class="progress" style="margin:-2px 0 10px"><i style="width:' + Math.round(colGot / col.length * 100) + '%"></i></div>');
+      colH.push('<div class="deck-grid">' + col.map(function (it, i) {
+        var isNew = (P.newNow || []).indexOf('c:' + it.id) >= 0;
+        return '<button type="button" class="deck-cell' + (isNew ? ' is-new' : '') + '" data-ci="' + i + '">' + Q.cardHtml(it.card, deckOpts({ mini: true })) + '</button>';
+      }).join('') + '</div>');
+    } else if (col.length) {
+      colH.push('<h3 class="pack-h">📖 收藏冊　' + colGot + ' / ' + col.length + (colGot === col.length ? ' 🎊 全收集！' : '') + '</h3>');
+      colH.push('<div class="item-grid">' + col.map(itemCellHtml).join('') + '</div>');
+    }
+    h = h.concat(colH);   // 卡牌放最下面
     $('#pack-rows').innerHTML = h.join('') || '<div class="lb-empty">還沒有收集到任何東西</div>';
     $('#pack-note').textContent = '';
     Q.$$('#pack-rows [data-ci]').forEach(function (b) {
