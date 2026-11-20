@@ -3,7 +3,7 @@
   'use strict';
   var $ = Q.$, $$ = Q.$$, esc = Q.esc;
   var KEY_STORE = 'gpsquest-admin-key';
-  var PROJECT_FIELDS = ['project_id', 'name', 'status', 'unlock_mode', 'description', 'intro', 'finish_message', 'cover_url',
+  var PROJECT_FIELDS = ['project_id', 'name', 'status', 'unlock_mode', 'description', 'intro', 'finish_message', 'cover_url', 'theme',
     'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy', 'is_default', 'show_leaderboard', 'require_run_code'];
   var STAGE_FIELDS = ['stage_id', 'enabled', 'clue', 'image_url', 'require_gps', 'show_location', 'bypass_code', 'question', 'show_question_early',
     'answer_type', 'points', 'choices', 'answer', 'max_attempts', 'form_url', 'form_verify_sheet', 'success_message',
@@ -36,6 +36,7 @@
     $('#ms-delete').onclick = deleteStage;
     $('#ms-answer_type').onchange = toggleTypeFields;
     $('#ms-here').onclick = useMyLocation;
+    $('#mp-theme').onchange = renderThemePrev;
     bindImageField('mp-cover_url', 'cover', function () { return $('#mp-project_id').value.trim(); });
     bindImageField('ms-image_url', 'stage', function () { return A.pid; });
     $('#ms-restore').onclick = function () {
@@ -66,6 +67,20 @@
     try { saved = sessionStorage.getItem(KEY_STORE) || ''; } catch (e) { /* */ }
     if (saved) { A.key = saved; enter(); }
   });
+
+  /* ---------- 前台畫面風格預覽 ---------- */
+  var THEME_INFO = {
+    retro:   ['羊皮紙、棕色邊框、古地圖濾鏡，像尋寶地圖。', ['#3b2d17', '#f3ead4', '#a12d1f', '#265f46']],
+    history: ['宣紙底、墨黑邊框、朱紅印章色，適合古蹟、老街、文史導覽。', ['#1c1c1c', '#efe9dc', '#9b1c1c', '#8c1d1d']],
+    sport:   ['白底、深藍與橘紅、粗斜體標題，適合體能、校慶、運動會闖關。', ['#0f172a', '#f4f7fb', '#ff4d1a', '#16a34a']],
+    mist:    ['深色背景、冷色調、薄霧與暗化地圖，適合夜間或懸疑主題。', ['#0a1118', '#0f1720', '#7dd3fc', '#1f8a8f']],
+    forest:  ['深綠與大地色，適合公園、步道、自然生態導覽。', ['#1f3a26', '#eef3e6', '#b4531a', '#2f6f3e']],
+    neon:    ['深紫底、青色與洋紅螢光，適合夜市、科技、電玩風格。', ['#07041a', '#0b0720', '#22d3ee', '#c026d3']]
+  };
+  function renderThemePrev() {
+    var t = $('#mp-theme').value, info = THEME_INFO[t] || THEME_INFO.retro;
+    $('#mp-theme-prev').innerHTML = info[1].map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('') + '<span>' + info[0] + '</span>';
+  }
 
   /* ---------- 圖片上傳（封面／關卡圖） ---------- */
   function compressImage(file, max, quality) {
@@ -206,7 +221,7 @@
 
   function openProject(p) {
     A.editProjectNew = !p;
-    p = p || { status: 'draft', unlock_mode: 'sequential', gps_max_accuracy: 80, time_limit_min: 0, show_leaderboard: true };
+    p = p || { status: 'draft', theme: 'retro', unlock_mode: 'sequential', gps_max_accuracy: 80, time_limit_min: 0, show_leaderboard: true };
     $('#mp-title').textContent = A.editProjectNew ? '新增專案' : '專案設定';
     PROJECT_FIELDS.forEach(function (f) {
       var el = $('#mp-' + f);
@@ -214,6 +229,8 @@
       else if (el.type === 'datetime-local') el.value = Q.toLocalInput(p[f]);
       else el.value = p[f] == null ? '' : p[f];
     });
+    if (!p.theme) $('#mp-theme').value = 'retro';
+    renderThemePrev();
     refreshImgPrev('mp-cover_url');
     $('#mp-project_id').disabled = !A.editProjectNew;
     $('#m-project').classList.remove('hidden');

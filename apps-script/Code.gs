@@ -16,11 +16,12 @@ var GPS_TOLERANCE_CAP = 20;         // 判定範圍最多額外放寬幾公尺�
 var MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 var ANSWER_TYPES = ['text', 'number', 'choice', 'photo', 'form', 'none'];
 var PROJECT_STATUS = ['active', 'hidden', 'draft', 'closed'];
+var THEMES = ['retro', 'history', 'sport', 'mist', 'forest', 'neon'];   // 前台畫面風格
 
 /* 各工作表欄位（可以在試算表後面自行加欄位，不影響程式） */
 var SCHEMA = {
   Projects: ['project_id', 'name', 'status', 'is_default', 'unlock_mode', 'description', 'intro',
-    'finish_message', 'cover_url', 'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy',
+    'finish_message', 'cover_url', 'theme', 'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy',
     'show_leaderboard', 'require_run_code', 'updated_at'],
   Stages: ['project_id', 'stage_id', 'order', 'enabled', 'title', 'clue', 'image_url', 'lat', 'lng',
     'radius_m', 'show_location', 'require_gps', 'bypass_code', 'question', 'show_question_early', 'answer_type', 'choices',
@@ -76,7 +77,7 @@ var ROUTES = {
 };
 
 function doGet(e) {
-  return json_({ ok: true, app: 'GPS 實境解謎 API', version: APP_VERSION, time: new Date() });
+  return json_({ ok: true, app: '實境解謎', version: APP_VERSION, time: new Date() });
 }
 
 function doPost(e) {
@@ -403,6 +404,8 @@ function adminSaveProject_(b) {
     if (!/^[A-Za-z0-9_-]{2,40}$/.test(id)) throw appError_('專案代碼只能用英文、數字、底線或連字號（2–40 字）', 'BAD_INPUT');
     if (!str_(p.name)) throw appError_('請輸入專案名稱', 'BAD_INPUT');
     if (p.status && PROJECT_STATUS.indexOf(p.status) < 0) throw appError_('狀態不正確', 'BAD_INPUT');
+    if (p.theme && THEMES.indexOf(p.theme) < 0) throw appError_('畫面風格不正確', 'BAD_INPUT');
+    ensureHeaders_('Projects');   // 舊試算表若缺新欄位（例如 theme），先補上，設定才會被存下來
     var rows = readRows_('Projects');
     var ex = find_(rows, function (r) { return str_(r.project_id) === id; });
     if (b.isNew && ex) throw appError_('專案代碼「' + id + '」已經存在', 'DUPLICATE');
@@ -704,7 +707,7 @@ function fillTemplate_(url, c) {
 
 function publicProject_(p, stages) {
   return {
-    project_id: p.project_id, name: p.name, description: p.description, intro: p.intro, cover_url: p.cover_url,
+    project_id: p.project_id, name: p.name, description: p.description, intro: p.intro, cover_url: p.cover_url, theme: p.theme,
     unlock_mode: p.unlock_mode, time_limit_min: p.time_limit_min, show_leaderboard: p.show_leaderboard,
     require_run_code: p.require_run_code, is_default: p.is_default, start_at: p.start_at || null,
     end_at: p.end_at || null, stage_count: stages.length
@@ -752,7 +755,8 @@ function cleanProject_(r) {
     is_default: bool_(r.is_default),
     unlock_mode: str_(r.unlock_mode).toLowerCase() === 'free' ? 'free' : 'sequential',
     description: str_(r.description), intro: str_(r.intro), finish_message: str_(r.finish_message),
-    cover_url: str_(r.cover_url), start_at: sd ? sd.toISOString() : '', end_at: ed ? ed.toISOString() : '',
+    cover_url: str_(r.cover_url), theme: THEMES.indexOf(str_(r.theme).toLowerCase()) >= 0 ? str_(r.theme).toLowerCase() : 'retro',
+    start_at: sd ? sd.toISOString() : '', end_at: ed ? ed.toISOString() : '',
     time_limit_min: num_(r.time_limit_min, 0), gps_max_accuracy: num_(r.gps_max_accuracy, DEFAULT_GPS_MAX_ACCURACY),
     show_leaderboard: bool_(r.show_leaderboard), require_run_code: bool_(r.require_run_code)
   };

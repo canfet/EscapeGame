@@ -105,6 +105,7 @@
     try {
       var r = await Q.run(function () { return api('getProject', { projectId: pid }); }, { noToast: true });
       var p = P.project = r.project;
+      applyTheme(p.theme);
       document.title = p.name;
       $('#intro-name').textContent = p.name;
       $('#intro-desc').textContent = p.description || '';
@@ -180,6 +181,7 @@
 
   function renderGame() {
     var s = P.state, se = s.session;
+    applyTheme(s.project.theme);
     document.title = s.project.name;
     $('#g-title').textContent = s.project.name;
     $('#g-team').textContent = se.team_name;
@@ -448,7 +450,24 @@
     drawStagesOnMap();
   }
 
-  var PIN_COLOR = { locked: '#7a6c58', open: '#a12d1f', arrived: '#a12d1f', solved: '#2d6a4f', failed: '#8a8272' };
+  /* ---------- 前台主題（後台「前台畫面風格」） ---------- */
+  var THEMES = ['retro', 'history', 'sport', 'mist', 'forest', 'neon'];
+  function themeVar(name, fallback) {
+    var v = getComputedStyle(document.body).getPropertyValue(name);
+    return (v && v.trim()) || fallback;
+  }
+  function pinColor(status) {
+    var key = { locked: '--pin-locked', open: '--pin-open', arrived: '--pin-open', solved: '--pin-solved', failed: '--pin-failed' }[status] || '--pin-locked';
+    return themeVar(key, '#5b4a32');
+  }
+  function applyTheme(t) {
+    t = THEMES.indexOf(t) >= 0 ? t : 'retro';
+    if (P.theme === t) return;
+    P.theme = t;
+    document.body.className = 'quest theme-' + t;
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', themeVar('--topbar', '#3b2d17'));
+  }
 
   function drawStagesOnMap() {
     if (!P.map || !P.state) return;
@@ -460,15 +479,15 @@
       if (prev) {
         var done = prev.status === 'solved';
         L.polyline([[prev.lat, prev.lng], [st.lat, st.lng]], done
-          ? { color: '#2d6a4f', weight: 4, opacity: .85, interactive: false }
-          : { color: '#5b4a32', weight: 3, opacity: .75, dashArray: '2 8', lineCap: 'round', interactive: false }
+          ? { color: themeVar('--route-done', '#2d6a4f'), weight: 4, opacity: .85, interactive: false }
+          : { color: themeVar('--route-todo', '#5b4a32'), weight: 3, opacity: .75, dashArray: '2 8', lineCap: 'round', interactive: false }
         ).addTo(P.layers);
       }
       prev = st;
     });
     P.state.stages.forEach(function (st, i) {
       if (st.lat == null) return;
-      var color = PIN_COLOR[st.status] || '#5b4a32';
+      var color = pinColor(st.status);
       var current = st.status === 'open' || st.status === 'arrived';
       L.circle([st.lat, st.lng], { radius: st.radius_m, color: color, weight: current ? 2 : 1, fillOpacity: current ? .16 : .06 }).addTo(P.layers);
       var sz = current ? 36 : 28;
@@ -531,7 +550,7 @@
     } else if (!inside && d > st.radius_m * 1.3) P.inside[st.stage_id] = false;
     var ll = [[P.pos.lat, P.pos.lng], [st.lat, st.lng]];
     var label = '距離「' + st.title + '」' + Q.fmtDist(d) + (P.pos.acc > 100 ? ' ⚠️誤差大' : '');
-    var style = { color: inside ? '#2d6a4f' : '#c1440e' };
+    var style = { color: inside ? themeVar('--link-near', '#2d6a4f') : themeVar('--link-far', '#c1440e') };
     if (!P.link) {
       P.link = L.polyline(ll, { color: style.color, weight: 2.5, dashArray: '4 7', interactive: false }).addTo(P.map);
       P.link.bindTooltip(label, { permanent: true, direction: 'center', className: 'dist-tip' });

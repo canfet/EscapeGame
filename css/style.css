@@ -367,3 +367,222 @@ body.quest { background: #f3ead4; }
 details.hint .hint-tag { margin-left: 8px; font-size: .78rem; font-weight: 500; color: var(--muted); }
 details.hint[open] .hint-tag { display: none; }
 
+
+.theme-prev { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.theme-prev i { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(0,0,0,.2); flex: none; }
+.theme-prev span { font-size: .82rem; color: var(--muted); margin-left: 6px; }
+
+/* ===================================================================
+   前台主題（後台「前台畫面風格」選擇）
+   body.quest.theme-xxx 只覆寫變數；下面共用規則一律吃變數，
+   所以預設（復古探險）看起來和之前完全一樣。
+   =================================================================== */
+body.quest {
+  --bg: #f3ead4; --accent: #a12d1f; --accent-soft: #fff7ea; --edge: #8a6d3b; --frame: #e9dcbc;
+  --topbar: #3b2d17; --hero: linear-gradient(135deg, #3b2d17, #5a4527);
+  --font-h: Georgia, "Noto Serif TC", "PMingLiU", serif;
+  --map-filter: sepia(.75) saturate(.8) contrast(.95) brightness(1.03);
+  --surface2: #fff; --note: #fbf3df; --note-line: #d4b06a; --clue: #fffdf8; --sel: #eaf4ee;
+  --chip: #ece4d3; --track: #e6dcc9; --btn-text: #fff; --overlay: rgba(20, 25, 20, .62);
+  --c-green-bg: #d8ecdf; --c-green-fg: #1f4d39; --c-amber-bg: #f8e3bf; --c-amber-fg: #6b4708;
+  --c-red-bg: #f3d6cf; --c-red-fg: #7a2716; --c-blue-bg: #d6e4ef; --c-blue-fg: #1d4566; --c-gray-bg: #e6e3dc; --c-gray-fg: #555;
+  --pin-locked: #7a6c58; --pin-open: #a12d1f; --pin-solved: #2d6a4f; --pin-failed: #8a8272;
+  --route-todo: #5b4a32; --route-done: #2d6a4f; --link-far: #c1440e; --link-near: #2d6a4f;
+  background: var(--bg); color: var(--ink);
+}
+
+/* ---- 共用規則：全部改吃變數 ---- */
+.quest h1, .quest h2, .quest h3, .quest .sc-title, .quest .ns-main, .quest .sheet-title, .quest .solved-title { font-family: var(--font-h); }
+.quest .topbar { background: var(--topbar); border-bottom: 2px solid var(--edge); }
+.quest .hero { background: var(--hero); border-color: var(--edge); }
+.quest .card, .quest .stat { background: var(--card); border-color: var(--line); color: var(--ink); }
+.quest .map-wrap { background: var(--frame); border-color: var(--edge); }
+.quest .map-wrap .map { border-color: var(--edge); }
+.quest #g-map .leaflet-tile-pane { filter: var(--map-filter); }
+.quest .gps-pill, .quest .map-fs { background: var(--card); color: var(--ink); border-color: var(--edge); }
+.quest .next-step { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.quest .ns-label { background: var(--accent); color: var(--btn-text); }
+.quest .ns-sub, .quest .ns-go { color: var(--accent); }
+.quest .next-step.arrived { border-color: var(--blue); }
+.quest .next-step.arrived .ns-label { background: var(--blue); }
+.quest .next-step.arrived .ns-sub, .quest .next-step.arrived .ns-go { color: var(--blue); }
+.quest .stage-card { background: var(--card); color: var(--ink); border-color: var(--line); }
+.quest .stage-card:hover { background: var(--surface2); }
+.quest .stage-card.locked { background: var(--chip); }
+.quest .stage-card.solved { border-color: var(--forest); }
+.quest .stage-card.open, .quest .stage-card.arrived { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+.quest .stage-card.open .sc-state, .quest .stage-card.arrived .sc-state { color: var(--accent); }
+.quest .stage-card.solved .sc-state { color: var(--forest); }
+.quest .sheet-body, .quest .solved-card { background: var(--bg); color: var(--ink); }
+.quest .solved-card { border: 2px solid var(--edge); }
+.quest .solved-overlay { background: var(--overlay); }
+.quest .sheet-actions { background: linear-gradient(to bottom, transparent, var(--bg) 28%); }
+.quest .close-x { background: var(--chip); color: var(--ink); }
+.quest input, .quest select, .quest textarea { background: var(--surface2); color: var(--ink); border-color: var(--line); }
+.quest .clue { background: var(--clue); }
+.quest .question { background: var(--surface2); border-color: var(--forest); }
+.quest .hint { background: var(--note); border-color: var(--note-line); }
+.quest .choice-list button { background: var(--surface2); color: var(--ink); border-color: var(--line); }
+.quest .choice-list button.sel { background: var(--sel); border-color: var(--forest); }
+.quest button.ghost, .quest .btn.ghost { color: var(--ink); border-color: var(--line); }
+.quest button.ghost:hover { background: var(--chip); }
+.quest .solved-msg { background: var(--surface2); border-color: var(--line); color: var(--ink); }
+.quest .progress { background: var(--track); }
+.quest .chip { background: var(--chip); color: var(--ink); }
+.quest .chip.green { background: var(--c-green-bg); color: var(--c-green-fg); }
+.quest .chip.amber { background: var(--c-amber-bg); color: var(--c-amber-fg); }
+.quest .chip.red { background: var(--c-red-bg); color: var(--c-red-fg); }
+.quest .chip.blue { background: var(--c-blue-bg); color: var(--c-blue-fg); }
+.quest .chip.gray { background: var(--c-gray-bg); color: var(--c-gray-fg); }
+.quest .compass { background: radial-gradient(circle, var(--card) 58%, var(--chip) 59%, var(--chip) 100%); border-color: var(--line); }
+.quest .stage-wrap.more::after { background: linear-gradient(to right, transparent, var(--bg)); }
+.quest a { color: var(--blue); }
+.quest .table-wrap, .quest table { background: var(--card); color: var(--ink); }
+.quest th { background: var(--chip); }
+.quest td, .quest th { border-color: var(--line); }
+.quest .toast { background: var(--topbar); color: #fff; }
+.quest .toast.ok { background: var(--forest); } .quest .toast.err { background: var(--red); } .quest .toast.warn { background: #8a5a12; }
+.quest #loading { background: color-mix(in srgb, var(--bg) 70%, transparent); }
+.quest button { color: var(--btn-text); }
+.quest button.ghost, .quest .close-x, .quest .choice-list button, .quest .map-fs { color: var(--ink); }
+.quest button.amber { color: #2a1d05; }
+.quest .sheet-pad { background: transparent; }
+
+/* ===== 2) 歷史古蹟：宣紙、墨黑、朱紅印章 ===== */
+body.theme-history {
+  --paper: #efe9dc; --card: #fbf8f1; --ink: #1a1a1a; --muted: #5b564b; --line: #d8cfba;
+  --forest: #8c1d1d; --forest-dark: #6b1414; --amber: #b8892b; --blue: #3a4a5f;
+  --bg: #efe9dc; --accent: #9b1c1c; --accent-soft: #f8efe6; --edge: #1c1c1c; --frame: #e4dcc7;
+  --topbar: #1c1c1c; --hero: linear-gradient(135deg, #1c1c1c, #3a1414);
+  --font-h: "Noto Serif TC", "Source Han Serif TC", "PMingLiU", "Songti TC", serif;
+  --map-filter: grayscale(.9) sepia(.25) contrast(1.05) brightness(1.02);
+  --surface2: #fffdf8; --note: #f6eddb; --note-line: #b8892b; --clue: #fbf8f1; --sel: #f6e4e0;
+  --chip: #e8e0cd; --track: #ddd3bd;
+  --pin-locked: #6b6b6b; --pin-open: #9b1c1c; --pin-solved: #1c1c1c; --pin-failed: #8a8272;
+  --route-todo: #6b5a3a; --route-done: #8c1d1d; --link-far: #9b1c1c; --link-near: #1c1c1c;
+}
+.theme-history .topbar { border-bottom: 3px double #9b1c1c; }
+.theme-history .hero, .theme-history .map-wrap { border-style: double; border-width: 4px; }
+.theme-history h1, .theme-history h2, .theme-history .sheet-title, .theme-history .sc-title { font-weight: 800; letter-spacing: .06em; }
+.theme-history .stage-card, .theme-history .card { border-radius: 6px; }
+.theme-history .ns-label { border-radius: 2px; letter-spacing: .1em; }
+.theme-history .stage-card.solved .stage-no, .theme-history .pin { border-radius: 4px; }
+
+/* ===== 3) 運動活力：明亮、高對比、粗斜體 ===== */
+body.theme-sport {
+  --paper: #f4f7fb; --card: #ffffff; --ink: #0f172a; --muted: #475569; --line: #dbe3ee;
+  --forest: #16a34a; --forest-dark: #15803d; --amber: #f59e0b; --blue: #1d4ed8; --red: #dc2626;
+  --bg: #f4f7fb; --accent: #ff4d1a; --accent-soft: #fff1ea; --edge: #0f172a; --frame: #dbeafe;
+  --topbar: #0f172a; --hero: linear-gradient(135deg, #0f172a, #1e3a8a);
+  --font-h: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --map-filter: saturate(1.15) contrast(1.05);
+  --surface2: #ffffff; --note: #fff7e0; --note-line: #f59e0b; --clue: #ffffff; --sel: #dcfce7;
+  --chip: #e2e8f0; --track: #dbe3ee;
+  --c-green-bg: #dcfce7; --c-green-fg: #166534; --c-blue-bg: #dbeafe; --c-blue-fg: #1e3a8a;
+  --pin-locked: #64748b; --pin-open: #ff4d1a; --pin-solved: #16a34a; --pin-failed: #94a3b8;
+  --route-todo: #0f172a; --route-done: #16a34a; --link-far: #ff4d1a; --link-near: #16a34a;
+}
+.theme-sport .topbar { border-bottom: 4px solid #ff4d1a; }
+.theme-sport h1, .theme-sport h2, .theme-sport .sheet-title, .theme-sport .sc-title, .theme-sport .ns-main, .theme-sport .solved-title {
+  font-weight: 900; font-style: italic; letter-spacing: .02em;
+}
+.theme-sport .stage-card, .theme-sport .card, .theme-sport .next-step { border-radius: 8px; border-width: 2px; }
+.theme-sport .map-wrap { border-radius: 10px; border-width: 3px; }
+.theme-sport button { font-weight: 800; letter-spacing: .02em; }
+.theme-sport .ns-label { border-radius: 4px; font-style: italic; }
+.theme-sport .pin { border-radius: 8px; transform: skewX(-6deg); }
+.theme-sport .solved-badge { background: #ff4d1a; box-shadow: 0 0 0 8px rgba(255, 77, 26, .18); }
+.theme-sport .solved-points { color: #ff4d1a; }
+
+/* ===== 4) 迷霧：深色、冷色調、薄霧 ===== */
+body.theme-mist {
+  --paper: #0f1720; --card: #16212c; --ink: #e6edf3; --muted: #9fb0bf; --line: #2a3a49;
+  --forest: #1f8a8f; --forest-dark: #17696d; --amber: #e0b24a; --blue: #7dd3fc; --red: #e0644a;
+  --bg: #0f1720; --accent: #7dd3fc; --accent-soft: #13222e; --edge: #3b556b; --frame: #1c2936;
+  --topbar: #0a1118; --hero: linear-gradient(135deg, #0a1118, #1f3347);
+  --font-h: "Noto Serif TC", "PMingLiU", Georgia, serif;
+  --map-filter: invert(1) hue-rotate(180deg) grayscale(.55) brightness(.8) contrast(.95);
+  --surface2: #1c2936; --note: #1b2a38; --note-line: #3b556b; --clue: #16212c; --sel: #17323a;
+  --chip: #243545; --track: #243545; --overlay: rgba(2, 6, 10, .72); --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .35);
+  --c-green-bg: rgba(47, 164, 169, .2); --c-green-fg: #7fe3e7; --c-amber-bg: rgba(224, 178, 74, .18); --c-amber-fg: #f0cd7d;
+  --c-red-bg: rgba(224, 100, 74, .2); --c-red-fg: #ff9d86; --c-blue-bg: rgba(125, 211, 252, .16); --c-blue-fg: #a5e1ff;
+  --c-gray-bg: #243545; --c-gray-fg: #b6c3cf;
+  --pin-locked: #4a5a6a; --pin-open: #38bdf8; --pin-solved: #2fa4a9; --pin-failed: #5b6b7b;
+  --route-todo: #8fb3cc; --route-done: #2fa4a9; --link-far: #7dd3fc; --link-near: #5eead4;
+}
+.theme-mist::before {
+  content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(40% 30% at 20% 30%, rgba(180, 205, 225, .10), transparent 70%),
+    radial-gradient(50% 35% at 80% 70%, rgba(180, 205, 225, .08), transparent 70%),
+    radial-gradient(35% 25% at 55% 10%, rgba(180, 205, 225, .07), transparent 70%);
+  animation: fog-drift 45s ease-in-out infinite alternate;
+}
+@keyframes fog-drift { to { transform: translate(7%, 4%) scale(1.08); } }
+.theme-mist .pin.cur { box-shadow: 0 0 0 4px rgba(56, 189, 248, .3), 0 0 14px rgba(56, 189, 248, .6); }
+.theme-mist .compass-arrow path { stroke: #0f1720; }
+.theme-mist .compass.inside { background: radial-gradient(circle, #123436 58%, #17484b 59%); }
+.theme-mist .compass-ring span { color: #9fb0bf; }
+.theme-mist .gps-pill { background: rgba(10, 17, 24, .9); }
+.theme-mist .map-hint { background: rgba(0, 0, 0, .7); }
+.theme-mist .leaflet-container { background: #0a1118; }
+.theme-mist .leaflet-control-zoom a, .theme-mist .leaflet-bar a { background: #16212c; color: #e6edf3; border-color: #2a3a49; }
+.theme-mist .leaflet-control-attribution { background: rgba(10, 17, 24, .75); color: #9fb0bf; }
+.theme-mist .leaflet-control-attribution a { color: #7dd3fc; }
+.theme-mist .gps-help { background: #2a1b1b; color: #ffb4a2; border-color: #5a2d2d; }
+.theme-mist .leaflet-tooltip.dist-tip { background: #0a1118; color: #7dd3fc; border-color: #7dd3fc; }
+
+/* ===== 5) 森林自然 ===== */
+body.theme-forest {
+  --paper: #eef3e6; --card: #fbfdf7; --ink: #1e2a1e; --muted: #53634f; --line: #d3dec3;
+  --forest: #2f6f3e; --forest-dark: #1f5230; --amber: #d89b2b; --blue: #2c6a8a; --red: #b4402a;
+  --bg: #eef3e6; --accent: #b4531a; --accent-soft: #fbf1e6; --edge: #4b6b3a; --frame: #dfe8cf;
+  --topbar: #1f3a26; --hero: linear-gradient(135deg, #1f3a26, #3b6b43);
+  --font-h: "Noto Serif TC", "PMingLiU", Georgia, serif;
+  --map-filter: saturate(.9) sepia(.15) hue-rotate(-8deg) brightness(1.02);
+  --surface2: #ffffff; --note: #f6f1d9; --note-line: #c9b25a; --clue: #fbfdf7; --sel: #e1f1de;
+  --chip: #e1e9d2; --track: #d3dec3;
+  --pin-locked: #7d8a72; --pin-open: #b4531a; --pin-solved: #2f6f3e; --pin-failed: #8a9080;
+  --route-todo: #6b5a3a; --route-done: #2f6f3e; --link-far: #b4531a; --link-near: #2f6f3e;
+}
+.theme-forest .stage-card, .theme-forest .card, .theme-forest .next-step { border-radius: 18px; }
+.theme-forest .map-wrap { border-radius: 20px; }
+
+/* ===== 6) 賽博霓虹 ===== */
+body.theme-neon {
+  --paper: #0b0720; --card: #150f33; --ink: #f3eaff; --muted: #b9a8e8; --line: #34286a;
+  --forest: #c026d3; --forest-dark: #a21caf; --amber: #fbbf24; --blue: #22d3ee; --red: #fb7185;
+  --bg: #0b0720; --accent: #22d3ee; --accent-soft: #12143a; --edge: #6d28d9; --frame: #1d1545;
+  --topbar: #07041a; --hero: linear-gradient(135deg, #1e0a4a, #4c1d95);
+  --font-h: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --map-filter: invert(1) hue-rotate(200deg) brightness(.78) saturate(1.4) contrast(.95);
+  --surface2: #1d1545; --note: #1d1545; --note-line: #6d28d9; --clue: #150f33; --sel: #2a1459;
+  --chip: #251a56; --track: #251a56; --overlay: rgba(4, 2, 16, .78); --shadow: 0 0 0 1px rgba(109, 40, 217, .35), 0 4px 18px rgba(0, 0, 0, .45);
+  --c-green-bg: rgba(52, 211, 153, .18); --c-green-fg: #6ee7b7; --c-amber-bg: rgba(251, 191, 36, .16); --c-amber-fg: #fcd34d;
+  --c-red-bg: rgba(251, 113, 133, .18); --c-red-fg: #fda4af; --c-blue-bg: rgba(34, 211, 238, .16); --c-blue-fg: #67e8f9;
+  --c-gray-bg: #251a56; --c-gray-fg: #c4b5fd;
+  --pin-locked: #4c3f8a; --pin-open: #22d3ee; --pin-solved: #c026d3; --pin-failed: #6b5fa8;
+  --route-todo: #a78bfa; --route-done: #e879f9; --link-far: #22d3ee; --link-near: #e879f9;
+}
+.theme-neon .topbar { border-bottom: 2px solid #22d3ee; box-shadow: 0 2px 14px rgba(34, 211, 238, .35); }
+.theme-neon h1, .theme-neon h2, .theme-neon .sheet-title { text-shadow: 0 0 10px rgba(217, 70, 239, .55); letter-spacing: .04em; }
+.theme-neon .next-step, .theme-neon .stage-card.open, .theme-neon .stage-card.arrived { box-shadow: 0 0 14px rgba(34, 211, 238, .45); }
+.theme-neon .pin.cur { box-shadow: 0 0 0 4px rgba(34, 211, 238, .3), 0 0 16px rgba(34, 211, 238, .8); }
+.theme-neon button.big:not(.ghost):not(.amber), .theme-neon #s-code-btn { background: linear-gradient(135deg, #c026d3, #7c3aed); }
+.theme-neon button.big:not(.ghost):hover { filter: brightness(1.12); }
+.theme-neon .compass-arrow path { stroke: #0b0720; }
+.theme-neon .compass.inside { background: radial-gradient(circle, #10233a 58%, #12304d 59%); }
+.theme-neon .compass-ring span { color: #b9a8e8; }
+.theme-neon .gps-pill { background: rgba(7, 4, 26, .9); }
+.theme-neon .leaflet-container { background: #07041a; }
+.theme-neon .leaflet-control-zoom a, .theme-neon .leaflet-bar a { background: #150f33; color: #f3eaff; border-color: #34286a; }
+.theme-neon .leaflet-control-attribution { background: rgba(7, 4, 26, .75); color: #b9a8e8; }
+.theme-neon .leaflet-control-attribution a { color: #22d3ee; }
+.theme-neon .gps-help { background: #2a1030; color: #fda4af; border-color: #5a2060; }
+.theme-neon .leaflet-tooltip.dist-tip { background: #07041a; color: #22d3ee; border-color: #22d3ee; }
+.theme-neon .solved-badge { background: #c026d3; box-shadow: 0 0 0 8px rgba(192, 38, 211, .22), 0 0 24px rgba(192, 38, 211, .6); }
+
+@media (prefers-reduced-motion: reduce) { .theme-mist::before { animation: none; } }
+
+.quest .retry-bar { background: var(--topbar); color: #fff; }
+.quest .retry-bar .ghost { color: #fff; border-color: rgba(255,255,255,.4); }

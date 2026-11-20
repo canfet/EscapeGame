@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex">
   <title>實境解謎 · 管理後台</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261120g">
+  <link rel="stylesheet" href="css/style.css?v=20261120h">
 </head>
 <body>
   <!-- 登入 -->
@@ -128,6 +128,17 @@
             <option value="free">自由順序（全部關卡同時開放）</option>
           </select></div>
       </div>
+      <div class="field"><label>前台畫面風格</label>
+        <select id="mp-theme">
+          <option value="retro">🗺️ 復古探險（羊皮紙古地圖）</option>
+          <option value="history">🏯 歷史古蹟（宣紙墨黑加朱紅）</option>
+          <option value="sport">🏃 運動活力（明亮高對比）</option>
+          <option value="mist">🌫️ 迷霧（深色、冷色調、薄霧）</option>
+          <option value="forest">🌲 森林自然（深綠與大地色）</option>
+          <option value="neon">🌃 賽博霓虹（深紫與螢光）</option>
+        </select>
+        <div class="theme-prev" id="mp-theme-prev"></div>
+        <div class="help">只影響闖關者看到的畫面（顏色、字體、地圖濾鏡），不影響關卡內容與計分。</div></div>
       <div class="field"><label>簡短說明</label><input id="mp-description"></div>
       <div class="field"><label>開場介紹</label><textarea id="mp-intro" placeholder="任務背景、規則、注意事項…"></textarea></div>
       <div class="field"><label>完成訊息</label><textarea id="mp-finish_message" placeholder="例如：請回到集合點找關主領獎"></textarea></div>
@@ -252,8 +263,8 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="config.js?v=20261120g"></script>
-  <script src="js/common.js?v=20261120g"></script>
-  <script src="js/admin.js?v=20261120g"></script>
+  <script src="config.js?v=20261120h"></script>
+  <script src="js/common.js?v=20261120h"></script>
+  <script src="js/admin.js?v=20261120h"></script>
 </body>
 </html>
