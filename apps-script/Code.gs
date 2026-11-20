@@ -79,6 +79,7 @@ var ROUTES = {
   // 後台（需管理密碼）
   adminLogin: admin_(adminLogin_),
   adminListProjects: admin_(adminListProjects_),
+  adminLiveCount: admin_(adminLiveCount_),
   adminGetProject: admin_(adminGetProject_),
   adminSaveProject: admin_(adminSaveProject_),
   adminDeleteProject: admin_(adminDeleteProject_),
@@ -116,6 +117,8 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  var t0 = Date.now();
+  resetMemo_();
   try {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     var fn = ROUTES[body.action];
@@ -125,6 +128,7 @@ function doPost(e) {
     // 版本資訊：前台比對後端是否過舊；後端也回報前台是否過舊
     result.version = APP_VERSION;
     result.front_stale = cmpVer_(body.fv || '0', MIN_FRONT) < 0;
+    result.ms = Date.now() - t0;   // 後端處理時間（毫秒），前台開發者工具可以看到，用來找出慢在哪
     return json_(result);
   } catch (err) {
     return json_({ ok: false, error: (err && err.message) || String(err), code: (err && err.code) || 'ERROR', version: APP_VERSION });
@@ -163,7 +167,7 @@ function getProject_(b) {
 }
 
 function startSession_(b) {
-  return withLock_(function () {
+  return lockedAction_(function () {
     var p = findProject_(b.projectId);
     var isTest = bool_(b.test) && isTestToken_(b.tt);   // 試玩：需要後台給的金鑰，不會計入排行榜與正式人數
     checkPlayable_(p, isTest);
@@ -186,9 +190,11 @@ function startSession_(b) {
         return str_(r.project_id) === p.project_id && str_(r.run_code) === run && str_(r.team_name) === team && bool_(r.test) === isTest;
       });
       if (dup) {
-        var st0 = buildState_(ctx_({ sessionId: str_(dup.session_id) }, false));
-        st0.resumed = true;
-        return st0;
+        return function () {
+          var st0 = buildState_(ctx_({ sessionId: str_(dup.session_id) }, false));
+          st0.resumed = true;
+          return st0;
+        };
       }
       route = preset.route;
       avatarWant = preset.avatar || avatarWant;
@@ -228,8 +234,10 @@ function startSession_(b) {
     writeRow_('Sessions', null, s);
     var saved = loadSession_(s.session_id);
     var c = { s: saved, p: p, stages: routeStages_(p, stages_(p.project_id), saved.route), now: now };
-    log_(c, null, 'start', {});
-    return buildState_(c);
+    return function () {
+      log_(c, null, 'start', {});
+      return buildState_(c);
+    };
   });
 }
 
@@ -256,13 +264,13 @@ function getSession_(b) {
 
 /** 抵達關卡：GPS 打卡或輸入現場通關碼 */
 function arrive_(b) {
-  return withLock_(function () {
+  return lockedAction_(function () {
     var c = ctx_(b, true);
     var st = getStage_(c, b.stageId);
     var status = statusOf_(c, st);
     var g = prog_(c, st);
     if (status === 'locked') throw appError_('這一關尚未解鎖，請先完成前面的關卡', 'LOCKED');
-    if (status === 'solved' || status === 'failed') return buildState_(c, { arrived: true });
+    if (status === 'solved' || status === 'failed') return function () { return buildState_(c, { arrived: true }); };
 
     var extra = {};
     if (status === 'open') {
@@ -287,20 +295,24 @@ function arrive_(b) {
         var maxAcc = c.p.gps_max_accuracy || DEFAULT_GPS_MAX_ACCURACY;
         if (acc > maxAcc) {
           saveSession_(c);
-          log_(c, st, 'arrive', merge_(pos, { result: 'low_accuracy' }));
-          return buildState_(c, {
-            arrived: false, distance_m: Math.round(d),
-            message: '目前定位誤差約 ' + Math.round(acc) + ' 公尺，太大了。請到空曠處、開啟「精確位置」後再試一次。'
-          });
+          return function () {
+            log_(c, st, 'arrive', merge_(pos, { result: 'low_accuracy' }));
+            return buildState_(c, {
+              arrived: false, distance_m: Math.round(d),
+              message: '目前定位誤差約 ' + Math.round(acc) + ' 公尺，太大了。請到空曠處、開啟「精確位置」後再試一次。'
+            });
+          };
         }
         var tol = Math.min(acc, GPS_TOLERANCE_CAP);
         if (d > st.radius_m + tol) {
           saveSession_(c);
-          log_(c, st, 'arrive', merge_(pos, { result: 'too_far' }));
-          return buildState_(c, {
-            arrived: false, distance_m: Math.round(d),
-            message: '還沒到喔！距離目標約 ' + Math.round(d) + ' 公尺，再靠近一點。'
-          });
+          return function () {
+            log_(c, st, 'arrive', merge_(pos, { result: 'too_far' }));
+            return buildState_(c, {
+              arrived: false, distance_m: Math.round(d),
+              message: '還沒到喔！距離目標約 ' + Math.round(d) + ' 公尺，再靠近一點。'
+            });
+          };
         }
         extra = merge_(pos, { note: 'gps' });
       } else if (st.bypass_code) {
@@ -312,21 +324,23 @@ function arrive_(b) {
     if (st.answer_type === 'none' && !g.solvedAt) solve_(c, st, g);
     finishIfDone_(c);
     saveSession_(c);
-    log_(c, st, 'arrive', merge_(extra, { result: 'ok', points: g.points || '' }));
-    return buildState_(c, {
-      arrived: true,
-      message: st.answer_type === 'none' ? (st.success_message || '打卡成功！') : '抵達成功！題目已解鎖。'
-    });
+    return function () {
+      log_(c, st, 'arrive', merge_(extra, { result: 'ok', points: g.points || '' }));
+      return buildState_(c, {
+        arrived: true,
+        message: st.answer_type === 'none' ? (st.success_message || '打卡成功！') : '抵達成功！題目已解鎖。'
+      });
+    };
   });
 }
 
 function submitAnswer_(b) {
-  return withLock_(function () {
+  return lockedAction_(function () {
     var c = ctx_(b, true);
     var st = getStage_(c, b.stageId);
     var status = statusOf_(c, st);
-    if (status === 'solved') return buildState_(c, { correct: true, message: '這一關已經完成了' });
-    if (status === 'failed') return buildState_(c, { correct: false, message: '這一關的作答次數已用完' });
+    if (status === 'solved') return function () { return buildState_(c, { correct: true, message: '這一關已經完成了' }); };
+    if (status === 'failed') return function () { return buildState_(c, { correct: false, message: '這一關的作答次數已用完' }); };
     if (status !== 'arrived') throw appError_('請先抵達關卡地點', 'NOT_ARRIVED');
     if (['text', 'number', 'choice'].indexOf(st.answer_type) < 0) throw appError_('這一關不需要輸入答案', 'BAD_TYPE');
     var g = prog_(c, st);
@@ -358,13 +372,15 @@ function submitAnswer_(b) {
     }
     finishIfDone_(c);
     saveSession_(c);
-    log_(c, st, 'answer', { input: ans, result: ok ? 'correct' : (g.failed ? 'failed' : 'wrong'), points: ok ? g.points : '', file_url: ok && g.fileUrl ? g.fileUrl : '' });
-    return buildState_(c, { correct: ok, message: msg });
+    return function () {
+      log_(c, st, 'answer', { input: ans, result: ok ? 'correct' : (g.failed ? 'failed' : 'wrong'), points: ok ? g.points : '', file_url: ok && g.fileUrl ? g.fileUrl : '' });
+      return buildState_(c, { correct: ok, message: msg });
+    };
   });
 }
 
 function getHint_(b) {
-  return withLock_(function () {
+  return lockedAction_(function () {
     var c = ctx_(b, true);
     var st = getStage_(c, b.stageId);
     var status = statusOf_(c, st);
@@ -375,8 +391,10 @@ function getHint_(b) {
     if (used >= hints.length) throw appError_('沒有更多提示了', 'NO_HINT');
     g.hints = used + 1;
     saveSession_(c);
-    log_(c, st, 'hint', { input: String(g.hints), note: hints[used] });
-    return buildState_(c, { hint: hints[used], message: st.hint_penalty ? '已使用提示：這一關答對可得 ' + Math.max(0, st.points - g.hints * st.hint_penalty) + ' 分（每則提示少 ' + st.hint_penalty + ' 分）' : '' });
+    return function () {
+      log_(c, st, 'hint', { input: String(g.hints), note: hints[used] });
+      return buildState_(c, { hint: hints[used], message: st.hint_penalty ? '已使用提示：這一關答對可得 ' + Math.max(0, st.points - g.hints * st.hint_penalty) + ' 分（每則提示少 ' + st.hint_penalty + ' 分）' : '' });
+    };
   });
 }
 
@@ -402,22 +420,55 @@ function checkPhoto_(dataUrl) {
 }
 
 function uploadPhoto_(b) {
-  return withLock_(function () {
+  // 存到雲端硬碟要好幾秒：先在鎖外做完（不會讓其他隊伍排隊等），鎖內只做「確認狀態 → 記錄過關」。
+  // 鎖外先擋掉明顯不該存的（還沒抵達、已結束、操作太頻繁），避免亂傳檔案。
+  var fileUrl = '';
+  var c0 = ctx_(b, false), st0 = getStage_(c0, b.stageId);
+  if (st0.answer_type === 'photo' && statusOf_(c0, st0) === 'arrived' && c0.s.status === 'playing' && !isTimeUp_(c0) &&
+    !rateBlocked_('s_' + c0.s.session_id, RATE.sessionPerMin)) {
+    checkPhoto_(b.dataUrl);
+    checkPlayable_(c0.p, bool_(c0.s.test));
+    fileUrl = savePhoto_(c0, st0, b.dataUrl, b.caption);
+  }
+  return lockedAction_(function () {
     var c = ctx_(b, true);
     var st = getStage_(c, b.stageId);
     var status = statusOf_(c, st);
-    if (status === 'solved') return buildState_(c, { message: '這一關已經完成了' });
+    if (status === 'solved') return function () { return buildState_(c, { message: '這一關已經完成了' }); };
     if (status !== 'arrived') throw appError_('請先抵達關卡地點', 'NOT_ARRIVED');
     if (st.answer_type !== 'photo') throw appError_('這一關不需要上傳照片', 'BAD_TYPE');
-    var fileUrl = savePhoto_(c, st, b.dataUrl, b.caption);
+    if (!fileUrl) fileUrl = savePhoto_(c, st, b.dataUrl, b.caption);   // 鎖外沒存到（例如剛好在等鎖的期間才抵達）
     var g = prog_(c, st);
     g.fileUrl = fileUrl;
     solve_(c, st, g);
     finishIfDone_(c);
     saveSession_(c);
-    log_(c, st, 'photo', { input: str_(b.caption).slice(0, 200), result: 'uploaded', points: g.points, file_url: g.fileUrl });
-    return buildState_(c, { correct: true, message: st.success_message || '照片上傳成功！' });
+    return function () {
+      log_(c, st, 'photo', { input: str_(b.caption).slice(0, 200), result: 'uploaded', points: g.points, file_url: g.fileUrl });
+      return buildState_(c, { correct: true, message: st.success_message || '照片上傳成功！' });
+    };
   });
+}
+
+/**
+ * 專案的圖片資料夾（_images）：記住資料夾代碼，不用每次上傳都找；資料夾本身設成「知道連結的人可檢視」一次，
+ * 裡面的檔案就繼承這個權限，不用每個檔案各自設定分享（那一步每次要 1～2 秒）。
+ * 回傳 { dir, shared }：shared 為 false 代表資料夾分享失敗，呼叫端要自己設定檔案分享。
+ */
+function imagesDir_(pid) {
+  var props = PropertiesService.getScriptProperties(), key = 'IMG_DIR_' + pid, dir = null, id = props.getProperty(key);
+  if (id) { try { dir = DriveApp.getFolderById(id); } catch (e) { dir = null; } }
+  if (!dir) {
+    var parent = folder_(pid), it = parent.getFoldersByName('_images');
+    dir = it.hasNext() ? it.next() : parent.createFolder('_images');
+    try { props.setProperty(key, dir.getId()); } catch (e) { /* */ }
+  }
+  var shared = false;
+  try {
+    if (dir.getSharingAccess() !== DriveApp.Access.ANYONE_WITH_LINK) dir.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    shared = true;
+  } catch (e) { shared = false; }
+  return { dir: dir, shared: shared };
 }
 
 /** 後台上傳封面／關卡圖片：存到 Drive 的 <專案代碼>/_images，設為「知道連結的人可檢視」，回傳可直接用於 <img> 的網址 */
@@ -431,10 +482,9 @@ function adminUploadImage_(b) {
   if (bytes.length > MAX_PHOTO_BYTES) throw appError_('圖片太大了（上限 8 MB）', 'TOO_LARGE');
   var ext = m[1].split('/')[1].replace('jpeg', 'jpg');
   var name = kind + '_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '.' + ext;
-  var parent = folder_(pid), it = parent.getFoldersByName('_images');
-  var dir = it.hasNext() ? it.next() : parent.createFolder('_images');
-  var file = dir.createFile(Utilities.newBlob(bytes, m[1], name));
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  var im = imagesDir_(pid);
+  var file = im.dir.createFile(Utilities.newBlob(bytes, m[1], name));
+  if (!im.shared) file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return { url: 'https://lh3.googleusercontent.com/d/' + file.getId(), file_id: file.getId() };
 }
 
@@ -452,20 +502,19 @@ function adminImportImage_(b) {
   var bytes = res.getContent();
   if (bytes.length > 5 * 1024 * 1024) throw appError_('圖片太大（上限 5 MB）', 'TOO_LARGE');
   var ext = type.split('/')[1].split(';')[0].replace('jpeg', 'jpg');
-  var parent = folder_('decks'), it = parent.getFoldersByName('_images');
-  var dir = it.hasNext() ? it.next() : parent.createFolder('_images');
-  var file = dir.createFile(Utilities.newBlob(bytes, type.split(';')[0], 'wm_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + rand_(4, 'abcdefghjkmnpqrstuvwxyz23456789') + '.' + ext));
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  var im = imagesDir_('decks');
+  var file = im.dir.createFile(Utilities.newBlob(bytes, type.split(';')[0], 'wm_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + rand_(4, 'abcdefghjkmnpqrstuvwxyz23456789') + '.' + ext));
+  if (!im.shared) file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return { url: 'https://lh3.googleusercontent.com/d/' + file.getId(), file_id: file.getId() };
 }
 
 /** Google 表單關卡：若有設定 form_verify_sheet，會去該工作表找隊伍代碼 */
 function checkForm_(b) {
-  return withLock_(function () {
+  return lockedAction_(function () {
     var c = ctx_(b, true);
     var st = getStage_(c, b.stageId);
     var status = statusOf_(c, st);
-    if (status === 'solved') return buildState_(c, { correct: true, message: '這一關已經完成了' });
+    if (status === 'solved') return function () { return buildState_(c, { correct: true, message: '這一關已經完成了' }); };
     if (status !== 'arrived') throw appError_('請先抵達關卡地點', 'NOT_ARRIVED');
     if (st.answer_type !== 'form') throw appError_('這一關不是表單關卡', 'BAD_TYPE');
     if (st.form_verify_sheet) {
@@ -473,16 +522,20 @@ function checkForm_(b) {
       if (!sh) throw appError_('找不到表單回應工作表「' + st.form_verify_sheet + '」，請通知關主', 'CONFIG');
       var found = sh.createTextFinder(c.s.code).matchCase(false).findNext();
       if (!found) {
-        log_(c, st, 'form', { result: 'not_found' });
-        return buildState_(c, { correct: false, message: '還沒收到你們的表單回覆。送出表單後，請等幾秒再按一次。' });
+        return function () {
+          log_(c, st, 'form', { result: 'not_found' });
+          return buildState_(c, { correct: false, message: '還沒收到你們的表單回覆。送出表單後，請等幾秒再按一次。' });
+        };
       }
     }
     var g = prog_(c, st);
     solve_(c, st, g);
     finishIfDone_(c);
     saveSession_(c);
-    log_(c, st, 'form', { result: 'ok', points: g.points });
-    return buildState_(c, { correct: true, message: st.success_message || '表單已確認，過關！' });
+    return function () {
+      log_(c, st, 'form', { result: 'ok', points: g.points });
+      return buildState_(c, { correct: true, message: st.success_message || '表單已確認，過關！' });
+    };
   });
 }
 
@@ -583,6 +636,16 @@ function adminListProjects_() {
     return p;
   });
   return { projects: list };
+}
+
+/** 某專案目前「正在玩」的正式隊伍數（只讀隊伍表，比專案清單輕很多）；後台危險操作前用來判斷要不要警告 */
+function adminLiveCount_(b) {
+  var pid = str_(b.projectId), recent = Date.now() - 6 * 3600 * 1000;
+  var n = readRows_('Sessions').filter(function (s) {
+    var la = date_(s.last_active_at);
+    return str_(s.project_id) === pid && !bool_(s.test) && str_(s.status) === 'playing' && la && la.getTime() >= recent;
+  }).length;
+  return { playing_count: n };
 }
 
 function adminGetProject_(b) {
@@ -834,6 +897,7 @@ function ctx_(b, mutate) {
     if (pending0) { s.status = 'playing'; s.finished_at = ''; }
   }
   if (mutate) {
+    Object.defineProperty(s, '_fresh', { value: true, enumerable: false, writable: true });   // 呼叫端已經取得鎖：這份進度是最新的
     if (rateHit_('s_' + s.session_id, RATE.sessionPerMin, 60)) throw appError_('操作太頻繁了，請稍等幾秒再試', 'RATE');
     checkPlayable_(p, bool_(s.test));
     if (s.status === 'finished') throw appError_('你們已經完成全部關卡囉！', 'FINISHED');
@@ -1603,7 +1667,7 @@ function saveSession_(c) {
     status: s.status, score: score_(c), progress_json: JSON.stringify(s.progress),
     finished_at: s.finished_at || '', last_active_at: c.now || new Date(),
     last_lat: s.last_lat === undefined ? '' : s.last_lat, last_lng: s.last_lng === undefined ? '' : s.last_lng
-  });
+  }, s._fresh ? s._vals : null);   // 在鎖內剛讀進來的進度才可以直接沿用原本那一列；不是的話重新讀一次，避免蓋掉別人的修改
 }
 
 function log_(c, st, action, extra) {
@@ -1630,7 +1694,16 @@ function folder_(pid) {
 
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 
+/**
+ * 單次請求內的記憶體快取（每個請求都是新的執行環境，所以不會跨請求；取得鎖、或寫入之後也會清掉對應部分）。
+ * 同一個請求裡，同一張工作表只會真的讀一次，標題列也只讀一次——這是降低 Apps Script 等待時間最有效的做法。
+ */
+var MEMO_ = { sheets: {}, hdr: {}, rows: {} };
+function resetMemo_() { MEMO_ = { sheets: {}, hdr: {}, rows: {} }; }
+function dropMemo_(name) { delete MEMO_.rows[name]; delete MEMO_.hdr[name]; }
+
 function sheet_(name) {
+  if (MEMO_.sheets[name]) return MEMO_.sheets[name];
   var ss = ss_(), sh = ss.getSheetByName(name);
   if (!sh) {
     sh = ss.insertSheet(name);
@@ -1638,6 +1711,7 @@ function sheet_(name) {
     sh.getRange(1, 1, 1, h.length).setValues([h]);
     sh.setFrozenRows(1);
   }
+  MEMO_.sheets[name] = sh;
   return sh;
 }
 
@@ -1647,8 +1721,14 @@ function headers_(sh) {
   return sh.getRange(1, 1, 1, lc).getValues()[0].map(function (h) { return String(h).trim(); });
 }
 
+/** 某張表的標題列（同一請求內只讀一次） */
+function hdrOf_(name) {
+  if (!MEMO_.hdr[name]) MEMO_.hdr[name] = headers_(sheet_(name));
+  return MEMO_.hdr[name];
+}
+
 function ensureHeaders_(name) {
-  var sh = sheet_(name), h = headers_(sh);
+  var sh = sheet_(name), h = hdrOf_(name);
   var missing = SCHEMA[name].filter(function (k) { return h.indexOf(k) < 0; });
   if (missing.length) {
     sh.getRange(1, h.length + 1, 1, missing.length).setValues([missing]);
@@ -1657,15 +1737,20 @@ function ensureHeaders_(name) {
       var fmt = (NUMBER_COLUMNS[name] || []).indexOf(k) >= 0 ? '0.########' : ((TEXT_COLUMNS[name] || []).indexOf(k) >= 0 ? '@' : '');
       if (fmt) sh.getRange(2, h.length + 1 + i, Math.max(sh.getMaxRows() - 1, 1), 1).setNumberFormat(fmt);
     });
+    dropMemo_(name);   // 標題列變了，記憶要清掉
   }
   return sh;
 }
 
 function readRows_(name) {
+  // 每次回傳複本：呼叫端常會修改取得的列（例如加欄位、刪 _row），不能影響記憶中的原本資料
+  var cloneAll = function (a) { return a.map(function (r) { return Object.assign({}, r); }); };
+  if (MEMO_.rows[name]) return cloneAll(MEMO_.rows[name]);
   var sh = sheet_(name), lr = sh.getLastRow(), lc = sh.getLastColumn();
-  if (lr < 2) return [];
+  if (lr < 2) { MEMO_.rows[name] = []; return []; }
   var vals = sh.getRange(1, 1, lr, lc).getValues();
   var h = vals[0].map(function (x) { return String(x).trim(); });
+  MEMO_.hdr[name] = h;
   var out = [];
   for (var i = 1; i < vals.length; i++) {
     var r = vals[i];
@@ -1674,13 +1759,15 @@ function readRows_(name) {
     h.forEach(function (k, j) { if (k) o[k] = r[j]; });
     out.push(o);
   }
-  return out;
+  MEMO_.rows[name] = out;
+  return cloneAll(out);
 }
 
-function writeRow_(name, rowIndex, obj) {
-  var sh = sheet_(name), h = headers_(sh);
+function writeRow_(name, rowIndex, obj, knownRow) {
+  var sh = sheet_(name), h = hdrOf_(name);
+  delete MEMO_.rows[name];   // 資料變了，下次讀要重新讀
   if (rowIndex) {
-    var existing = sh.getRange(rowIndex, 1, 1, h.length).getValues()[0];
+    var existing = (knownRow && knownRow.length === h.length) ? knownRow : sh.getRange(rowIndex, 1, 1, h.length).getValues()[0];
     var merged = h.map(function (k, j) { return (k && k in obj) ? toCell_(obj[k]) : existing[j]; });
     sh.getRange(rowIndex, 1, 1, h.length).setValues([merged]);
   } else {
@@ -1699,6 +1786,7 @@ function deleteRows_(name, pred) {
     sh.deleteRows(rows[j], j - i + 1);
     i = j + 1;
   }
+  delete MEMO_.rows[name];
   return rows.length;
 }
 
@@ -1718,12 +1806,13 @@ function readTailRows_(name, n) {
 }
 
 function findRowByValue_(name, col, value) {
-  var sh = sheet_(name), h = headers_(sh), ci = h.indexOf(col) + 1, lr = sh.getLastRow();
+  var sh = sheet_(name), h = hdrOf_(name), ci = h.indexOf(col) + 1, lr = sh.getLastRow();
   if (!ci || lr < 2) return null;
   var cell = sh.getRange(2, ci, lr - 1, 1).createTextFinder(String(value)).matchEntireCell(true).findNext();
   if (!cell) return null;
   var row = cell.getRow(), vals = sh.getRange(row, 1, 1, h.length).getValues()[0], o = { _row: row };
   h.forEach(function (k, j) { if (k) o[k] = vals[j]; });
+  Object.defineProperty(o, '_vals', { value: vals, enumerable: false, writable: true });   // 原始整列，之後寫回時不必再讀
   return o;
 }
 
@@ -1813,9 +1902,20 @@ function json_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
+/**
+ * 縮短「占著鎖」的時間：fn 在鎖內只做「讀進度 → 判斷 → 寫回進度」，並回傳一個函式；
+ * 解鎖後才執行那個函式（寫作答紀錄、整理回傳給玩家的畫面資料）。這些步驟不會改動進度，不需要擋住其他隊伍。
+ * fn 如果直接回傳一般結果（不是函式）也可以，會原樣回傳。
+ */
+function lockedAction_(fn) {
+  var post = withLock_(fn);
+  return typeof post === 'function' ? post() : post;
+}
+
 function withLock_(fn) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(15000)) throw appError_('目前人數較多，請再按一次', 'BUSY');
+  resetMemo_();   // 等鎖的期間別的請求可能改過資料，取得鎖後一律重新讀
   try { return fn(); } finally { lock.releaseLock(); }
 }
 

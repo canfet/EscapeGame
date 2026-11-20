@@ -58,6 +58,7 @@
       ce.code = 'NO_CONFIG';
       throw ce;
     }
+    var t00 = Date.now();
     for (var attempt = 0; ; attempt++) {
       var res, ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
       var timer = ctl ? setTimeout(function () { ctl.abort(); }, 30000) : null;
@@ -81,8 +82,10 @@
         throw new Error('伺服器回應格式錯誤。請確認 Apps Script 部署時「誰可以存取」選擇「所有人」。');
       }
       try { checkVersions(data); } catch (e) { /* 版本檢查不能影響遊戲 */ }
+      // 耗時記錄：開發者工具 Console 可以看到每個動作「後端處理多久／整體多久」，用來找出慢在哪
+      try { if (global.console && console.debug) console.debug('[api] ' + action + '：後端 ' + (data.ms == null ? '?' : data.ms) + ' ms／整體 ' + (Date.now() - t00) + ' ms'); } catch (e) { /* */ }
       if (!data.ok) {
-        if (data.code === 'BUSY' && attempt < 3) { await sleep(1500 * (attempt + 1)); continue; }
+        if (data.code === 'BUSY' && attempt < 4) { await sleep(1200 * (attempt + 1) + Math.random() * 1500); continue; }   // 加亂數：避免大家同一秒一起重試又撞在一起
         var err = new Error(data.error || '發生錯誤');
         err.code = data.code;
         throw err;

@@ -23,11 +23,8 @@
 
   /** 這個專案現在有幾支「正在玩」的正式隊伍（6 小時內有操作） */
   async function liveCount(pid) {
-    try {
-      var r = await call('adminListProjects');
-      var p = r.projects.filter(function (x) { return x.project_id === pid; })[0];
-      return p ? (p.playing_count || 0) : 0;
-    } catch (e) { return 0; }
+    try { return (await call('adminLiveCount', { projectId: pid })).playing_count || 0; }   // 輕量路由：只讀隊伍表
+    catch (e) { return 0; }
   }
 
   /**
@@ -360,8 +357,7 @@
       $('#m-deck').classList.add('hidden');
       Q.toast('圖鑑已儲存', 'ok');
       if (lost.length) Q.toast('⚠️ 第 ' + lost.slice(0, 8).join('、') + ' 張卡的圖片網址沒有完整存下來（網址太長？），請改用「⬆ 上傳」或重新搜尋', 'warn', 9000);
-      await loadDecks();
-      await loadProjects();
+      await Promise.all([loadDecks(), loadProjects()]);
     } catch (e) { /* */ }
   }
 
@@ -374,7 +370,7 @@
       var dkr = await call('adminDeleteDeck', { deckId: dk.deck_id });
       $('#m-deck').classList.add('hidden');
       Q.toast('已刪除', 'ok'); showBackup(dkr);
-      await loadDecks(); await loadProjects();
+      await Promise.all([loadDecks(), loadProjects()]);
     } catch (e) { /* */ }
   }
 
@@ -658,8 +654,7 @@
       $('#link-sheet').href = r.spreadsheet_url;
       $('#v-login').classList.add('hidden');
       $('#v-app').classList.remove('hidden');
-      await loadDecks();
-      await loadProjects();
+      await Promise.all([loadDecks(), loadProjects()]);   // 兩份清單同時讀，登入比較快
     } catch (e) { /* toast 已顯示 */ }
   }
 
