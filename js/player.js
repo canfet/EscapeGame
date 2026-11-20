@@ -97,7 +97,9 @@
       $('#intro-name').textContent = p.name;
       $('#intro-desc').textContent = p.description || '';
       $('#intro-text').innerHTML = Q.linkify(p.intro || '依照線索找到每個地點，抵達後打卡解鎖題目！');
-      if (p.cover_url) { $('#intro-cover').src = p.cover_url; $('#intro-cover').classList.remove('hidden'); }
+      var cov = $('#intro-cover');
+      if (p.cover_url) { cov.src = p.cover_url; cov.classList.remove('hidden'); }
+      else { cov.removeAttribute('src'); cov.classList.add('hidden'); }
       var meta = ['<span class="chip">🗺 ' + p.stage_count + ' 個關卡</span>',
         '<span class="chip">' + (p.unlock_mode === 'free' ? '🔓 自由順序' : '➡️ 依序解鎖') + '</span>'];
       if (p.time_limit_min) meta.push('<span class="chip amber">⏱ 限時 ' + p.time_limit_min + ' 分鐘</span>');
@@ -171,20 +173,26 @@
     $('#g-score').textContent = se.score;
     $('#g-progress-text').textContent = s.summary.done + ' / ' + s.summary.total;
     $('#g-progress').style.width = (s.summary.total ? s.summary.done / s.summary.total * 100 : 0) + '%';
+    $('#g-unlock-mode').textContent = s.project.unlock_mode === 'free' ? '自由順序' : '依序解鎖';
     $('#g-finished').classList.toggle('hidden', se.status !== 'finished');
     $('#g-timeup').classList.toggle('hidden', se.status !== 'timeup');
 
     $('#g-stages').innerHTML = s.stages.map(function (st, i) {
-      var lab = Q.STATUS_LABEL[st.status];
-      var right = st.status === 'solved' ? '+' + st.earned : st.status === 'locked' ? '🔒' : '›';
       var dist = '';
       if (st.lat != null && P.pos && (st.status === 'open')) dist = distText(st);
+      var state = st.status === 'solved' ? '✓ 已完成 +' + st.earned
+        : st.status === 'locked' ? '🔒 未解鎖'
+        : st.status === 'failed' ? '✗ 未通過'
+        : st.status === 'arrived' ? '作答中' : '挑戰中';
       return '<button class="stage-card ' + st.status + '" data-id="' + esc(st.stage_id) + '">' +
-        '<div class="stage-no">' + (st.status === 'solved' ? '✓' : (i + 1)) + '</div>' +
-        '<div class="grow"><div><b>' + esc(st.title) + '</b> <span class="chip ' + lab[1] + '">' + lab[0] + '</span></div>' +
-        '<div class="meta">' + Q.TYPE_LABEL[st.answer_type] + '・' + st.points + ' 分<span data-dist="' + esc(st.stage_id) + '">' + dist + '</span></div></div>' +
-        '<b>' + right + '</b></button>';
+        '<div class="sc-top"><span class="sc-no">第 ' + (i + 1) + ' 關</span><span class="sc-state">' + state + '</span></div>' +
+        '<div class="sc-title">' + esc(st.title) + '</div>' +
+        '<div class="meta">' + Q.TYPE_LABEL[st.answer_type] + '・' + st.points + ' 分<span data-dist="' + esc(st.stage_id) + '">' + dist + '</span></div>' +
+        '</button>';
     }).join('');
+    // 進行中的那一關捲到可見位置
+    var cur = document.querySelector('#g-stages .stage-card.open, #g-stages .stage-card.arrived');
+    if (cur && cur.scrollIntoView && !P.scrolledCur) { P.scrolledCur = true; cur.scrollIntoView({ block: 'nearest', inline: 'center' }); }
     Q.$$('#g-stages [data-id]').forEach(function (b) {
       b.onclick = function () {
         var st = findStage(b.dataset.id);
@@ -406,16 +414,35 @@
     drawStagesOnMap();
   }
 
+  var PIN_COLOR = { locked: '#7a6c58', open: '#a12d1f', arrived: '#a12d1f', solved: '#2d6a4f', failed: '#8a8272' };
+
   function drawStagesOnMap() {
     if (!P.map || !P.state) return;
     P.layers.clearLayers();
-    var pts = [];
+    var pts = [], prev = null;
     P.state.stages.forEach(function (st, i) {
       if (st.lat == null) return;
-      var color = Q.STATUS_COLOR[st.status];
-      L.circle([st.lat, st.lng], { radius: st.radius_m, color: color, weight: 2, fillOpacity: .12 }).addTo(P.layers);
-      var icon = L.divIcon({ className: '', html: '<div class="pin" style="background:' + color + '">' + (st.status === 'solved' ? '✓' : i + 1) + '</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
-      L.marker([st.lat, st.lng], { icon: icon }).addTo(P.layers).on('click', function () { openStage(st.stage_id); });
+      // 闖關路線：依關卡順序連線，已完成的路段實線（綠）、未走的路段虛線（棕）
+      if (prev) {
+        var done = prev.status === 'solved';
+        L.polyline([[prev.lat, prev.lng], [st.lat, st.lng]], done
+          ? { color: '#2d6a4f', weight: 4, opacity: .85, interactive: false }
+          : { color: '#5b4a32', weight: 3, opacity: .75, dashArray: '2 8', lineCap: 'round', interactive: false }
+        ).addTo(P.layers);
+      }
+      prev = st;
+    });
+    P.state.stages.forEach(function (st, i) {
+      if (st.lat == null) return;
+      var color = PIN_COLOR[st.status] || '#5b4a32';
+      var current = st.status === 'open' || st.status === 'arrived';
+      L.circle([st.lat, st.lng], { radius: st.radius_m, color: color, weight: current ? 2 : 1, fillOpacity: current ? .16 : .06 }).addTo(P.layers);
+      var sz = current ? 36 : 28;
+      var icon = L.divIcon({ className: '', html: '<div class="pin ' + (current ? 'cur' : '') + '" style="background:' + color + '">' + (st.status === 'solved' ? '✓' : i + 1) + '</div>', iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2] });
+      L.marker([st.lat, st.lng], { icon: icon, zIndexOffset: current ? 500 : 0 }).addTo(P.layers).on('click', function () {
+        if (st.status === 'locked') return Q.toast('請先完成前面的關卡', 'warn');
+        openStage(st.stage_id);
+      });
       pts.push([st.lat, st.lng]);
     });
     if (!P.fitted) {
@@ -513,11 +540,13 @@
     var se = P.state.session, playing = se.status === 'playing';
     var lab = Q.STATUS_LABEL[st.status];
     var h = [];
-    h.push('<div class="sheet-head"><h2>' + esc(st.title) + '</h2><button class="close-x" id="s-close" aria-label="關閉">✕</button></div>');
+    // 關卡有上傳圖片才顯示頂部大圖；沒設定就不顯示
+    if (st.image_url) h.push('<div class="sheet-hero"><img class="hero-img" src="' + esc(st.image_url) + '" alt="" onerror="this.parentNode.remove()"></div>');
+    var no = P.state.stages.indexOf(st) + 1;
+    h.push('<div class="sheet-head"><div class="grow"><div class="sheet-sub">第 ' + no + ' 關</div><h2 class="sheet-title">' + esc(st.title) + '</h2></div><button class="close-x" id="s-close" aria-label="關閉">✕</button></div>');
     h.push('<div class="row wrap" style="margin-bottom:12px"><span class="chip ' + lab[1] + '">' + lab[0] + '</span>' +
       '<span class="chip">' + Q.TYPE_LABEL[st.answer_type] + '</span><span class="chip">' + st.points + ' 分</span></div>');
     h.push('<div class="stack">');
-    if (st.image_url) h.push('<img src="' + esc(st.image_url) + '" alt="" style="border-radius:12px">');
     if (st.clue) h.push('<div class="clue">' + Q.linkify(st.clue) + '</div>');
 
     // 提示

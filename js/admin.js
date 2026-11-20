@@ -36,6 +36,8 @@
     $('#ms-delete').onclick = deleteStage;
     $('#ms-answer_type').onchange = toggleTypeFields;
     $('#ms-here').onclick = useMyLocation;
+    bindImageField('mp-cover_url', 'cover', function () { return $('#mp-project_id').value.trim(); });
+    bindImageField('ms-image_url', 'stage', function () { return A.pid; });
     $('#ms-restore').onclick = function () {
       if (A.edOrig) { setEdPoint(A.edOrig.lat, A.edOrig.lng, true); Q.toast('已還原為原本位置', 'ok'); }
     };
@@ -64,6 +66,55 @@
     try { saved = sessionStorage.getItem(KEY_STORE) || ''; } catch (e) { /* */ }
     if (saved) { A.key = saved; enter(); }
   });
+
+  /* ---------- 圖片上傳（封面／關卡圖） ---------- */
+  function compressImage(file, max, quality) {
+    max = max || 1600; quality = quality || 0.82;
+    return new Promise(function (resolve, reject) {
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        var s = Math.min(1, max / Math.max(img.width, img.height));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = function () { reject(new Error('無法讀取這張圖片，請換一張')); };
+      img.src = url;
+    });
+  }
+
+  function refreshImgPrev(id) {
+    var url = $('#' + id).value.trim(), prev = $('#' + id + '-prev');
+    prev.classList.toggle('hidden', !url);
+    if (url) prev.src = url; else prev.removeAttribute('src');
+  }
+
+  /** id 是網址輸入框；旁邊有 -pick / -clear / -file / -prev。kind: cover | stage */
+  function bindImageField(id, kind, getProjectId) {
+    var input = $('#' + id), file = $('#' + id + '-file'), pick = $('#' + id + '-pick');
+    input.addEventListener('input', function () { refreshImgPrev(id); });
+    $('#' + id + '-clear').onclick = function () { input.value = ''; refreshImgPrev(id); };
+    pick.onclick = function () {
+      if (!getProjectId()) return Q.toast(kind === 'cover' ? '請先填寫專案代碼再上傳' : '請先選擇專案', 'warn');
+      file.click();
+    };
+    file.onchange = async function () {
+      var f = file.files[0]; file.value = '';
+      if (!f) return;
+      if (!/^image\//.test(f.type)) return Q.toast('請選擇圖片檔', 'warn');
+      pick.disabled = true; var old = pick.textContent; pick.textContent = '上傳中…';
+      try {
+        var dataUrl = await Q.run(function () { return compressImage(f); });
+        var r = await call('adminUploadImage', { projectId: getProjectId(), kind: kind, dataUrl: dataUrl });
+        if (!r || !r.url) throw new Error('伺服器沒有回傳圖片網址');
+        input.value = r.url; refreshImgPrev(id);
+        Q.toast('圖片已上傳，記得按「儲存」', 'ok');
+      } catch (e) { /* call 已顯示錯誤 */ }
+      finally { pick.disabled = false; pick.textContent = old; }
+    };
+  }
 
   /* ---------- 登入 ---------- */
   async function login() {
@@ -160,6 +211,7 @@
       else if (el.type === 'datetime-local') el.value = Q.toLocalInput(p[f]);
       else el.value = p[f] == null ? '' : p[f];
     });
+    refreshImgPrev('mp-cover_url');
     $('#mp-project_id').disabled = !A.editProjectNew;
     $('#m-project').classList.remove('hidden');
   }
@@ -307,6 +359,7 @@
       if (el.type === 'checkbox') el.checked = !!d[f];
       else el.value = d[f] == null ? '' : d[f];
     });
+    refreshImgPrev('ms-image_url');
     $('#ms-stage_id').disabled = !!s;
     $('#ms-delete').classList.toggle('hidden', !s);
     toggleTypeFields();

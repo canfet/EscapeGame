@@ -98,14 +98,20 @@ input[type=checkbox] { width: auto; transform: scale(1.2); margin-right: 6px; }
 .progress > i { display: block; height: 100%; background: var(--forest); transition: width .4s; }
 
 /* ----- 關卡卡片 ----- */
-.stage-list { display: grid; gap: 10px; }
+.stage-list { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; padding: 2px 2px 10px; -webkit-overflow-scrolling: touch; }
 .stage-card {
-  display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line);
+  display: block; flex: 0 0 168px; scroll-snap-align: start; background: var(--card); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 12px 14px; cursor: pointer; box-shadow: var(--shadow); text-align: left;
-  color: var(--ink); width: 100%; font-weight: 400;
+  color: var(--ink); font-weight: 400;
 }
 .stage-card:hover { background: #fffaf0; }
-.stage-card.locked { opacity: .55; cursor: default; }
+.stage-card.locked { opacity: .6; cursor: default; background: #f3eee2; }
+.stage-card.open, .stage-card.arrived { border-color: #a12d1f; box-shadow: 0 0 0 1px #a12d1f, var(--shadow); }
+.stage-card.solved { border-color: var(--forest); }
+.sc-top { display: flex; justify-content: space-between; gap: 6px; font-size: .78rem; color: var(--muted); margin-bottom: 4px; }
+.stage-card.open .sc-state, .stage-card.arrived .sc-state { color: #a12d1f; font-weight: 700; }
+.stage-card.solved .sc-state { color: var(--forest); font-weight: 700; }
+.sc-title { font-family: Georgia, "Noto Serif TC", "PMingLiU", serif; font-weight: 700; font-size: 1rem; line-height: 1.3; margin-bottom: 4px; }
 .stage-no {
   width: 38px; height: 38px; border-radius: 50%; flex: none; display: grid; place-items: center;
   font-weight: 800; background: #ece4d3; color: var(--ink);
@@ -118,6 +124,20 @@ input[type=checkbox] { width: auto; transform: scale(1.2); margin-right: 6px; }
 /* ----- 地圖 ----- */
 .map { height: 260px; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; z-index: 1; }
 .map.tall { height: 420px; }
+.img-prev { display: block; max-width: 100%; max-height: 160px; margin-top: 8px; border-radius: 10px; border: 1px solid var(--line); object-fit: cover; }
+/* 前台封面橫幅／關卡大圖 */
+.hero-img { width: 100%; max-height: 260px; object-fit: cover; display: block; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.sheet-hero { margin: -4px -4px 12px; }
+.sheet-hero .hero-img { border-radius: 12px; max-height: 220px; }
+.sheet-sub { font-size: .82rem; color: var(--muted); letter-spacing: .02em; }
+.sheet-title { font-family: Georgia, "Noto Serif TC", "PMingLiU", serif; }
+/* 古地圖風格（只套用在玩家地圖，GPS 功能不受影響） */
+.map-wrap { position: relative; padding: 6px; background: #e9dcbc; border: 2px solid #8a6d3b; border-radius: var(--radius); box-shadow: inset 0 0 14px rgba(90, 60, 20, .35); }
+.map-wrap .map { border: 1px solid #8a6d3b; border-radius: 8px; }
+#g-map .leaflet-tile-pane { filter: sepia(.75) saturate(.8) contrast(.95) brightness(1.03); }
+#g-map::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 450; box-shadow: inset 0 0 40px rgba(110, 75, 25, .35); }
+.compass-rose { position: absolute; right: 14px; bottom: 14px; width: 64px; height: 64px; z-index: 500; pointer-events: none; filter: drop-shadow(0 1px 3px rgba(0,0,0,.3)); }
+.pin.cur { width: 36px; height: 36px; font-size: 16px; box-shadow: 0 0 0 4px rgba(161, 45, 31, .25), 0 1px 5px rgba(0,0,0,.45); }
 .leaflet-tooltip.dist-tip { background: #fff; border: 1px solid #c1440e; color: #c1440e; font-weight: 600; font-size: 12px; padding: 1px 6px; box-shadow: none; }
 .pin {
   width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff;

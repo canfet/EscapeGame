@@ -131,7 +131,14 @@
       <div class="field"><label>簡短說明</label><input id="mp-description"></div>
       <div class="field"><label>開場介紹</label><textarea id="mp-intro" placeholder="任務背景、規則、注意事項…"></textarea></div>
       <div class="field"><label>完成訊息</label><textarea id="mp-finish_message" placeholder="例如：請回到集合點找關主領獎"></textarea></div>
-      <div class="field"><label>封面圖片網址</label><input id="mp-cover_url" placeholder="https://…"></div>
+      <div class="field"><label>封面圖片（專案開頭頁顯示，沒設定就不顯示）</label>
+        <div class="row">
+          <input class="grow" id="mp-cover_url" placeholder="上傳後自動填入，也可以直接貼圖片網址">
+          <button type="button" class="ghost sm" id="mp-cover_url-pick">⬆ 上傳圖片</button>
+          <button type="button" class="ghost sm" id="mp-cover_url-clear">移除</button>
+        </div>
+        <input type="file" accept="image/*" id="mp-cover_url-file" class="hidden">
+        <img id="mp-cover_url-prev" class="img-prev hidden" alt="封面預覽"></div>
       <div class="grid2">
         <div class="field"><label>開放時間</label><input type="datetime-local" id="mp-start_at"></div>
         <div class="field"><label>結束時間</label><input type="datetime-local" id="mp-end_at"></div>
@@ -162,7 +169,14 @@
           </div>
           <label class="check field"><input type="checkbox" id="ms-enabled"> 啟用這個關卡</label>
           <div class="field"><label>線索（抵達前就看得到）</label><textarea id="ms-clue" placeholder="引導闖關者找到地點的文字"></textarea></div>
-          <div class="field"><label>圖片網址（選填）</label><input id="ms-image_url" placeholder="https://…"></div>
+          <div class="field"><label>關卡圖片（選填，關卡面板頂部大圖；沒設定就不顯示）</label>
+            <div class="row">
+              <input class="grow" id="ms-image_url" placeholder="上傳後自動填入，也可以直接貼圖片網址">
+              <button type="button" class="ghost sm" id="ms-image_url-pick">⬆ 上傳圖片</button>
+              <button type="button" class="ghost sm" id="ms-image_url-clear">移除</button>
+            </div>
+            <input type="file" accept="image/*" id="ms-image_url-file" class="hidden">
+            <img id="ms-image_url-prev" class="img-prev hidden" alt="關卡圖片預覽"></div>
 
           <div class="section-title">抵達條件</div>
           <label class="check"><input type="checkbox" id="ms-require_gps"> 需要 GPS 定位打卡</label>

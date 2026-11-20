@@ -403,6 +403,7 @@ sequenceDiagram
 | `adminSaveProject` | `project, isNew` |
 | `adminDeleteProject` | `projectId` |
 | `adminDuplicateProject` | `projectId, newId, newName` |
+| `adminUploadImage` | `projectId, kind(cover\|stage), dataUrl` → `{ url, file_id }`（存到 Drive `<專案>/_images`，連結可檢視） |
 | `adminSaveStage` | `stage, isNew` |
 | `adminDeleteStage` | `projectId, stageId` |
 | `adminReorderStages` | `projectId, order[]` |
