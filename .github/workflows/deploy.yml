@@ -1,6 +1,5 @@
-name: 部署到 GitHub Pages
+name: Deploy to GitHub Pages
 
-# push 到 main 就部署；也可以到 Actions 頁面手動按「Run workflow」重新部署
 on:
   push:
     branches: [main]
@@ -27,8 +26,8 @@ jobs:
 
       - name: 產生 config.js（後端網址來自 Repository variable）
         env:
+          # 在 repo Settings → Secrets and variables → Actions → Variables 設定
           APPS_SCRIPT_URL: ${{ vars.APPS_SCRIPT_URL }}
-          SITE_NAME: ${{ vars.SITE_NAME }}
         run: node .github/scripts/make-config.js
 
       - name: 移除不需要放上網站的檔案

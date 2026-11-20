@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  GPS 實境解謎闖關系統 － Apps Script 後端 API
+ *  實境解謎 － Apps Script 後端 API
  *  資料存在「綁定的 Google 試算表」，前台放 GitHub Pages。
  *  學生不需登入，只會在背景呼叫這支 API。
  * ============================================================
@@ -495,7 +495,7 @@ function adminUploadImage_(b) {
 function adminImportImage_(b) {
   var url = str_(b.url);
   if (!/^https:\/\/upload\.wikimedia\.org\/[A-Za-z0-9_\-.\/%()~,+:;@!'*]+$/.test(url)) throw appError_('只能匯入維基媒體（upload.wikimedia.org）的圖片', 'BAD_INPUT');
-  var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'GPS-Quest-Deck/1.0 (educational event tool)' } });
+  var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'EscapeGame-Deck/1.0 (educational event tool)' } });
   if (res.getResponseCode() !== 200) throw appError_('下載圖片失敗（' + res.getResponseCode() + '）', 'FETCH_FAILED');
   var type = String(res.getHeaders()['Content-Type'] || res.getHeaders()['content-type'] || '');
   if (!/^image\/(jpeg|png|webp|gif)/.test(type)) throw appError_('下載到的不是圖片', 'FETCH_FAILED');
@@ -1683,7 +1683,7 @@ function folder_(pid) {
   var root = null, id = props.getProperty('DRIVE_FOLDER_ID');
   if (id) { try { root = DriveApp.getFolderById(id); } catch (e) { root = null; } }
   if (!root) {
-    root = DriveApp.createFolder('GPS實境解謎_上傳照片');
+    root = DriveApp.createFolder('實境解謎_上傳照片');
     props.setProperty('DRIVE_FOLDER_ID', root.getId());
   }
   var it = root.getFoldersByName(pid);

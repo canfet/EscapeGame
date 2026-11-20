@@ -53,8 +53,8 @@
 
   async function api(action, payload) {
     var url = global.APP_CONFIG && global.APP_CONFIG.API_URL;
-    if (!url || url.indexOf('PASTE_') === 0) {
-      var ce = new Error('這個網站還沒有設定後端網址。請編輯 config.js，把 API_URL 換成你自己部署的 Apps Script 網址（fork 本專案的人請參考 README 步驟 3）。');
+    if (!url) {
+      var ce = new Error('這個網站還沒有設定後端網址。如果你是管理者：到 GitHub repo 的 Settings → Secrets and variables → Actions → Variables 設定 APPS_SCRIPT_URL 後重新部署；本機測試請複製 config.example.js 成 config.js 並填入網址（詳見 README 步驟 3）。');
       ce.code = 'NO_CONFIG';
       throw ce;
     }

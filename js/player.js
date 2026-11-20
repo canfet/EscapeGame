@@ -9,7 +9,7 @@
     map: null, layers: null, me: null, meAcc: null, fitted: false,
     openId: null, choice: null, photo: null, timer: null
   };
-  var LS = function (pid) { return 'gpsquest:' + pid; };
+  var LS = function (pid) { return 'escapegame:' + pid; };
 
   document.addEventListener('DOMContentLoaded', init);
 
@@ -25,7 +25,7 @@
 
   /* ---------- 啟動 ---------- */
   async function init() {
-    var name = (window.APP_CONFIG && APP_CONFIG.SITE_NAME) || 'GPS 實境解謎';
+    var name = '實境解謎';
     $('#site-name').textContent = name;
     document.title = name;
     var q = new URLSearchParams(location.search);
@@ -39,9 +39,9 @@
     // LINE／Facebook／Instagram 等內建瀏覽器常常拿不到定位與指南針：提醒改用 Safari／Chrome
     try {
       var inApp = /Line\/|FBAN|FBAV|Instagram|MicroMessenger|; wv\)/i.test(navigator.userAgent);
-      if (inApp && sessionStorage.getItem('gpsquest:inapp-ok') !== '1') $('#inapp-banner').classList.remove('hidden');
+      if (inApp && sessionStorage.getItem('escapegame:inapp-ok') !== '1') $('#inapp-banner').classList.remove('hidden');
     } catch (e) { /* */ }
-    $('#inapp-x').onclick = function () { $('#inapp-banner').classList.add('hidden'); try { sessionStorage.setItem('gpsquest:inapp-ok', '1'); } catch (e) { /* */ } };
+    $('#inapp-x').onclick = function () { $('#inapp-banner').classList.add('hidden'); try { sessionStorage.setItem('escapegame:inapp-ok', '1'); } catch (e) { /* */ } };
     $('#inapp-copy').onclick = function () {
       var url = location.href;
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { Q.toast('已複製連結，請貼到 Safari／Chrome 開啟', 'ok', 5000); })
@@ -51,10 +51,10 @@
     var syncOnline = function () { $('#offline-chip').classList.toggle('hidden', navigator.onLine !== false); };
     window.addEventListener('offline', syncOnline); window.addEventListener('online', syncOnline); syncOnline();
     // 大字模式（長輩友善）：整體字放大，設定會記住
-    try { if (localStorage.getItem('gpsquest:bigtext') === '1') document.documentElement.classList.add('big-text'); } catch (e) { /* */ }
+    try { if (localStorage.getItem('escapegame:bigtext') === '1') document.documentElement.classList.add('big-text'); } catch (e) { /* */ }
     $('#btn-font').onclick = function () {
       var on = document.documentElement.classList.toggle('big-text');
-      try { localStorage.setItem('gpsquest:bigtext', on ? '1' : '0'); } catch (e) { /* */ }
+      try { localStorage.setItem('escapegame:bigtext', on ? '1' : '0'); } catch (e) { /* */ }
       Q.toast(on ? '已開啟大字模式' : '已關閉大字模式', 'ok', 1800);
     };
     // 答案輸入草稿：一輸入就暫存，重畫或斷線重連後還在
@@ -246,7 +246,7 @@
       Q.toast(r.resumed ? '這支隊伍已經開始過了，已接續原本的進度' : '隊伍建立成功，出發吧！', 'ok', r.resumed ? 5000 : 3000);
       // 新隊伍：教學（含隊伍代碼）只在這支手機第一次玩時出現；其餘情況單獨提醒記下代碼
       var tutSeen = false;
-      try { tutSeen = localStorage.getItem('gpsquest:tut') === '1'; } catch (e) { /* */ }
+      try { tutSeen = localStorage.getItem('escapegame:tut') === '1'; } catch (e) { /* */ }
       if (!r.resumed && tutSeen) setTimeout(function () { showTeamCode(true); }, 1200);
     } catch (e) { /* toast 已顯示 */ }
   }
@@ -388,7 +388,7 @@
   function closeCardView() { $('#card-view').classList.add('hidden'); layerClose('cardview'); }
   var RARITY_TXT = { normal: '普通', rare: '稀有', legend: '傳說' };
 
-  function draftKey(stageId, field) { return 'gpsquest:draft:' + P.sid + ':' + stageId + ':' + field; }
+  function draftKey(stageId, field) { return 'escapegame:draft:' + P.sid + ':' + stageId + ':' + field; }
   function clearDrafts(stageId) { ['s-ans', 's-caption', 's-code'].forEach(function (f) { try { localStorage.removeItem(draftKey(stageId, f)); } catch (e) { /* */ } }); }
 
   /** 隊伍代碼：換手機、清掉瀏覽器資料時，靠它接回進度。點上方代碼可再看一次 */
@@ -405,7 +405,7 @@
   /* ---------- 新手教學（第一次進來才顯示，可跳過） ---------- */
   var TUT = [];
   function maybeTutorial(state) {
-    try { if (localStorage.getItem('gpsquest:tut') === '1') return; } catch (e) { return; }
+    try { if (localStorage.getItem('escapegame:tut') === '1') return; } catch (e) { return; }
     var pj = state.project || {}, hasColl = (state.collection || []).length, hasFrag = (state.fragments || []).length;
     TUT = [
       { icon: '🔑', title: '記下你們的隊伍代碼：' + ((state.session && state.session.code) || ''), text: '換手機或瀏覽器資料被清掉時，靠這組代碼接回進度。\n請截圖或抄下來；之後點上方的代碼也能再看到。' },
@@ -429,7 +429,7 @@
   function tutNext() { if (P.tutI >= TUT.length - 1) return tutEnd(); P.tutI++; renderTut(); }
   function tutEnd() {
     $('#tutorial').classList.add('hidden');
-    try { localStorage.setItem('gpsquest:tut', '1'); } catch (e) { /* */ }
+    try { localStorage.setItem('escapegame:tut', '1'); } catch (e) { /* */ }
   }
 
   /* ---------- 抵達成功的明顯回饋 ---------- */
@@ -442,7 +442,7 @@
   }
 
   /* ---------- 🎒 紅點：有新收集的東西 ---------- */
-  function seenKey() { return 'gpsquest:seen:' + P.sid; }
+  function seenKey() { return 'escapegame:seen:' + P.sid; }
   function currentOwned() {
     var s = P.state || {}, ids = [];
     (s.collection || []).forEach(function (x) { if (x.got) ids.push('c:' + (x.id || x.stage_id)); });
@@ -1196,7 +1196,7 @@
 
   /* ---------- 音效與震動（可在右上角關閉） ---------- */
   var Snd = { on: true, ctx: null };
-  try { Snd.on = localStorage.getItem('gpsquest:sound') !== '0'; } catch (e) { /* */ }
+  try { Snd.on = localStorage.getItem('escapegame:sound') !== '0'; } catch (e) { /* */ }
   var TOUCH = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
 
   function sfx(kind) {
@@ -1229,7 +1229,7 @@
 
   function toggleSound() {
     Snd.on = !Snd.on;
-    try { localStorage.setItem('gpsquest:sound', Snd.on ? '1' : '0'); } catch (e) { /* */ }
+    try { localStorage.setItem('escapegame:sound', Snd.on ? '1' : '0'); } catch (e) { /* */ }
     renderSoundBtn();
     if (Snd.on) sfx('ok');
   }
