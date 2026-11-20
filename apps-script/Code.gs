@@ -1057,7 +1057,8 @@ function parseDeck_(s) {
       id: id, name: name,
       type: CARD_TYPES.indexOf(str_(x.type)) >= 0 ? str_(x.type) : 'forest',
       rarity: RARITIES.indexOf(str_(x.rarity)) >= 0 ? str_(x.rarity) : 'normal',
-      art: str_(x.art).slice(0, 300), art_credit: str_(x.art_credit).slice(0, 160), hp: clampStat_(x.hp), atk: clampStat_(x.atk), def: clampStat_(x.def),
+      art: str_(x.art).slice(0, 300), art_credit: str_(x.art_credit).slice(0, 160),
+      art_fit: str_(x.art_fit) === 'cover' ? 'cover' : 'contain', art_pos: ['top', 'bottom'].indexOf(str_(x.art_pos)) >= 0 ? str_(x.art_pos) : 'center', hp: clampStat_(x.hp), atk: clampStat_(x.atk), def: clampStat_(x.def),
       skill_name: str_(x.skill_name).slice(0, 16), skill_desc: str_(x.skill_desc).slice(0, 80), story: str_(x.story).slice(0, 200)
     });
   });
@@ -1065,7 +1066,7 @@ function parseDeck_(s) {
 }
 
 function cardFull_(d, number) {
-  return { id: d.id, number: number, name: d.name, type: d.type, rarity: d.rarity, art: d.art, art_credit: d.art_credit || '', hp: d.hp, atk: d.atk, def: d.def, skill_name: d.skill_name, skill_desc: d.skill_desc, story: d.story };
+  return { id: d.id, number: number, name: d.name, type: d.type, rarity: d.rarity, art: d.art, art_credit: d.art_credit || '', art_fit: d.art_fit || 'contain', art_pos: d.art_pos || 'center', hp: d.hp, atk: d.atk, def: d.def, skill_name: d.skill_name, skill_desc: d.skill_desc, story: d.story };
 }
 
 /** 所有圖鑑本 */
@@ -1160,7 +1161,7 @@ function collectionList_(c) {
       return {
         kind: 'card', id: d.id, number: num, got: got, icon: d.art, rarity: d.rarity,
         name: got ? d.name : '', story: got ? d.story : '',
-        card: got ? cardFull_(d, num) : { number: num, type: d.type, rarity: d.rarity, art: d.art }
+        card: got ? cardFull_(d, num) : { number: num, type: d.type, rarity: d.rarity, art: d.art, art_fit: d.art_fit || 'contain' }
       };
     });
   }

@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex">
   <title>實境解謎 · 管理後台</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261121h">
+  <link rel="stylesheet" href="css/style.css?v=20261121j">
 </head>
 <body>
   <!-- 登入 -->
@@ -404,6 +404,12 @@
                   <button type="button" class="ghost sm" id="dk-art-search" title="用名稱搜尋圖片">🔍</button><button type="button" class="ghost sm" id="dk-art-pick">⬆</button><button type="button" class="ghost sm" id="dk-art-clear">✕</button></div>
                 <input type="file" accept="image/*" id="dk-art-file" class="hidden"><img id="dk-art-prev" class="img-prev hidden" alt="" style="max-height:60px"></div>
             </div>
+            <div class="grid2">
+              <div class="field"><label>圖片顯示方式</label>
+                <select id="dk-art_fit"><option value="contain">完整顯示（不裁切，建議）</option><option value="cover">填滿裁切</option></select></div>
+              <div class="field"><label>填滿裁切時的對焦</label>
+                <select id="dk-art_pos"><option value="center">置中</option><option value="top">偏上（保留頭部）</option><option value="bottom">偏下</option></select></div>
+            </div>
             <div class="grid3">
               <div class="field"><label id="dk-l-hp">HP</label><input type="number" min="0" max="999" id="dk-hp"></div>
               <div class="field"><label id="dk-l-atk">攻擊</label><input type="number" min="0" max="999" id="dk-atk"></div>
@@ -464,8 +470,8 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/qrcode.min.js"></script>
-  <script src="config.js?v=20261121h"></script>
-  <script src="js/common.js?v=20261121h"></script>
-  <script src="js/admin.js?v=20261121h"></script>
+  <script src="config.js?v=20261121j"></script>
+  <script src="js/common.js?v=20261121j"></script>
+  <script src="js/admin.js?v=20261121j"></script>
 </body>
 </html>

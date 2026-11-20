@@ -176,7 +176,7 @@
     var stat = function () { return base + Math.floor(rng() * 31); };
     var skill = pickOf(rng, info.skills[type]), eff = pickOf(rng, info.effects), tl = info.types[type];
     return {
-      id: '', name: name, type: type, rarity: rarity, art: pickOf(rng, info.emoji[type]),
+      id: '', name: name, type: type, rarity: rarity, art: pickOf(rng, info.emoji[type]), art_fit: 'contain', art_pos: 'center',
       hp: stat(), atk: stat(), def: stat(), skill_name: skill,
       skill_desc: (kind === 'place' ? name + '：' : name + '使出「' + skill + '」，') + eff,
       story: pickOf(rng, info.stories).replace('{n}', name).replace('{t}', tl)
@@ -270,6 +270,7 @@
     $('#dk-editor').classList.toggle('hidden', !c);
     if (c) {
       $('#dk-name').value = c.name; $('#dk-rarity').value = c.rarity; $('#dk-type').value = c.type; $('#dk-art').value = c.art || '';
+      $('#dk-art_fit').value = c.art_fit || 'contain'; $('#dk-art_pos').value = c.art_pos || 'center';
       $('#dk-hp').value = c.hp; $('#dk-atk').value = c.atk; $('#dk-def').value = c.def;
       $('#dk-skill_name').value = c.skill_name || ''; $('#dk-skill_desc').value = c.skill_desc || ''; $('#dk-story').value = c.story || '';
       refreshImgPrev('dk-art');
@@ -289,6 +290,7 @@
     var c = A.editDeck.cards[A.deckSel];
     if (!c) return;
     c.name = $('#dk-name').value.trim().slice(0, 20) || c.name; c.rarity = $('#dk-rarity').value; c.type = $('#dk-type').value; c.art = $('#dk-art').value.trim();
+    c.art_fit = $('#dk-art_fit').value; c.art_pos = $('#dk-art_pos').value;
     c.hp = Number($('#dk-hp').value) || 0; c.atk = Number($('#dk-atk').value) || 0; c.def = Number($('#dk-def').value) || 0;
     c.skill_name = $('#dk-skill_name').value.trim(); c.skill_desc = $('#dk-skill_desc').value.trim(); c.story = $('#dk-story').value.trim();
   }
@@ -503,7 +505,7 @@
     };
     $('#dk-up').onclick = function () { mv(-1); };
     $('#dk-down').onclick = function () { mv(1); };
-    ['#dk-name', '#dk-rarity', '#dk-type', '#dk-art', '#dk-hp', '#dk-atk', '#dk-def', '#dk-skill_name', '#dk-skill_desc', '#dk-story'].forEach(function (sel) {
+    ['#dk-name', '#dk-rarity', '#dk-type', '#dk-art', '#dk-art_fit', '#dk-art_pos', '#dk-hp', '#dk-atk', '#dk-def', '#dk-skill_name', '#dk-skill_desc', '#dk-story'].forEach(function (sel) {
       var ev = function () {
         readDeckForm(); renderDeckPreview();
         var item = $('#dk-list .dk-item.sel'); if (item && A.deckSel >= 0) item.innerHTML = Q.cardHtml(Object.assign({ number: A.deckSel + 1 }, A.editDeck.cards[A.deckSel]), Object.assign(dkOpts(), { mini: true }));

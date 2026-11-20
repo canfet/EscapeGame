@@ -222,6 +222,14 @@
   var RARITY_STARS = { normal: '★', rare: '★★', legend: '★★★' };
   var RARITY_LABEL = { normal: '普通', rare: '稀有', legend: '傳說' };
 
+  /** 卡面圖片區：預設「完整顯示」（不裁切），空白處用同一張圖放大模糊填滿；也可選「填滿裁切」並指定對焦位置 */
+  function cardArtBox(card) {
+    var art = String(card.art || ''), isUrl = /^(https?:|data:image)/i.test(art);
+    if (!isUrl) return '<div class="tcg-art">' + cardArt(art) + '</div>';
+    var fit = card.art_fit === 'cover' ? 'cover' : 'contain', pos = { top: 'center top', bottom: 'center bottom' }[card.art_pos] || 'center center';
+    return '<div class="tcg-art has-img fit-' + fit + '" style="--art:url(&quot;' + esc(art.replace(/"/g, '%22')) + '&quot;);--pos:' + pos + '">' + cardArt(art) + '</div>';
+  }
+
   function cardArt(art, fallback) {
     art = String(art || '');
     if (/^(https?:|data:image)/i.test(art)) return '<img src="' + esc(art) + '" alt="" onerror="this.replaceWith(document.createTextNode(\'' + (fallback || '🎴') + '\'))">';
@@ -241,11 +249,11 @@
     var tl = '<span>' + esc(types[card.type] || '') + '</span><span>No.' + num + '　' + (RARITY_STARS[card.rarity] || '★') + '</span>';
     if (locked) {
       return '<div class="' + cls + '"><div class="tcg-in"><div class="tcg-head"><b class="tcg-name">？？？</b></div>' +
-        '<div class="tcg-art">' + cardArt(card.art) + '</div><div class="tcg-typeline">' + tl + '</div></div></div>';
+        cardArtBox(card) + '<div class="tcg-typeline">' + tl + '</div></div></div>';
     }
     return '<div class="' + cls + '"' + (o.tilt ? ' data-tilt="1"' : '') + '><div class="tcg-in">' +
       '<div class="tcg-head"><b class="tcg-name">' + esc(card.name) + '</b><span class="tcg-hp"><small>' + esc(stats[0]) + '</small>' + esc(card.hp) + '</span></div>' +
-      '<div class="tcg-art">' + cardArt(card.art) + '</div>' +
+      cardArtBox(card) +
       '<div class="tcg-typeline">' + tl + '</div>' +
       '<div class="tcg-skill">' + (card.skill_name ? '<b>' + esc(card.skill_name) + '</b>' : '') + esc(card.skill_desc || '') + '</div>' +
       '<div class="tcg-stats"><span>' + esc(stats[1]) + ' ' + esc(card.atk) + '</span><span>' + esc(stats[2]) + ' ' + esc(card.def) + '</span></div>' +
