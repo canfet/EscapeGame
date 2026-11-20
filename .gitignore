@@ -1,0 +1,9 @@
+# 後端網址不放進 git：
+#  ‧ 上線時由 GitHub Actions 依 Repository variable「APPS_SCRIPT_URL」產生
+#  ‧ 本機測試請複製 config.example.js 成 config.js 並填入網址（這個檔案不會被提交）
+config.js
+
+# 作業系統／編輯器雜物
+.DS_Store
+Thumbs.db
+node_modules/

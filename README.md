@@ -37,23 +37,24 @@
 
 > ⚠️ 之後若修改 `Code.gs`，要到「部署 → 管理部署作業 → ✏️ 編輯 → 版本：新版本 → 部署」，網址不變，修改才會生效。
 
-### 步驟 3：放到 GitHub Pages
+### 步驟 3：放到 GitHub Pages（用 GitHub Actions 部署）
 
-1. 在 GitHub 建立一個新的 **Public** repository，例如 `gps-quest`。
-2. 把整個資料夾的檔案上傳（可以直接在網頁上拖曳上傳）。
-3. 編輯 `config.js`，把 `API_URL` 換成步驟 2 的網址（**fork 這個專案的人一定要改成自己的網址**，專案裡的 `config.js` 是原作者的；範本見 `config.example.js`）：
-   ```js
-   window.APP_CONFIG = {
-     API_URL: 'https://script.google.com/macros/s/AKfy.../exec',
-     SITE_NAME: 'GPS 實境解謎'
-   };
-   ```
-4. repository 的「Settings → Pages」→ Source 選「Deploy from a branch」→ Branch 選 `main`、資料夾 `/ (root)` → Save。
+後端網址**不放在原始碼裡**：部署時由 GitHub Actions 讀取 Repository variable，自動產生 `config.js`。
+
+1. 在 GitHub 建立一個新的 **Public** repository，例如 `gps-quest`，把整個資料夾的檔案推上去（包含 `.github/` 資料夾）。
+2. 設定後端網址：repo 的 **Settings → Secrets and variables → Actions → Variables → New repository variable**
+   - Name：`APPS_SCRIPT_URL`
+   - Value：步驟 2 複製的網址（結尾是 `/exec`，不要加引號或空白）
+   - （選用）再新增 `SITE_NAME`：網站標題，沒設就用「實境解謎」。
+3. 設定 Pages 來源：**Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**（不是 Deploy from a branch）。
+4. 到 **Actions** 頁面，開啟「部署到 GitHub Pages」，按 **Run workflow**（或之後每次 push 到 `main` 都會自動部署）。
 5. 等 1～2 分鐘，網址會是：
    - 前台：`https://你的帳號.github.io/gps-quest/`
    - 後台：`https://你的帳號.github.io/gps-quest/admin.html`
 
-> `apps-script/` 資料夾也會被公開，但裡面沒有任何密碼或答案，不影響安全。介意的話可以不上傳這個資料夾。
+> ‧ 部署失敗並顯示「缺少 APPS_SCRIPT_URL」或「格式不正確」：回到第 2 步檢查變數名稱和網址。
+> ‧ **本機測試**：複製 `config.example.js` 成 `config.js` 並填入網址；`config.js` 已加進 `.gitignore`，不會被提交。
+> ‧ `tools/`（負載演練腳本）與 `.github/` 不會放上網站。`apps-script/` 資料夾會被公開，但裡面沒有任何密碼或答案，不影響安全。
 
 ### 步驟 4：測試
 
@@ -77,8 +78,9 @@
 
 ## 關於 config.js 與安全
 
-- `config.js` 裡的 `API_URL` **本來就是公開的**：網站是純靜態頁面，瀏覽器要呼叫後端，網址一定看得到。把它放進 GitHub 沒有問題，也沒辦法藏。
-- **fork 或複製這個專案時，請務必把 `config.js` 的 `API_URL` 換成自己的**（參考 `config.example.js`，API_URL 留空）。沒改就會連到原作者的後端與試算表。
+- **後端網址不在原始碼裡**：`config.js` 沒有提交到 git，部署時才由 GitHub Actions 依 Repository variable `APPS_SCRIPT_URL` 產生。所以別人 clone、fork 或下載 ZIP 看不到你的網址，fork 的人也必須設定**自己的** `APPS_SCRIPT_URL`，不會誤用到你的後端。
+- **但線上網站仍看得到**：瀏覽器要呼叫後端，網址一定會出現在 `https://你的帳號.github.io/.../config.js`，這在靜態網站無法避免。所以網址不是機密，下面這些保護才是重點。
+- 網址若外洩、想換掉：Apps Script 重新部署（或建立新部署）取得新網址，更新 `APPS_SCRIPT_URL` 後重新執行部署，並停用舊的部署作業即可。
 - 真正需要保護的是後端，系統已做了這些：
   - 所有後台功能（`admin*`）都必須帶**管理密碼**，由後端驗證，前端畫面藏起來不算數。管理密碼是 12 碼隨機字元，存在 Apps Script 的指令碼屬性，不在原始碼裡。
   - 猜密碼限制：15 分鐘內輸入錯誤 10 次，後台會暫時鎖定 15 分鐘（期間連正確密碼也不收，到期自動解除）。

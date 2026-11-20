@@ -1,0 +1,47 @@
+name: 部署到 GitHub Pages
+
+# push 到 main 就部署；也可以到 Actions 頁面手動按「Run workflow」重新部署
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 取得程式碼
+        uses: actions/checkout@v4
+
+      - name: 產生 config.js（後端網址來自 Repository variable）
+        env:
+          APPS_SCRIPT_URL: ${{ vars.APPS_SCRIPT_URL }}
+          SITE_NAME: ${{ vars.SITE_NAME }}
+        run: node .github/scripts/make-config.js
+
+      - name: 移除不需要放上網站的檔案
+        run: rm -rf tools .github
+
+      - name: 設定 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 打包網站
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: 部署
+        id: deployment
+        uses: actions/deploy-pages@v4
