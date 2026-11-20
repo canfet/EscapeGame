@@ -9,7 +9,9 @@
  */
 
 /* ===================== 基本設定 ===================== */
-var APP_VERSION = '1.0.0';
+var APP_VERSION = '1.1.0';
+// 前台至少要是這個版本（前台每次呼叫都會帶自己的版本 fv）；太舊時回傳 front_stale，前台會提示重新整理
+var MIN_FRONT = '1.1.0';
 var CACHE_SEC = 30;                 // 專案／關卡資料快取秒數
 var DEFAULT_GPS_MAX_ACCURACY = 80;  // 定位誤差超過幾公尺就不接受
 var GPS_TOLERANCE_CAP = 20;         // 判定範圍最多額外放寬幾公尺（依手機回報的誤差）
@@ -99,6 +101,16 @@ var ROUTES = {
   adminDeleteDeck: admin_(adminDeleteDeck_)
 };
 
+/** 版本比較："1.10.0" vs "1.9.0"，回傳 -1／0／1 */
+function cmpVer_(a, b) {
+  var x = String(a).split('.'), y = String(b).split('.');
+  for (var i = 0; i < Math.max(x.length, y.length); i++) {
+    var m = parseInt(x[i] || '0', 10) || 0, n = parseInt(y[i] || '0', 10) || 0;
+    if (m !== n) return m < n ? -1 : 1;
+  }
+  return 0;
+}
+
 function doGet(e) {
   return json_({ ok: true, app: '實境解謎', version: APP_VERSION, time: new Date() });
 }
@@ -110,9 +122,12 @@ function doPost(e) {
     if (!fn) throw appError_('不支援的動作：' + body.action, 'BAD_ACTION');
     var result = fn(body) || {};
     result.ok = true;
+    // 版本資訊：前台比對後端是否過舊；後端也回報前台是否過舊
+    result.version = APP_VERSION;
+    result.front_stale = cmpVer_(body.fv || '0', MIN_FRONT) < 0;
     return json_(result);
   } catch (err) {
-    return json_({ ok: false, error: (err && err.message) || String(err), code: (err && err.code) || 'ERROR' });
+    return json_({ ok: false, error: (err && err.message) || String(err), code: (err && err.code) || 'ERROR', version: APP_VERSION });
   }
 }
 
@@ -154,6 +169,7 @@ function startSession_(b) {
     checkPlayable_(p, isTest);
     var team = noFormula_(b.teamName).trim().slice(0, 30);
     if (!team) throw appError_('請輸入隊伍名稱（不能以 = + - @ 開頭）', 'BAD_INPUT');
+    if (rateHit_('st_' + p.project_id, RATE.startPerMin, 60)) throw appError_('現在太多人同時開始了，請稍等幾秒再按一次', 'RATE');
     var run = str_(b.runCode).slice(0, 30);
     if (p.require_run_code && !run) throw appError_('請輸入場次代碼（請向關主索取）', 'NEED_RUN_CODE');
     var now = new Date();
@@ -222,10 +238,11 @@ function resumeSession_(b) {
   var p = findProject_(b.projectId);
   if (!p) throw appError_('找不到這個闖關專案', 'NOT_FOUND');
   var code = str_(b.code).toUpperCase().replace(/\s+/g, '');
+  if (rateBlocked_('res_' + p.project_id, RATE.resumeFail)) throw appError_('輸入錯誤次數過多，請 10 分鐘後再試', 'TOO_MANY');
   var row = code ? find_(readRows_('Sessions'), function (r) {
     return str_(r.project_id) === p.project_id && str_(r.code).toUpperCase() === code && (!bool_(r.test) || isTestToken_(b.tt));
   }) : null;
-  if (!row) { Utilities.sleep(600); throw appError_('找不到這個隊伍代碼，請確認有沒有輸入正確', 'NO_CODE'); }
+  if (!row) { rateHit_('res_' + p.project_id, RATE.resumeFail, 600); Utilities.sleep(600); throw appError_('找不到這個隊伍代碼，請確認有沒有輸入正確', 'NO_CODE'); }
   return buildState_(ctx_({ sessionId: str_(row.session_id) }, false));
 }
 
@@ -534,7 +551,13 @@ function leaderboard_(b) {
 function admin_(fn) {
   return function (b) {
     var key = PropertiesService.getScriptProperties().getProperty('ADMIN_KEY');
+    // 防止暴力猜密碼：15 分鐘內錯 10 次就整個鎖住（連正確密碼也暫時不收），15 分鐘後自動解除
+    if (rateBlocked_('adm', RATE.adminFail)) {
+      Utilities.sleep(800);
+      throw appError_('密碼錯誤次數過多，已暫時鎖定，請 15 分鐘後再試', 'TOO_MANY');
+    }
     if (!key || str_(b.adminKey) !== key) {
+      rateHit_('adm', RATE.adminFail, 900);
       Utilities.sleep(800);
       throw appError_('管理密碼錯誤', 'UNAUTHORIZED');
     }
@@ -551,6 +574,12 @@ function adminListProjects_() {
   var list = projects_().map(function (p) {
     p.stage_count = stages.filter(function (s) { return str_(s.project_id) === p.project_id; }).length;
     p.session_count = sessions.filter(function (s) { return str_(s.project_id) === p.project_id && !bool_(s.test); }).length;
+    // 「正在玩」：狀態是進行中，而且 6 小時內有操作過（昨天沒玩完的不算）
+    var recent = Date.now() - 6 * 3600 * 1000;
+    p.playing_count = sessions.filter(function (s) {
+      var la = date_(s.last_active_at);
+      return str_(s.project_id) === p.project_id && !bool_(s.test) && str_(s.status) === 'playing' && la && la.getTime() >= recent;
+    }).length;
     return p;
   });
   return { projects: list };
@@ -580,6 +609,12 @@ function adminSaveProject_(b) {
     var routesNow = ex ? parseRoutes_(ex.routes) : [];
     if ('routes' in data) {
       var rts = parseRoutes_(data.routes);
+      var seenR = {};
+      rts.forEach(function (r) {
+        var nm = str_(r.name).trim();
+        if (nm && seenR[nm]) throw appError_('路線名稱「' + nm + '」重複了，請修改後再儲存', 'BAD_INPUT');
+        seenR[nm] = 1;
+      });
       rts.forEach(function (r) {
         if (!/^[A-Za-z0-9_-]{4,20}$/.test(r.id)) throw appError_('路線代碼格式不正確（4–20 字，英數字、底線、連字號）：' + r.id, 'BAD_INPUT');
       });
@@ -588,6 +623,14 @@ function adminSaveProject_(b) {
     }
     if ('deck_id' in data && str_(data.deck_id) && !find_(decks_(), function (d) { return d.deck_id === str_(data.deck_id); })) throw appError_('找不到這本圖鑑', 'BAD_INPUT');
     if ('teams' in data) {
+      var rawTeams = Array.isArray(data.teams) ? data.teams : parseJson_(data.teams, []);
+      var seenT = {};
+      (Array.isArray(rawTeams) ? rawTeams : []).forEach(function (x) {
+        var nm = str_(x && x.name).trim().slice(0, 30);
+        if (!nm) return;
+        if (seenT[nm]) throw appError_('隊伍名單裡「' + nm + '」重複了，請修改後再儲存', 'BAD_INPUT');
+        seenT[nm] = 1;
+      });
       var tms = parseTeams_(data.teams, routesNow);
       data.teams = tms.length ? JSON.stringify(tms) : '';
     }
@@ -600,17 +643,33 @@ function adminSaveProject_(b) {
     }
     writeRow_('Projects', ex ? ex._row : null, data);
     bumpCache_();
-    return { project_id: id };
+    // 從「非開放」改成「開放中」前先檢查：有嚴重錯誤就退回「準備中」（除非關主確認仍要開放 force）
+    var res = { project_id: id };
+    if (str_(data.status) === 'active' && (!ex || str_(ex.status) !== 'active') && !bool_(b.force)) {
+      var chk = checkProject_(findProject_(id));
+      var errs = chk.items.filter(function (x) { return x.level === 'error'; });
+      if (errs.length) {
+        var saved = find_(readRows_('Projects'), function (r) { return str_(r.project_id) === id; });
+        if (saved) writeRow_('Projects', saved._row, { status: 'draft' });
+        bumpCache_();
+        res.blocked = true;
+        res.errors = errs.map(function (x) { return x.text; });
+      }
+    }
+    return res;
   });
 }
 
 function adminDeleteProject_(b) {
   return withLock_(function () {
     var id = str_(b.projectId);
+    // 刪整個專案：一定要在請求裡帶一次專案代碼確認（前台會要求輸入），避免誤觸或亂呼叫
+    if (!id || str_(b.confirmId) !== id) throw appError_('刪除專案需要輸入專案代碼確認', 'NEED_CONFIRM');
+    var bk = backupSheets_('刪專案', ['Projects', 'Stages']);
     var n = deleteRows_('Projects', function (r) { return str_(r.project_id) === id; });
     var m = deleteRows_('Stages', function (r) { return str_(r.project_id) === id; });
     bumpCache_();
-    return { deleted_projects: n, deleted_stages: m };
+    return { deleted_projects: n, deleted_stages: m, backup: bk };
   });
 }
 
@@ -648,6 +707,9 @@ function adminSaveStage_(b) {
     if (!str_(s.title)) throw appError_('請輸入關卡名稱', 'BAD_INPUT');
     var type = str_(s.answer_type) || 'text';
     if (ANSWER_TYPES.indexOf(type) < 0) throw appError_('作答方式不正確', 'BAD_INPUT');
+    var latN = num_(s.lat, NaN), lngN = num_(s.lng, NaN);
+    if (isFinite(latN) && Math.abs(latN) > 90) throw appError_('緯度要在 -90～90 之間（台灣約 21～26）。看起來經度和緯度填反了嗎？', 'BAD_INPUT');
+    if (isFinite(lngN) && Math.abs(lngN) > 180) throw appError_('經度要在 -180～180 之間（台灣約 119～123）', 'BAD_INPUT');
     var rows = readRows_('Stages');
     var mine = rows.filter(function (r) { return str_(r.project_id) === pid; });
     var ex = find_(mine, function (r) { return str_(r.stage_id) === id; });
@@ -682,11 +744,12 @@ function adminSaveStage_(b) {
 
 function adminDeleteStage_(b) {
   return withLock_(function () {
+    var bk = backupSheets_('刪關卡', ['Stages']);
     var n = deleteRows_('Stages', function (r) {
       return str_(r.project_id) === str_(b.projectId) && str_(r.stage_id) === str_(b.stageId);
     });
     bumpCache_();
-    return { deleted: n };
+    return { deleted: n, backup: bk };
   });
 }
 
@@ -748,11 +811,12 @@ function adminDeleteSession_(b) {
   return withLock_(function () {
     var sid = str_(b.sessionId);
     if (!sid) throw appError_('缺少隊伍編號', 'BAD_INPUT');
+    var bk = backupSheets_('刪隊伍', ['Sessions', 'Submissions']);
     var n = deleteRows_('Sessions', function (r) { return str_(r.session_id) === sid; });
     // 連同這支隊伍的作答紀錄（打卡、答題、提示、照片…）一併刪除
     var m = deleteRows_('Submissions', function (r) { return str_(r.session_id) === sid; });
     bumpCache_();
-    return { deleted: n, deleted_submissions: m };
+    return { deleted: n, deleted_submissions: m, backup: bk };
   });
 }
 
@@ -770,6 +834,7 @@ function ctx_(b, mutate) {
     if (pending0) { s.status = 'playing'; s.finished_at = ''; }
   }
   if (mutate) {
+    if (rateHit_('s_' + s.session_id, RATE.sessionPerMin, 60)) throw appError_('操作太頻繁了，請稍等幾秒再試', 'RATE');
     checkPlayable_(p, bool_(s.test));
     if (s.status === 'finished') throw appError_('你們已經完成全部關卡囉！', 'FINISHED');
     if (s.status === 'timeup') throw appError_('闖關時間已到', 'TIMEUP');
@@ -974,11 +1039,12 @@ function adminGetTestToken_() { return { token: getTestToken_() }; }
 function adminClearTests_(b) {
   return withLock_(function () {
     var pid = str_(b.projectId), ids = {};
+    var bk = backupSheets_('清試玩', ['Sessions', 'Submissions']);
     readRows_('Sessions').forEach(function (r) { if (str_(r.project_id) === pid && bool_(r.test)) ids[str_(r.session_id)] = 1; });
     var n = deleteRows_('Sessions', function (r) { return str_(r.project_id) === pid && bool_(r.test); });
     var m = deleteRows_('Submissions', function (r) { return !!ids[str_(r.session_id)]; });
     bumpCache_();
-    return { deleted: n, deleted_submissions: m };
+    return { deleted: n, deleted_submissions: m, backup: bk };
   });
 }
 
@@ -986,6 +1052,10 @@ function adminClearTests_(b) {
 function adminCheckProject_(b) {
   var p = findProject_(b.projectId);
   if (!p) throw appError_('找不到專案', 'NOT_FOUND');
+  return checkProject_(p);
+}
+
+function checkProject_(p) {
   var all = stages_(p.project_id, true), stages = all.filter(function (s) { return s.enabled; }), items = [];
   var add = function (level, text, where) { items.push({ level: level, text: text, where: where || '' }); };
   var now = new Date();
@@ -1002,6 +1072,8 @@ function adminCheckProject_(b) {
   stages.forEach(function (s, i) {
     var tag = '第 ' + (i + 1) + ' 關「' + s.title + '」', w = 'stage:' + s.stage_id;
     if (s.require_gps && (s.lat === null || s.lng === null)) add('error', tag + '需要 GPS 打卡，但還沒設定座標', w);
+    if (s.lat !== null && s.lng !== null && (Math.abs(s.lat) > 90 || Math.abs(s.lng) > 180)) add('error', tag + '的座標不合理（緯度要在 -90～90、經度要在 -180～180，可能填反了）', w);
+    else if (s.require_gps && s.lat === 0 && s.lng === 0) add('error', tag + '的座標是 0, 0（在非洲外海），應該是忘了設定', w);
     if (s.require_gps && s.radius_m < 15) add('warn', tag + '範圍只有 ' + s.radius_m + ' 公尺，GPS 誤差容易讓玩家打不到卡（建議 30 公尺以上）', w);
     if (['text', 'number', 'choice'].indexOf(s.answer_type) >= 0 && !s.final_from_fragments && !s.coop_final && !str_(s.answer)) add('warn', tag + '沒有設定正確答案：任何答案都會過關', w);
     if (s.answer_type === 'choice' && !str_(s.choices)) add('error', tag + '是選擇題，但沒有設定選項', w);
@@ -1017,6 +1089,10 @@ function adminCheckProject_(b) {
   all.forEach(function (s) {
     Object.keys(stageRouteMap_(s)).forEach(function (k) { if (!routeById_(p, k)) add('warn', '關卡「' + s.title + '」指定了已經不存在的路線，這一關不會出現在任何路線', 'stage:' + s.stage_id); });
   });
+  var tn = {};
+  (p.teams || []).forEach(function (t) { if (tn[t.name]) add('error', '隊伍名單有重複的名稱「' + t.name + '」', 'project'); tn[t.name] = 1; });
+  var rn = {};
+  (p.routes || []).forEach(function (r) { if (rn[r.name]) add('error', '有兩條路線都叫「' + r.name + '」', 'project'); rn[r.name] = 1; });
   (p.teams || []).forEach(function (t) { if ((p.routes || []).length && !t.route) add('info', '隊伍「' + t.name + '」沒有指定路線，會自動平均分配', 'project'); });
   // 碎片與最後一關
   var finals = stages.filter(function (s) { return s.final_from_fragments || s.coop_final; });
@@ -1063,7 +1139,7 @@ function parseDeck_(s) {
       id: id, name: name,
       type: CARD_TYPES.indexOf(str_(x.type)) >= 0 ? str_(x.type) : 'forest',
       rarity: RARITIES.indexOf(str_(x.rarity)) >= 0 ? str_(x.rarity) : 'normal',
-      art: str_(x.art).slice(0, 300), art_credit: str_(x.art_credit).slice(0, 160),
+      art: str_(x.art).slice(0, 600), art_credit: str_(x.art_credit).slice(0, 160),
       art_fit: str_(x.art_fit) === 'cover' ? 'cover' : 'contain', art_pos: ['top', 'bottom'].indexOf(str_(x.art_pos)) >= 0 ? str_(x.art_pos) : 'center', hp: clampStat_(x.hp), atk: clampStat_(x.atk), def: clampStat_(x.def),
       skill_name: str_(x.skill_name).slice(0, 16), skill_desc: str_(x.skill_desc).slice(0, 80), story: str_(x.story).slice(0, 200)
     });
@@ -1117,10 +1193,11 @@ function adminSaveDeck_(b) {
 function adminDeleteDeck_(b) {
   return withLock_(function () {
     var id = str_(b.deckId);
+    var bk = backupSheets_('刪圖鑑', ['Decks', 'Projects']);
     var n = deleteRows_('Decks', function (r) { return str_(r.deck_id) === id; });
     readRows_('Projects').forEach(function (r) { if (str_(r.deck_id) === id) writeRow_('Projects', r._row, { deck_id: '' }); });
     bumpCache_();
-    return { deleted: n };
+    return { deleted: n, backup: bk };
   });
 }
 
@@ -1655,6 +1732,60 @@ function toCell_(v) {
   if (typeof v === 'number' && !isFinite(v)) return '';
   if (typeof v === 'object' && !(v instanceof Date)) return JSON.stringify(v);
   return v;
+}
+
+/* ===================== 頻率限制 ===================== */
+
+// 用 CacheService 計次（Apps Script 拿不到使用者 IP，所以以「專案」「隊伍」「後台」為單位限制）
+var RATE = { adminFail: 10, resumeFail: 20, startPerMin: 300, sessionPerMin: 60 };
+
+/** 已超過上限就回傳 true（不計次） */
+function rateBlocked_(key, limit) {
+  try { return (parseInt(CacheService.getScriptCache().get('rl_' + key) || '0', 10) || 0) >= limit; } catch (e) { return false; }
+}
+/** 計一次；超過上限回傳 true。快取出問題時不限制，避免誤擋正常玩家 */
+function rateHit_(key, limit, windowSec) {
+  try {
+    var c = CacheService.getScriptCache(), k = 'rl_' + key, n = parseInt(c.get(k) || '0', 10) || 0;
+    if (n >= limit) return true;
+    c.put(k, String(n + 1), windowSec);
+  } catch (e) { /* 忽略 */ }
+  return false;
+}
+
+/* ===================== 自動備份 ===================== */
+
+var BACKUP_MAX_ROWS = 20000;   // 太大的工作表不備份（複製太慢）
+var BACKUP_KEEP = 24;          // 最多保留幾張備份分頁
+
+/**
+ * 危險操作（刪除）之前，把相關工作表複製一份成「備份_時間_原因_表名」（隱藏）。
+ * ‧ 在試算表選單「檢視 → 隱藏的工作表」可以顯示出來，要還原就把資料複製回去。
+ * ‧ 同一張表 10 分鐘內只備份一次（連續刪好幾支隊伍時不會每次都複製）。
+ * ‧ 備份失敗不影響原本的操作。回傳這次建立的備份分頁名稱。
+ */
+function backupSheets_(reason, names) {
+  var made = [];
+  try {
+    var ss = ss_(), cache = CacheService.getScriptCache();
+    var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyMMdd_HHmmss');
+    names.forEach(function (n) {
+      var sh = ss.getSheetByName(n);
+      if (!sh || sh.getLastRow() <= 1 || sh.getLastRow() > BACKUP_MAX_ROWS) return;
+      var ck = 'bk_' + n;
+      try { if (cache.get(ck)) return; } catch (e) { /* */ }
+      var cp = sh.copyTo(ss);
+      cp.setName(('備份_' + ts + '_' + reason + '_' + n).slice(0, 99));
+      try { cp.hideSheet(); } catch (e) { /* */ }
+      try { cache.put(ck, '1', 600); } catch (e) { /* */ }
+      made.push(cp.getName());
+    });
+    // 只保留最新的幾張備份
+    var baks = ss.getSheets().filter(function (s) { return s.getName().indexOf('備份_') === 0; })
+      .sort(function (a, b) { return a.getName() < b.getName() ? 1 : -1; });
+    baks.slice(BACKUP_KEEP).forEach(function (s) { try { ss.deleteSheet(s); } catch (e) { /* */ } });
+  } catch (e) { /* 備份失敗不擋操作 */ }
+  return made;
 }
 
 /* ===================== 快取 ===================== */

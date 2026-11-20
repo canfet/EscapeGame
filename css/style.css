@@ -1013,3 +1013,16 @@ body { font-size: 1rem; }
 .tcg.big .tcg-story, .flipper .tcg .tcg-story { padding-bottom: .2em; }
 .tcg.big .tcg-art, .flipper .tcg .tcg-art { height: calc(8.6em / 4.6); }
 .flipper { min-height: 0; }
+
+/* 版本提醒列（前台太舊／後端太舊） */
+#ver-stack { position: fixed; left: 0; right: 0; top: 0; z-index: 3000; }
+.ver-banner { display: block; line-height: 1.6;
+  padding: calc(8px + env(safe-area-inset-top)) 14px 8px; background: #fff3cd; color: #5c4400; border-bottom: 2px solid #e0a800; font-size: .9rem; text-align: center; }
+.ver-banner button { min-height: 0; padding: 4px 12px; margin-left: 8px; vertical-align: middle; }
+
+/* 隊伍代碼可以點 */
+#g-code.clickable { cursor: pointer; }
+
+/* 後台編輯閃卡的預覽：閃光強度和前台「放大檢視」一致（所見即所得） */
+#dk-preview .tcg.s-foil.r-rare::after { opacity: .3; }
+#dk-preview .tcg.s-foil.r-legend::after { opacity: .4; }

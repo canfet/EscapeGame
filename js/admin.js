@@ -21,6 +21,34 @@
       .catch(function (e) { if (e.code === 'UNAUTHORIZED') logout(); throw e; });
   }
 
+  /** 這個專案現在有幾支「正在玩」的正式隊伍（6 小時內有操作） */
+  async function liveCount(pid) {
+    try {
+      var r = await call('adminListProjects');
+      var p = r.projects.filter(function (x) { return x.project_id === pid; })[0];
+      return p ? (p.playing_count || 0) : 0;
+    } catch (e) { return 0; }
+  }
+
+  /**
+   * 活動進行中的危險操作守門：有隊伍正在玩時，要輸入專案代碼才能繼續。
+   * 確認過一次後，同一個專案 10 分鐘內不再重複詢問（例如連續調整關卡順序）。
+   */
+  async function guardLive(pid, what) {
+    A.liveOk = A.liveOk || {};
+    if ((A.liveOk[pid] || 0) > Date.now()) return true;
+    var n = await liveCount(pid);
+    if (!n) return true;
+    var typed = prompt('⚠️ 目前有 ' + n + ' 支隊伍正在闖關！\n\n' + what + '\n\n確定要繼續，請輸入專案代碼「' + pid + '」：');
+    if (typed !== pid) { if (typed !== null) Q.toast('代碼不符，已取消', 'warn'); return false; }
+    A.liveOk[pid] = Date.now() + 10 * 60 * 1000;
+    return true;
+  }
+
+  function showBackup(r) {
+    if (r && r.backup && r.backup.length) Q.toast('🛟 已自動備份 ' + r.backup.length + ' 張工作表（試算表「檢視 → 隱藏的工作表」可找回）', 'ok', 6000);
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     $('#btn-login').onclick = login;
     $('#login-key').addEventListener('keydown', function (e) { if (e.key === 'Enter') login(); });
@@ -55,7 +83,7 @@
     $('#btn-clear-tests').onclick = async function () {
       var pid = $('#mon-project').value;
       if (!confirm('清除這個專案所有「試玩」隊伍與它們的作答紀錄？\n（正式隊伍不受影響）')) return;
-      try { var r = await call('adminClearTests', { projectId: pid }); Q.toast('已清除 ' + r.deleted + ' 支試玩隊伍', 'ok'); loadMonitor(); } catch (e) { /* */ }
+      try { var r = await call('adminClearTests', { projectId: pid }); Q.toast('已清除 ' + r.deleted + ' 支試玩隊伍', 'ok'); showBackup(r); loadMonitor(); } catch (e) { /* */ }
     };
     $('#qs-print').onclick = function () {
       document.body.classList.add('printing-qr');
@@ -265,7 +293,7 @@
     $('#dk-list').innerHTML = dk.cards.map(function (c, i) {
       return '<button type="button" class="dk-item' + (i === A.deckSel ? ' sel' : '') + '" data-i="' + i + '">' + Q.cardHtml(Object.assign({ number: i + 1 }, c), Object.assign(dkOpts(), { mini: true })) + '</button>';
     }).join('') || '<div class="help">還沒有卡牌。在左邊貼上名稱，按「產生卡牌」。</div>';
-    $$('#dk-list [data-i]').forEach(function (b) { b.onclick = function () { A.deckSel = +b.dataset.i; renderDeckEditor(); }; });
+    $$('#dk-list [data-i]').forEach(function (b) { b.onclick = function () { readDeckForm(); A.deckSel = +b.dataset.i; renderDeckEditor(); }; });
     var c = dk.cards[A.deckSel];
     $('#dk-editor').classList.toggle('hidden', !c);
     if (c) {
@@ -289,7 +317,9 @@
   function readDeckForm() {
     var c = A.editDeck.cards[A.deckSel];
     if (!c) return;
-    c.name = $('#dk-name').value.trim().slice(0, 20) || c.name; c.rarity = $('#dk-rarity').value; c.type = $('#dk-type').value; c.art = $('#dk-art').value.trim();
+    var newArt = $('#dk-art').value.trim();
+    if (newArt !== (c.art || '')) { c.art_credit = ''; $('#dk-credit').textContent = ''; }   // 換了別張圖：舊圖的授權資訊不再適用
+    c.name = $('#dk-name').value.trim().slice(0, 20) || c.name; c.rarity = $('#dk-rarity').value; c.type = $('#dk-type').value; c.art = newArt;
     c.art_fit = $('#dk-art_fit').value; c.art_pos = $('#dk-art_pos').value;
     c.hp = Number($('#dk-hp').value) || 0; c.atk = Number($('#dk-atk').value) || 0; c.def = Number($('#dk-def').value) || 0;
     c.skill_name = $('#dk-skill_name').value.trim(); c.skill_desc = $('#dk-skill_desc').value.trim(); c.story = $('#dk-story').value.trim();
@@ -324,9 +354,12 @@
     if (!dk.title) return Q.toast('請輸入圖鑑名稱', 'warn');
     if (!dk.cards.length) return Q.toast('至少要有一張卡牌', 'warn');
     try {
-      await call('adminSaveDeck', { deckId: dk.deck_id, title: dk.title, kind: dk.kind, style: dk.style, cards: dk.cards });
+      var sr = await call('adminSaveDeck', { deckId: dk.deck_id, title: dk.title, kind: dk.kind, style: dk.style, cards: dk.cards });
+      var lost = [];
+      (sr.cards || []).forEach(function (sc, i) { if (dk.cards[i] && String(dk.cards[i].art || '') !== String(sc.art || '')) lost.push(i + 1); });
       $('#m-deck').classList.add('hidden');
       Q.toast('圖鑑已儲存', 'ok');
+      if (lost.length) Q.toast('⚠️ 第 ' + lost.slice(0, 8).join('、') + ' 張卡的圖片網址沒有完整存下來（網址太長？），請改用「⬆ 上傳」或重新搜尋', 'warn', 9000);
       await loadDecks();
       await loadProjects();
     } catch (e) { /* */ }
@@ -338,9 +371,9 @@
     var used = (A.decks.filter(function (x) { return x.deck_id === dk.deck_id; })[0] || { used_by: [] }).used_by;
     if (!confirm('刪除圖鑑「' + dk.title + '」？' + (used.length ? '\n\n正在使用它的專案（' + used.join('、') + '）會變成不使用圖鑑。' : '') + '\n此動作無法復原。')) return;
     try {
-      await call('adminDeleteDeck', { deckId: dk.deck_id });
+      var dkr = await call('adminDeleteDeck', { deckId: dk.deck_id });
       $('#m-deck').classList.add('hidden');
-      Q.toast('已刪除', 'ok');
+      Q.toast('已刪除', 'ok'); showBackup(dkr);
       await loadDecks(); await loadProjects();
     } catch (e) { /* */ }
   }
@@ -512,7 +545,7 @@
       };
       $(sel).addEventListener('input', ev); $(sel).addEventListener('change', ev);
     });
-    $('#dk-art').addEventListener('input', function () { refreshImgPrev('dk-art'); var c = A.editDeck.cards[A.deckSel]; if (c && c.art_credit && c.art !== $('#dk-art').value.trim()) { c.art_credit = ''; $('#dk-credit').textContent = ''; } });
+    $('#dk-art').addEventListener('input', function () { refreshImgPrev('dk-art'); });
     bindImageField('dk-art', 'stage', function () { return 'decks'; });
   }
 
@@ -557,8 +590,17 @@
         var s = Math.min(1, max / Math.max(img.width, img.height));
         var c = document.createElement('canvas');
         c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        var cx = c.getContext('2d');
         URL.revokeObjectURL(url);
+        // PNG（可能有透明背景）：盡量保留成 PNG；太大才轉 JPEG
+        if (file.type === 'image/png') {
+          cx.drawImage(img, 0, 0, c.width, c.height);
+          var png = c.toDataURL('image/png');
+          if (png.length * 0.75 <= 2 * 1024 * 1024) return resolve(png);
+        }
+        // 轉 JPEG：先鋪白底，否則透明的地方會變成黑色
+        cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
+        cx.drawImage(img, 0, 0, c.width, c.height);
         resolve(c.toDataURL('image/jpeg', quality));
       };
       img.onerror = function () {
@@ -580,7 +622,8 @@
   function bindImageField(id, kind, getProjectId) {
     var input = $('#' + id), file = $('#' + id + '-file'), pick = $('#' + id + '-pick');
     input.addEventListener('input', function () { refreshImgPrev(id); });
-    $('#' + id + '-clear').onclick = function () { input.value = ''; refreshImgPrev(id); };
+    var fire = function () { refreshImgPrev(id); input.dispatchEvent(new Event('input', { bubbles: true })); };
+    $('#' + id + '-clear').onclick = function () { input.value = ''; fire(); };
     pick.onclick = function () {
       if (!getProjectId()) return Q.toast(kind === 'cover' ? '請先填寫專案代碼再上傳' : '請先選擇專案', 'warn');
       file.click();
@@ -594,7 +637,7 @@
         var dataUrl = await Q.run(function () { return compressImage(f); });
         var r = await call('adminUploadImage', { projectId: getProjectId(), kind: kind, dataUrl: dataUrl });
         if (!r || !r.url) throw new Error('伺服器沒有回傳圖片網址');
-        input.value = r.url; refreshImgPrev(id);
+        input.value = r.url; fire();
         Q.toast('圖片已上傳，記得按「儲存」', 'ok');
       } catch (e) { /* call 已顯示錯誤 */ }
       finally { pick.disabled = false; pick.textContent = old; }
@@ -830,10 +873,31 @@
       if (seenTeam[p.teams[ti].name]) return Q.toast('隊伍名稱重複：' + p.teams[ti].name, 'warn');
       seenTeam[p.teams[ti].name] = 1;
     }
+    var seenRoute = {};
+    for (var ri = 0; ri < p.routes.length; ri++) {
+      if (seenRoute[p.routes[ri].name]) return Q.toast('路線名稱重複：' + p.routes[ri].name, 'warn');
+      seenRoute[p.routes[ri].name] = 1;
+    }
+    // 活動進行中：改路線、隊伍名單、或把專案關閉／改回準備中，會影響正在玩的隊伍
+    var orig = !A.editProjectNew && A.projects.filter(function (x) { return x.project_id === p.project_id; })[0];
+    if (orig) {
+      var sig = function (routes, teams) {
+        return JSON.stringify([(routes || []).map(function (r) { return [r.id, r.name]; }), (teams || []).map(function (t) { return [t.name, t.route || '']; })]);
+      };
+      var changedStruct = sig(orig.routes, orig.teams) !== sig(p.routes, p.teams);
+      var closing = orig.status === 'active' && (p.status === 'draft' || p.status === 'closed');
+      if ((changedStruct || closing) && !(await guardLive(p.project_id, closing ? '把專案改成「準備中／已結束」後，玩家就無法繼續進入。' : '修改路線或隊伍名單，可能讓正在玩的隊伍進度對不上。'))) return;
+    }
     try {
-      await call('adminSaveProject', { project: p, isNew: A.editProjectNew });
+      var r = await call('adminSaveProject', { project: p, isNew: A.editProjectNew });
+      // 要開放的專案若有嚴重錯誤，後端會先把狀態退回「準備中」
+      if (r.blocked) {
+        var go = confirm('這個專案還有以下問題，所以暫時維持「準備中」：\n\n• ' + r.errors.join('\n• ') + '\n\n建議先到「活動前檢查」修正。\n要忽略這些問題、仍然改成開放嗎？（不建議）');
+        if (go) { r = await call('adminSaveProject', { project: p, isNew: false, force: true }); }
+        else Q.toast('已儲存，狀態維持「準備中」；修正後再改成開放', 'warn', 7000);
+      }
       $('#m-project').classList.add('hidden');
-      Q.toast('已儲存', 'ok');
+      if (!r.blocked) Q.toast('已儲存', 'ok');
       A.pid = p.project_id;
       await loadProjects();
     } catch (e) { /* */ }
@@ -856,8 +920,8 @@
     var typed = prompt('刪除專案會一併刪除所有關卡設定（闖關紀錄會保留）。\n確定要刪除請輸入專案代碼「' + p.project_id + '」：');
     if (typed !== p.project_id) { if (typed !== null) Q.toast('代碼不符，未刪除', 'warn'); return; }
     try {
-      await call('adminDeleteProject', { projectId: p.project_id });
-      Q.toast('已刪除', 'ok');
+      var dpr = await call('adminDeleteProject', { projectId: p.project_id, confirmId: typed });
+      Q.toast('已刪除', 'ok'); showBackup(dpr);
       if (A.pid === p.project_id) A.pid = '';
       await loadProjects();
     } catch (e) { /* */ }
@@ -1067,6 +1131,7 @@
     var i = ids.indexOf(id), j = i + dir;
     if (j < 0 || j >= ids.length) return;
     ids[i] = ids[j]; ids[j] = id;
+    if (!(await guardLive(A.pid, '調整關卡順序會改變正在玩的隊伍的下一關。'))) return;
     try {
       await call('adminReorderStages', { projectId: A.pid, order: ids });
       await selectProject(A.pid);
@@ -1320,6 +1385,19 @@
       var moved = Q.distM(A.edOrig.lat, A.edOrig.lng, s.lat, s.lng);
       if (moved > 500 && !confirm('新位置離原本位置約 ' + Math.round(moved) + ' 公尺，確定要儲存嗎？\n（電腦定位常常不準，可按「還原原本位置」）')) return;
     }
+    // 防呆：座標、範圍
+    if (isFinite(s.lat) && isFinite(s.lng)) {
+      if (Math.abs(s.lat) > 90) return Q.toast('緯度要在 -90～90 之間（台灣約 21～26），看起來經度和緯度填反了？', 'err', 7000);
+      if (s.lat === 0 && s.lng === 0) return Q.toast('座標是 0, 0，應該是忘了設定', 'err', 6000);
+      // 離專案裡其他關卡太遠（常見於座標打錯一個數字）
+      var others = A.stages.filter(function (x) { return (!A.editStage || x.stage_id !== A.editStage.stage_id) && x.lat !== null && x.lng !== null && isFinite(x.lat) && isFinite(x.lng); });
+      if (others.length) {
+        var near = Math.min.apply(null, others.map(function (x) { return Q.distM(x.lat, x.lng, s.lat, s.lng); }));
+        if (near > 20000 && !confirm('這一關離專案裡其他關卡至少 ' + Math.round(near / 1000) + ' 公里遠。\n\n座標沒有打錯嗎？（例如少打或多打一個數字）\n確定要儲存嗎？')) return;
+      }
+    }
+    if (s.require_gps && isFinite(s.radius_m) && s.radius_m > 0 && s.radius_m < 15 &&
+      !confirm('抵達範圍只有 ' + s.radius_m + ' 公尺。\n\n手機 GPS 常有十幾公尺的誤差，範圍太小玩家可能怎麼走都打不到卡（建議 30 公尺以上）。\n仍要儲存嗎？')) return;
     try {
       var r = await call('adminSaveStage', { stage: s, isNew: !A.editStage });
       $('#m-stage').classList.add('hidden');
@@ -1331,10 +1409,11 @@
 
   async function deleteStage() {
     if (!A.editStage || !confirm('確定刪除關卡「' + A.editStage.title + '」？')) return;
+    if (!(await guardLive(A.pid, '刪除關卡會讓已經玩到這一關的隊伍進度、分數對不上。'))) return;
     try {
-      await call('adminDeleteStage', { projectId: A.pid, stageId: A.editStage.stage_id });
+      var dsr = await call('adminDeleteStage', { projectId: A.pid, stageId: A.editStage.stage_id });
       $('#m-stage').classList.add('hidden');
-      Q.toast('已刪除', 'ok');
+      Q.toast('已刪除', 'ok'); showBackup(dsr);
       await selectProject(A.pid);
     } catch (e) { /* */ }
   }
@@ -1412,7 +1491,7 @@
         if (!confirm(warn)) return;
         try {
           var dr = await call('adminDeleteSession', { sessionId: b.dataset.del });
-          Q.toast('已刪除隊伍，並刪除 ' + (dr.deleted_submissions || 0) + ' 筆作答紀錄', 'ok');
+          Q.toast('已刪除隊伍，並刪除 ' + (dr.deleted_submissions || 0) + ' 筆作答紀錄', 'ok'); showBackup(dr);
           loadMonitor();
         } catch (e) { /* */ }
       };

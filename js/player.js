@@ -244,6 +244,10 @@
       try { localStorage.setItem(LS(P.projectId), P.sid); } catch (e) { /* */ }
       startGame(r.state);
       Q.toast(r.resumed ? '這支隊伍已經開始過了，已接續原本的進度' : '隊伍建立成功，出發吧！', 'ok', r.resumed ? 5000 : 3000);
+      // 新隊伍：教學（含隊伍代碼）只在這支手機第一次玩時出現；其餘情況單獨提醒記下代碼
+      var tutSeen = false;
+      try { tutSeen = localStorage.getItem('gpsquest:tut') === '1'; } catch (e) { /* */ }
+      if (!r.resumed && tutSeen) setTimeout(function () { showTeamCode(true); }, 1200);
     } catch (e) { /* toast 已顯示 */ }
   }
 
@@ -301,6 +305,8 @@
     $('#g-title').textContent = s.project.name;
     $('#g-team').textContent = se.team_name;
     $('#g-code').textContent = se.code;
+    $('#g-code').classList.add('clickable');
+    $('#g-code').onclick = function () { showTeamCode(false); };
     $('#btn-board').classList.toggle('hidden', !s.project.leaderboard_live);
     var frs = s.fragments || [], gotN = frs.filter(function (f) { return f.got; }).length;
     var col = s.collection || [], colGot = col.filter(function (x) { return x.got; }).length, bds = s.badges || [];
@@ -385,12 +391,24 @@
   function draftKey(stageId, field) { return 'gpsquest:draft:' + P.sid + ':' + stageId + ':' + field; }
   function clearDrafts(stageId) { ['s-ans', 's-caption', 's-code'].forEach(function (f) { try { localStorage.removeItem(draftKey(stageId, f)); } catch (e) { /* */ } }); }
 
+  /** 隊伍代碼：換手機、清掉瀏覽器資料時，靠它接回進度。點上方代碼可再看一次 */
+  function showTeamCode(first) {
+    var code = (P.state && P.state.session && P.state.session.code) || '';
+    if (!code) return;
+    try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code); } catch (e) { /* */ }
+    askConfirm('🔑 隊伍代碼：' + code,
+      (first ? '隊伍建立成功！請先把這組代碼截圖或抄下來。\n\n' : '') +
+      '如果手機沒電、換手機、或瀏覽器資料被清掉，在開始頁面按「用隊伍代碼接續」輸入它，就能接回原本的進度。\n（代碼已複製到剪貼簿）',
+      '我記下了', true);
+  }
+
   /* ---------- 新手教學（第一次進來才顯示，可跳過） ---------- */
   var TUT = [];
   function maybeTutorial(state) {
     try { if (localStorage.getItem('gpsquest:tut') === '1') return; } catch (e) { return; }
     var pj = state.project || {}, hasColl = (state.collection || []).length, hasFrag = (state.fragments || []).length;
     TUT = [
+      { icon: '🔑', title: '記下你們的隊伍代碼：' + ((state.session && state.session.code) || ''), text: '換手機或瀏覽器資料被清掉時，靠這組代碼接回進度。\n請截圖或抄下來；之後點上方的代碼也能再看到。' },
       { icon: '📍', title: '跟著指示找地點', text: '地圖上的「下一站」會告訴你方向和距離。\n走到地點附近，按「我到了，定位打卡」。' },
       { icon: '✏️', title: '答題過關', text: '打卡後就能作答。需要幫忙時可以按「需要提示」，\n但看提示會讓這一關可得的分數變少。' }
     ];
@@ -1076,7 +1094,10 @@
       if (!file) return;
       file.onchange = async function () {
         if (!file.files[0]) return;
-        try { P.photo = await Q.run(function () { return compressImage(file.files[0]); }); renderStage(); }
+        var f0 = file.files[0];
+        if (f0.type && !/^image\//i.test(f0.type)) { file.value = ''; return Q.toast('請選擇照片檔（jpg、png…）', 'warn'); }
+        if (f0.size > 40 * 1024 * 1024) { file.value = ''; return Q.toast('這個檔案太大了（超過 40 MB），請換一張或重新拍攝', 'warn', 5000); }
+        try { P.photo = await Q.run(function () { return compressToLimit(f0); }); renderStage(); }
         catch (e) { /* */ }
       };
     });
@@ -1139,6 +1160,17 @@
       if (e.code === 'NETWORK') showRetry(function () { act(action, payload); });
       return false;
     }
+  }
+
+  /** 壓縮到約 1.5 MB 以下：先 1280px，太大再逐步降低尺寸與品質（手機原圖常常好幾 MB，容易逾時） */
+  async function compressToLimit(file) {
+    var steps = [[1280, 0.82], [1024, 0.7], [800, 0.6], [640, 0.5]], out = '';
+    for (var i = 0; i < steps.length; i++) {
+      out = await compressImage(file, steps[i][0], steps[i][1]);
+      if (out.length * 0.75 <= 1.5 * 1024 * 1024) return out;
+    }
+    if (out.length * 0.75 > 6 * 1024 * 1024) throw new Error('照片太大，請重新拍攝');
+    return out;
   }
 
   /** 照片壓縮到長邊 1280px，避免上傳太久 */

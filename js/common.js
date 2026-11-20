@@ -10,9 +10,54 @@
    * ‧ 30 秒沒回應就視為連線失敗（NETWORK），前台會出現「重試」。
    * ‧ 後端回「BUSY」（很多人同時操作、排隊太久）代表這個動作還沒執行，自動等一下再試，最多 3 次。
    */
+  // 前台版本：後端會檢查它（太舊會叫玩家重新整理）；後端版本太舊時，後台會提示重新部署 Code.gs
+  var FRONT_VERSION = '1.1.0', MIN_BACKEND = '1.1.0';
+
+  function cmpVer(a, b) {
+    var x = String(a || '0').split('.'), y = String(b || '0').split('.');
+    for (var i = 0; i < Math.max(x.length, y.length); i++) {
+      var m = parseInt(x[i] || '0', 10) || 0, n = parseInt(y[i] || '0', 10) || 0;
+      if (m !== n) return m < n ? -1 : 1;
+    }
+    return 0;
+  }
+
+  /** 頁面最上方的提醒列（重新整理、重新部署…）；同一種提醒只顯示一次 */
+  function topBanner(id, html) {
+    if (document.getElementById(id)) return;
+    var d = document.createElement('div');
+    d.id = id; d.className = 'ver-banner'; d.setAttribute('role', 'alert');
+    d.innerHTML = html;
+    var stack = document.getElementById('ver-stack');
+    if (!stack) { stack = document.createElement('div'); stack.id = 'ver-stack'; document.body.appendChild(stack); }
+    stack.appendChild(d);
+    var b = d.querySelector('[data-reload]');
+    if (b) b.onclick = function () { location.reload(); };
+    var x = d.querySelector('[data-close]');
+    if (x) x.onclick = function () { d.remove(); };
+  }
+
+  function checkVersions(data) {
+    if (!data) return;
+    var isAdmin = /admin/i.test(location.pathname);
+    // 後端太舊（沒帶 version 的舊後端也算）：只有管理者看得懂也處理得了
+    if (isAdmin && cmpVer(data.version || '0', MIN_BACKEND) < 0) {
+      topBanner('ver-backend', '⚠️ 後端程式版本過舊（目前 ' + esc(data.version || '更舊') + '，需要 ' + MIN_BACKEND + ' 以上），部分功能可能無法使用。' +
+        '請把最新的 <b>apps-script/Code.gs</b> 貼到 Apps Script，再「部署 → 管理部署作業 → 編輯 → 新版本」。<button type="button" data-close class="sm ghost">我知道了</button>');
+    }
+    // 前台太舊：玩家與管理者都請重新整理
+    if (data.front_stale) {
+      topBanner('ver-front', '🔄 網站有新版本了，請重新整理頁面以取得最新功能。<button type="button" data-reload class="sm">重新整理</button>');
+    }
+  }
+
   async function api(action, payload) {
     var url = global.APP_CONFIG && global.APP_CONFIG.API_URL;
-    if (!url || url.indexOf('PASTE_') === 0) throw new Error('尚未設定 API 網址，請編輯 config.js');
+    if (!url || url.indexOf('PASTE_') === 0) {
+      var ce = new Error('這個網站還沒有設定後端網址。請編輯 config.js，把 API_URL 換成你自己部署的 Apps Script 網址（fork 本專案的人請參考 README 步驟 3）。');
+      ce.code = 'NO_CONFIG';
+      throw ce;
+    }
     for (var attempt = 0; ; attempt++) {
       var res, ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
       var timer = ctl ? setTimeout(function () { ctl.abort(); }, 30000) : null;
@@ -20,7 +65,7 @@
         res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+          body: JSON.stringify(Object.assign({ action: action, fv: FRONT_VERSION }, payload || {})),
           redirect: 'follow',
           signal: ctl ? ctl.signal : undefined
         });
@@ -35,6 +80,7 @@
       try { data = JSON.parse(text); } catch (e) {
         throw new Error('伺服器回應格式錯誤。請確認 Apps Script 部署時「誰可以存取」選擇「所有人」。');
       }
+      try { checkVersions(data); } catch (e) { /* 版本檢查不能影響遊戲 */ }
       if (!data.ok) {
         if (data.code === 'BUSY' && attempt < 3) { await sleep(1500 * (attempt + 1)); continue; }
         var err = new Error(data.error || '發生錯誤');
@@ -287,7 +333,7 @@
     cardHtml: cardHtml, cardBackHtml: cardBackHtml, bindTilt: bindTilt, cardArt: cardArt,
     CARD_TYPE_LABEL: CARD_TYPE_LABEL, CARD_STAT_LABEL: CARD_STAT_LABEL, RARITY_LABEL: RARITY_LABEL,
     boardHtml: boardHtml,
-    api: api, $: $, $$: $$, esc: esc, linkify: linkify, toast: toast, loading: loading, run: run,
+    api: api, FRONT_VERSION: FRONT_VERSION, $: $, $$: $$, esc: esc, linkify: linkify, toast: toast, loading: loading, run: run,
     distM: distM, fmtDist: fmtDist, fmtDuration: fmtDuration, fmtTime: fmtTime, toLocalInput: toLocalInput,
     parseLatLng: parseLatLng, locate: locate, STATUS_LABEL: STATUS_LABEL, TYPE_LABEL: TYPE_LABEL, STATUS_COLOR: STATUS_COLOR
   };
