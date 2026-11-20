@@ -622,7 +622,10 @@
     if (st.status === 'open') {
       if (st.lat != null && st.require_gps) h.push(compassHtml(st)); // 不需要 GPS 的關卡不顯示方向與距離
       if (playing) {
-        if (st.require_gps) acts.push('<button class="big" id="s-arrive">📍 我到了，定位打卡</button>');
+        // 需要 GPS 打卡、又要輸入文字／數字答案：到了現場可以直接填答案，一次完成「定位＋送答案」
+        var combo = st.require_gps && st.question && (st.answer_type === 'text' || st.answer_type === 'number');
+        if (combo) h.push(answerUI(st).body);
+        if (st.require_gps) acts.push('<button class="big" id="s-arrive">' + (combo ? '📍 我到了，定位打卡' : '📍 我到了，定位打卡') + '</button>');
         if (st.has_bypass) {
           h.push('<div class="card"><label for="s-code">' + (st.require_gps ? '定位不準？輸入現場通關碼' : '輸入現場的通關碼') + '</label>' +
             '<div class="row"><input id="s-code" class="grow" autocomplete="off" placeholder="通關碼"><button id="s-code-btn">確認</button></div></div>');
@@ -710,7 +713,13 @@
     });
     on('btn-compass', function () { startCompass(true, true); });
     updateCompass();
-    on('s-arrive', function () { doArrive(st); });
+    var arriveBtn = document.getElementById('s-arrive'), ansEl = document.getElementById('s-ans');
+    var arriveLabel = function () { return ansEl && st.status === 'open' && ansEl.value.trim() ? '📍 定位打卡並送出答案' : '📍 我到了，定位打卡'; };
+    if (arriveBtn && ansEl && st.status === 'open') {
+      arriveBtn.textContent = arriveLabel();
+      ansEl.addEventListener('input', function () { arriveBtn.textContent = arriveLabel(); });
+    }
+    on('s-arrive', function () { doArrive(st, ansEl && st.status === 'open' ? ansEl.value.trim() : ''); });
     on('s-code-btn', function () {
       var code = $('#s-code').value.trim();
       if (!code) return Q.toast('請輸入通關碼', 'warn');
@@ -735,7 +744,7 @@
       b.onclick = function () { P.choice = st.choices[+b.dataset.choice]; renderStage(); };
     });
     var input = $('#s-ans');
-    if (input) input.addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#s-submit').click(); });
+    if (input) input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { var go = $('#s-submit') || $('#s-arrive'); if (go) go.click(); } });
     var file = $('#s-file');
     if (file) file.onchange = async function () {
       if (!file.files[0]) return;
@@ -750,18 +759,20 @@
     on('s-form', function () { act('checkForm', { stageId: st.stage_id }); });
   }
 
-  async function doArrive(st) {
+  async function doArrive(st, ans) {
     if (!st.require_gps) return act('arrive', { stageId: st.stage_id });
     var btn = $('#s-arrive');
     if (btn) { btn.disabled = true; btn.textContent = '定位中…'; }
     try {
       var pos = await getFix();
-      await act('arrive', { stageId: st.stage_id, lat: pos.lat, lng: pos.lng, accuracy: pos.acc });
+      var r = await act('arrive', { stageId: st.stage_id, lat: pos.lat, lng: pos.lng, accuracy: pos.acc });
+      // 同時填了答案：定位通過（arrived 不是 false）才接著送出答案
+      if (ans && r && r.arrived !== false) await act('submitAnswer', { stageId: st.stage_id, answer: ans });
     } catch (e) {
       Q.toast(e.message, 'err', 6000);
     } finally {
       btn = $('#s-arrive');
-      if (btn) { btn.disabled = false; btn.textContent = '📍 我到了，定位打卡'; }
+      if (btn) { btn.disabled = false; var a2 = $('#s-ans'); btn.textContent = (a2 && a2.value.trim() && findStage(st.stage_id) && findStage(st.stage_id).status === 'open') ? '📍 定位打卡並送出答案' : '📍 我到了，定位打卡'; }
     }
   }
 
@@ -786,7 +797,7 @@
       // 過關時顯示過關畫面（任務全部完成時由完成畫面接手）
       if (solved && r.state.session.status === 'playing') showSolved(solved);
       else if (r.message) Q.toast(r.message, type, type === 'warn' ? 4500 : 3000);
-      return true;
+      return r;
     } catch (e) {
       if (['TIMEUP', 'FINISHED', 'CLOSED'].indexOf(e.code) >= 0) refresh();
       if (e.code === 'NETWORK') showRetry(function () { act(action, payload); });
