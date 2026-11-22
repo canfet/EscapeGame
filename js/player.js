@@ -108,6 +108,12 @@
       cv.addEventListener('touchend', function (e) { if (y0 != null && cv.scrollTop <= 0 && e.changedTouches[0].clientY - y0 > 80) closeCardView(); y0 = null; }, { passive: true });
     })();
     $('#gps-retry').onclick = retryGps;
+    $('#btn-copy-code').onclick = function () { copyText((P.state && P.state.session && P.state.session.code) || '').then(function (ok) { Q.toast(ok ? '已複製隊伍代碼' : '複製失敗，請手動抄下代碼', ok ? 'ok' : 'warn'); }); };
+    $('#time-banner').onclick = function () { this.classList.add('hidden'); };
+    $('#btn-share').onclick = openShare;
+    $('#share-x').onclick = closeShare;
+    $('#share-view').addEventListener('click', function (e) { if (e.target === this || e.target.classList.contains('share-box')) closeShare(); });
+
     $('#pack-close').onclick = closePack;
     $('#board-close').onclick = closeBoard;
     $('#btn-locate').onclick = function () { if (P.pos && P.map) P.map.setView([P.pos.lat, P.pos.lng], 17); else toastGps(); };
@@ -243,7 +249,7 @@
     if (P.project && P.project.require_run_code && !run) { Q.toast('請輸入場次代碼', 'warn'); return; }
     // 在使用者按下按鈕時要定位權限（iOS 比較穩）
     startWatch();
-    startCompass(true);
+    startCompass(true);   // 一律在第一次進來、按下開始的當下就要定位權限（iOS 在使用者按鈕當下比較穩）
     try {
       var r = await Q.run(function () {
         return api('startSession', {
@@ -284,8 +290,8 @@
     applyState(state);
     if (state.session.test) $('#test-banner').classList.remove('hidden');
     setTimeout(function () { maybeTutorial(state); }, 400);
-    initMap();
-    startWatch();
+    if (stateNoGps(state)) noGpsMode(); else { initMap();
+    startWatch(); }
     clearInterval(P.timer);
     P.timer = setInterval(tick, 1000);
     tick();
@@ -316,6 +322,7 @@
     $('#g-title').textContent = s.project.name;
     $('#g-team').textContent = se.team_name;
     $('#g-code').textContent = se.code;
+    $('#g-code-big').textContent = se.code;
     $('#g-code').classList.add('clickable');
     $('#g-code').onclick = function () { showTeamCode(false); };
     $('#btn-board').classList.toggle('hidden', !s.project.leaderboard_live);
@@ -413,6 +420,21 @@
       '我記下了', true);
   }
 
+  function copyText(text) {
+    return new Promise(function (resolve) {
+      if (!text) return resolve(false);
+      try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { resolve(true); }, function () { resolve(legacyCopy(text)); }); } catch (e) { /* */ }
+      resolve(legacyCopy(text));
+    });
+  }
+  function legacyCopy(text) {
+    try {
+      var t = document.createElement('textarea'); t.value = text; t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(t); t.select(); t.setSelectionRange(0, 999);
+      var ok = document.execCommand('copy'); t.remove(); return ok;
+    } catch (e) { return false; }
+  }
+
   /* ---------- 新手教學（第一次進來才顯示，可跳過） ---------- */
   var TUT = [];
   function maybeTutorial(state) {
@@ -426,6 +448,8 @@
     if (hasColl) TUT.push({ icon: '🃏', title: '收集卡牌與收藏品', text: '每過一關都能收進圖鑑。點右上角的 🎒 看收集進度，\n集滿整本會有驚喜。你的小夥伴也會越來越多！' });
     if (hasFrag) TUT.push({ icon: '🧩', title: '收集密碼碎片', text: '過關會得到密碼碎片，全部收集起來，\n就能在最後一關解開最終密碼。' });
     if (pj.leaderboard_live) TUT.push({ icon: '🏆', title: '看看其他隊伍', text: '點上方的「🏆 排行榜」，隨時看各隊的進度。' });
+    var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+    if (TOUCH && !standalone) TUT.push({ icon: '📲', title: '小技巧：加到主畫面', text: 'iPhone：點 Safari 下方的分享鈕 →「加入主畫面」。\nAndroid：點瀏覽器選單 →「加到主畫面」。\n之後從主畫面開啟，沒有網址列，畫面更大。' });
     P.tutI = 0;
     renderTut();
     $('#tutorial').classList.remove('hidden');
@@ -493,10 +517,30 @@
     el.classList.remove('hidden');
     el.textContent = '⏱ ' + Q.fmtDuration(left);
     el.style.background = left < 300 ? 'rgba(181,69,47,.85)' : '';
+    if (left > 0) timeWarn(left);
     if (left <= 0 && !P.timeupChecked) {
       P.timeupChecked = true;
       refresh();
     }
+  }
+
+  /** 剩 10 分鐘、3 分鐘時，用醒目的橫幅＋震動提醒（每個門檻只提醒一次，重新整理也不會重複） */
+  function timeWarn(left) {
+    if (!P.sid) return;
+    var key = 'escapegame:tw:' + P.sid, done = [];
+    try { done = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { /* */ }
+    var hit = [600, 180].filter(function (t) { return left <= t; }), th = hit.length ? hit[hit.length - 1] : null;
+    if (th == null || done.indexOf(th) >= 0) return;
+    [600, 180].forEach(function (t) { if (t >= th && done.indexOf(t) < 0) done.push(t); });
+    try { localStorage.setItem(key, JSON.stringify(done)); } catch (e) { /* */ }
+    var b = $('#time-banner');
+    b.innerHTML = '⏰ 剩下約 <b>' + Math.max(1, Math.round(th / 60)) + ' 分鐘</b>！<span>' + (th <= 180 ? '趕快完成手上的關卡，或準備回集合點' : '注意時間，記得預留回集合點的時間') + '（點一下關閉）</span>';
+    b.classList.toggle('urgent', th <= 180);
+    b.classList.remove('hidden');
+    try { if (Snd.on && navigator.vibrate) navigator.vibrate([250, 120, 250, 120, 250]); } catch (e) { /* */ }
+    sfx('bad');
+    clearTimeout(P.twT);
+    P.twT = setTimeout(function () { b.classList.add('hidden'); }, 15000);
   }
 
   async function refresh() {
@@ -506,10 +550,25 @@
     } catch (e) { /* 靜默 */ }
   }
 
+  /* ---------- 沒有任何定位關卡：不顯示地圖與定位標籤、不持續定位（權限仍照樣在進入時詢問） ---------- */
+  function stateNoGps(state) {
+    var ss = (state && state.stages) || [];
+    return !!ss.length && !ss.some(function (s) { return s.require_gps && s.lat != null; });
+  }
+  function noGpsMode() {
+    P.noGps = true;
+    try { if (P.watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(P.watchId); } catch (e) { /* */ }
+    P.watchId = null;
+    // 沒有定位關卡也一樣要過定位權限（只問一次，不持續定位、也不顯示地圖）
+    try { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(function () { /* */ }, function () { /* */ }, { maximumAge: 600000, timeout: 15000 }); } catch (e) { /* */ }
+    ['#map-card', '#g-gps'].forEach(function (s) { var el = $(s); if (el) el.classList.add('hidden'); });
+  }
+
   /* ---------- 定位 ---------- */
   function startWatch() {
-    if (P.watchId != null) return;
+    if (P.watchId != null || P.noGps) return;
     if (!('geolocation' in navigator)) { setGps('none'); return; }
+    var hi = P.gpsMode !== 'low';
     P.watchId = navigator.geolocation.watchPosition(function (p) {
       var prevPos = P.pos;
       P.pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
@@ -521,9 +580,21 @@
       setGps('ok');
       updateMe();
       updateDistances();
+      adaptGps();
     }, function (err) {
       setGps(err.code === 1 ? 'denied' : 'error');
-    }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 25000 });
+    }, hi ? { enableHighAccuracy: true, maximumAge: 5000, timeout: 25000 } : { enableHighAccuracy: false, maximumAge: 30000, timeout: 40000 });
+  }
+
+  /** 離下一個定位關卡超過 600 公尺 → 省電模式（不開高精度、更新較慢）；進到 350 公尺內就切回高精度 */
+  function adaptGps() {
+    if (!P.pos || P.noGps) return;
+    var st = focusStage(), d = st ? Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng) : Infinity;
+    var want = P.gpsMode === 'low' ? (d < 350 ? 'high' : 'low') : (d > 600 ? 'low' : 'high');
+    if (want === (P.gpsMode || 'high') || Date.now() - (P.gpsModeT || 0) < 30000) return;
+    P.gpsMode = want; P.gpsModeT = Date.now();
+    try { navigator.geolocation.clearWatch(P.watchId); } catch (e) { /* */ }
+    P.watchId = null; startWatch();
   }
 
   function setGps(state) {
@@ -533,8 +604,9 @@
     if (state === 'ok') {
       var acc = Math.round(P.pos.acc);
       cls = acc > 50 ? 'warn' : 'ok';
-      text = (acc > 50 ? '定位不準 ±' : '定位中 ±') + acc + ' 公尺';
-      if (acc > 100) tip = '⚠️ 誤差很大（電腦定位常見），地圖距離僅供參考，建議用手機到現場。';
+      text = P.gpsMode === 'low' ? '省電定位中 ±' + acc + ' 公尺' : (acc > 50 ? '定位不準 ±' : '定位中 ±') + acc + ' 公尺';
+      if (P.gpsMode === 'low') cls = 'ok';
+      if (acc > 100 && P.gpsMode !== 'low') tip = '⚠️ 誤差很大（電腦定位常見），地圖距離僅供參考，建議用手機到現場。';
     } else if (state === 'denied') {
       cls = 'bad'; text = '未允許定位';
       tip = (/iPhone|iPad|iPod/i.test(navigator.userAgent)
@@ -780,7 +852,7 @@
   }
 
   function updateMe() {
-    if (!P.map || !P.pos) return;
+    if (P.noGps || !P.map || !P.pos) return;
     $('#map-card').classList.remove('hidden');
     var ll = [P.pos.lat, P.pos.lng];
     if (!P.me) {
@@ -1698,6 +1770,81 @@
   }
 
   /* ---------- 完成 ---------- */
+  /* ---------- 成果圖：把成績、稱號、徽章、卡牌畫成一張圖，可存圖或分享 ---------- */
+  function buildShareImage() {
+    var s = P.state, se = s.session, W = 1080, pj = s.project || {};
+    var fb = s.badges || [], got = (s.collection || []).filter(function (x) { return x.got; });
+    var rows = Math.max(1, Math.ceil(Math.min(got.length, 12) / 4));
+    var H = 760 + (fb.length ? 150 : 0) + (got.length ? 120 + rows * 250 : 0) + 120;
+    var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var g = cv.getContext('2d'), FONT = '"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
+    var bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#1d2a2f'); bg.addColorStop(1, '#265f46');
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+    function wrap(text, x, y, maxW, lh, maxLines) {
+      var line = '', n = 0;
+      for (var i = 0; i < text.length; i++) {
+        var t = line + text[i];
+        if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y + n * lh); n++; line = text[i]; if (n >= maxLines) return; } else line = t;
+      }
+      if (line) g.fillText(line, x, y + n * lh);
+    }
+    g.textAlign = 'center'; g.fillStyle = '#e8c97a'; g.font = '700 34px ' + FONT; g.fillText('實境解謎', W / 2, 90);
+    g.fillStyle = '#fff'; g.font = '800 64px ' + FONT; wrap(pj.name || '', W / 2, 190, W - 160, 76, 2);
+    g.font = '700 54px ' + FONT; g.fillStyle = '#ffe9a8';
+    g.fillText((se.avatar ? se.avatar + ' ' : '') + se.team_name, W / 2, 360);
+    if (s.title) { g.font = '600 38px ' + FONT; g.fillStyle = '#cfe8d5'; g.fillText('稱號：' + s.title, W / 2, 425); }
+    // 三個數字
+    var stats = [[String(se.score), '總分'], [s.summary.solved + '/' + s.summary.total, '完成關卡'], [se.finished_at ? Q.fmtDuration((new Date(se.finished_at) - new Date(se.started_at)) / 1000) : '—', '花費時間']];
+    stats.forEach(function (it, i) {
+      var x = 70 + i * 316;
+      g.fillStyle = 'rgba(255,255,255,.12)'; rr(x, 480, 296, 190, 28); g.fill();
+      g.fillStyle = '#fff'; g.font = '800 70px ' + FONT; g.fillText(it[0], x + 148, 580);
+      g.fillStyle = '#cfe8d5'; g.font = '500 32px ' + FONT; g.fillText(it[1], x + 148, 637);
+    });
+    var y = 730;
+    if (fb.length) {
+      g.fillStyle = '#e8c97a'; g.font = '700 36px ' + FONT; g.fillText('🏅 成就', W / 2, y + 20);
+      g.font = '56px ' + FONT; var shown = fb.slice(0, 8), step = Math.min(120, (W - 160) / shown.length);
+      shown.forEach(function (b, i) { g.fillText(b.icon || '🏅', W / 2 - (shown.length - 1) * step / 2 + i * step, y + 100); });
+      y += 150;
+    }
+    if (got.length) {
+      g.fillStyle = '#e8c97a'; g.font = '700 36px ' + FONT; g.fillText('🃏 ' + (pj.deck_title || '收藏') + '　' + got.length + ' 件', W / 2, y + 20);
+      var col = { normal: '#cfe8d5', rare: '#bcd4ff', legend: '#ffe08a' };
+      got.slice(0, 12).forEach(function (it, i) {
+        var cx = 60 + (i % 4) * 242, cy = y + 60 + Math.floor(i / 4) * 250, art = (it.card && it.card.art) || it.icon || '🃏';
+        g.fillStyle = col[it.rarity] || col.normal; rr(cx, cy, 222, 230, 22); g.fill();
+        g.fillStyle = '#1d2a2f'; g.font = '84px ' + FONT;
+        g.fillText(/^(https?:|data:)/i.test(art) ? '🃏' : String(art).slice(0, 2), cx + 111, cy + 112);
+        g.font = '700 28px ' + FONT; g.fillText(String(it.name || '').slice(0, 7), cx + 111, cy + 168);
+        g.font = '500 24px ' + FONT; g.fillText(it.rarity === 'legend' ? '★★★' : it.rarity === 'rare' ? '★★' : '★', cx + 111, cy + 205);
+      });
+      if (got.length > 12) { g.fillStyle = '#cfe8d5'; g.font = '500 28px ' + FONT; g.fillText('…還有 ' + (got.length - 12) + ' 件', W / 2, y + 60 + rows * 250 + 20); }
+    }
+    g.fillStyle = 'rgba(255,255,255,.6)'; g.font = '500 28px ' + FONT; g.fillText(Q.fmtTime(new Date()) + '・一起來玩實境解謎', W / 2, H - 50);
+    return new Promise(function (resolve) { cv.toBlob(resolve, 'image/png'); });
+  }
+  var shareBlob = null, shareUrl = '';
+  async function openShare() {
+    try {
+      var blob = await Q.run(buildShareImage);
+      if (!blob) throw new Error('產生圖片失敗');
+      shareBlob = blob;
+      if (shareUrl) URL.revokeObjectURL(shareUrl);
+      shareUrl = URL.createObjectURL(blob);
+      $('#share-img').src = shareUrl;
+      $('#share-dl').href = shareUrl;
+      var file = new File([blob], 'escape-result.png', { type: 'image/png' });
+      var can = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+      $('#share-send').classList.toggle('hidden', !can);
+      $('#share-send').onclick = function () { navigator.share({ files: [file], title: '實境解謎成果', text: '我們完成了「' + ((P.state.project || {}).name || '') + '」！' }).catch(function () { /* 取消分享 */ }); };
+      $('#share-view').classList.remove('hidden');
+      layerOpen('share');
+    } catch (e) { Q.toast(e.message || '產生圖片失敗', 'err'); }
+  }
+  function closeShare() { $('#share-view').classList.add('hidden'); layerClose('share'); }
+
   async function showFinish() {
     var s = P.state, se = s.session;
     $('#fin-team').textContent = se.team_name + (se.run_code ? '・' + se.run_code : '');

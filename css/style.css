@@ -1125,3 +1125,34 @@ button:focus-visible, .btn:focus-visible, a:focus-visible { outline: 3px solid #
   .leaflet-touch .leaflet-bar a { width: 40px; height: 40px; line-height: 40px; font-size: 1.3rem; }
   .topbar .chip[href] { min-height: 40px; display: inline-flex; align-items: center; }
 }
+
+/* 開卡翻面：iPhone Safari 的 backface-visibility 常失效（卡背透出來像浮水印）。
+   改成翻到一半（.4s）就直接切換顯示哪一面，不依賴瀏覽器的背面隱藏。 */
+.flipper .face { backface-visibility: visible; -webkit-backface-visibility: visible; }
+.flipper .back { visibility: visible; }
+.flipper .front { visibility: hidden; }
+.flipper.open .back { visibility: hidden; transition: visibility 0s .4s; }
+.flipper.open .front { visibility: visible; transition: visibility 0s .4s; }
+@media (prefers-reduced-motion: reduce) { .flipper.open .back, .flipper.open .front { transition: none; } }
+
+/* 隊伍代碼常駐一行 */
+.code-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: .82rem; color: var(--muted); }
+.code-line b { color: var(--ink); letter-spacing: .08em; font-size: .95rem; }
+.code-line button { flex: 0 0 auto; min-height: 36px; }
+
+/* 剩餘時間提醒橫幅 */
+.time-banner { position: fixed; left: 10px; right: 10px; top: calc(10px + env(safe-area-inset-top)); z-index: 3100; background: #e09f3e; color: #2a1d05; border-radius: 14px; padding: 12px 14px; box-shadow: 0 6px 22px rgba(0,0,0,.4); font-size: 1.1rem; line-height: 1.4; animation: tb-in .35s ease-out; }
+.time-banner b { font-size: 1.35rem; }
+.time-banner span { display: block; font-size: .85rem; opacity: .85; margin-top: 2px; }
+.time-banner.urgent { background: #b5452f; color: #fff; animation: tb-in .35s ease-out, tb-pulse 1.2s ease-in-out 3; }
+@keyframes tb-in { from { transform: translateY(-120%); } }
+@keyframes tb-pulse { 50% { transform: scale(1.03); } }
+@media (prefers-reduced-motion: reduce) { .time-banner, .time-banner.urgent { animation: none; } }
+
+/* 成果圖 */
+#share-view { z-index: 2500; }
+.share-box { display: grid; gap: 12px; width: min(92vw, 420px); }
+.share-box img { width: 100%; height: auto; border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+.share-box .row { display: flex; gap: 8px; }
+.share-box .btn, .share-box button { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+#share-view.hidden .cv-x { display: none; }
