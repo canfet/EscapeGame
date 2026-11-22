@@ -3,10 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1d2a2f">
+  <link rel="manifest" href="admin.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="解謎後台">
   <meta name="robots" content="noindex">
   <title>實境解謎 · 管理後台</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261122i">
+  <link rel="stylesheet" href="css/style.css?v=20261122m">
 </head>
 <body>
   <!-- 登入 -->
@@ -62,12 +69,11 @@
 
     <!-- 圖鑑本 -->
     <div id="t-decks" class="page wide hidden">
-      <div class="row" style="margin-bottom:12px">
+      <div class="row wrap" style="margin-bottom:12px">
         <h2 class="grow" style="margin:0">🃏 圖鑑本</h2>
-        <button class="ghost" id="btn-default-deck">⚡ 一鍵建立預設荒野自然名圖鑑</button>
-        <button id="btn-new-deck">＋ 新增圖鑑本</button>
+        <button id="btn-new-deck">＋ 新增</button>
       </div>
-      <p class="muted small">一本圖鑑＝一組卡牌。輸入多筆名稱（例如荒野自然名、當地的景點或代表物），就能自動產生整本卡牌；可以做很多本，再到「專案設定」決定每個專案使用哪一本。</p>
+      <p class="muted small">一本圖鑑＝一組卡牌。貼上多筆名稱就能自動產生；到「專案設定」選擇每個專案使用哪一本。</p>
       <div id="deck-grid" class="project-grid"></div>
     </div>
 
@@ -388,30 +394,29 @@
             <div class="field"><label>圖鑑名稱 *</label><input id="dk-title" maxlength="40" placeholder="例如：荒野自然名圖鑑"></div>
             <div class="field"><label>類型</label>
               <select id="dk-kind">
-                <option value="nature">🌿 荒野自然名角色（屬性、技能、HP）</option>
-                <option value="place">🏯 在地景點／代表物（人氣、歷史、美景）</option>
+                <option value="nature">🌿 荒野自然名</option>
+                <option value="place">🏯 在地景點</option>
                 <option value="custom">✏️ 自訂</option>
               </select></div>
           </div>
           <div class="field"><label>卡面畫風</label>
             <select id="dk-style">
-              <option value="foil">✨ 閃卡（稀有、傳說會閃光，像寶可夢卡牌）</option>
-              <option value="classic">📜 古典標本圖鑑（羊皮紙、襯線字、金邊）</option>
-              <option value="watercolor">🎨 水彩手繪（柔和暈染、大圓角）</option>
-              <option value="pixel">👾 像素遊戲（8-bit 方塊風）</option>
+              <option value="foil">✨ 閃卡</option>
+              <option value="classic">📜 古典標本</option>
+              <option value="watercolor">🎨 水彩手繪</option>
+              <option value="pixel">👾 像素遊戲</option>
             </select></div>
-          <div class="field"><label>貼上多筆名稱，一次產生卡牌</label>
-            <textarea id="dk-names" style="min-height:96px" placeholder="一行一個，或用逗號、頓號分隔，例如：&#10;小水鹿&#10;藍腹鷴&#10;山椒魚"></textarea>
+          <div class="field"><label>貼上名稱，一次產生卡牌</label>
+            <textarea id="dk-names" style="min-height:96px" placeholder="一行一個，例如：&#10;小水鹿&#10;藍腹鷴"></textarea>
             <div class="row wrap" style="margin-top:6px">
               <button type="button" id="dk-gen">⚡ 產生卡牌</button>
-              <button type="button" class="ghost" id="dk-load-default">📋 填入預設荒野自然名</button>
-              <button type="button" class="ghost" id="dk-reroll-all">🎲 全部重新隨機屬性</button>
+              <button type="button" class="ghost" id="dk-reroll-all">🎲 全部重抽</button>
             </div>
             <div class="row wrap" style="margin-top:6px">
-              <button type="button" class="ghost" id="dk-auto-img">🖼 自動找圖（還沒有圖的卡）</button>
-              <button type="button" class="ghost" id="dk-mirror">🗄 圖片存到雲端硬碟</button>
+              <button type="button" class="ghost" id="dk-auto-img">🖼 自動找圖</button>
+              <button type="button" class="ghost" id="dk-mirror">🗄 圖存雲端</button>
             </div>
-            <div class="help">系統會依名稱自動決定屬性、稀有度、數值、技能和故事（同一個名字每次產生的結果一樣）。產生後可以逐張修改，也可以上傳自己畫的圖。已經有的名稱不會重複產生。</div></div>
+            <div class="help">依名稱自動產生屬性、技能和故事，之後可逐張修改。已有的名稱不會重複產生。</div></div>
           <div class="section-title" id="dk-count">卡牌</div>
           <div id="dk-list" class="dk-list"></div>
         </div>
@@ -425,16 +430,16 @@
             </div>
             <div class="grid2">
               <div class="field"><label>屬性／分類</label><select id="dk-type"></select></div>
-              <div class="field"><label>圖（emoji 或上傳圖片）</label>
+              <div class="field"><label>圖片（emoji 或上傳）</label>
                 <div class="row"><input class="grow" id="dk-art" maxlength="300" placeholder="🦌 或上傳">
                   <button type="button" class="ghost sm" id="dk-art-search" title="用名稱搜尋圖片">🔍</button><button type="button" class="ghost sm" id="dk-art-pick">⬆</button><button type="button" class="ghost sm" id="dk-art-clear">✕</button></div>
                 <input type="file" accept="image/*" id="dk-art-file" class="hidden"><img id="dk-art-prev" class="img-prev hidden" alt="" style="max-height:60px"></div>
             </div>
             <div class="grid2">
               <div class="field"><label>圖片顯示方式</label>
-                <select id="dk-art_fit"><option value="contain">完整顯示（不裁切，建議）</option><option value="cover">填滿裁切</option></select></div>
-              <div class="field"><label>填滿裁切時的對焦</label>
-                <select id="dk-art_pos"><option value="center">置中</option><option value="top">偏上（保留頭部）</option><option value="bottom">偏下</option></select></div>
+                <select id="dk-art_fit"><option value="contain">完整顯示（建議）</option><option value="cover">填滿裁切</option></select></div>
+              <div class="field"><label>裁切對焦</label>
+                <select id="dk-art_pos"><option value="center">置中</option><option value="top">偏上</option><option value="bottom">偏下</option></select></div>
             </div>
             <div class="grid3">
               <div class="field"><label id="dk-l-hp">HP</label><input type="number" min="0" max="999" id="dk-hp"></div>
@@ -448,8 +453,8 @@
             <div class="row wrap">
               <button type="button" class="ghost sm" id="dk-up">⬆ 往前</button>
               <button type="button" class="ghost sm" id="dk-down">⬇ 往後</button>
-              <button type="button" class="ghost sm" id="dk-reroll">🎲 重新隨機這張</button>
-              <button type="button" class="danger sm" id="dk-del">刪除這張</button>
+              <button type="button" class="ghost sm" id="dk-reroll">🎲 重抽</button>
+              <button type="button" class="danger sm" id="dk-del">刪除</button>
             </div>
           </div>
           <div class="center" style="margin-top:14px"><div id="dk-preview"></div></div>
@@ -496,8 +501,8 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/qrcode.min.js"></script>
-  <script src="config.js?v=20261122i"></script>
-  <script src="js/common.js?v=20261122i"></script>
-  <script src="js/admin.js?v=20261122i"></script>
+  <script src="config.js?v=20261122m"></script>
+  <script src="js/common.js?v=20261122m"></script>
+  <script src="js/admin.js?v=20261122m"></script>
 </body>
 </html>

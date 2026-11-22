@@ -1161,3 +1161,24 @@ button:focus-visible, .btn:focus-visible, a:focus-visible { outline: 3px solid #
 .sheet-map-card { padding: 8px; }
 .sheet-map { height: 230px; }
 .sheet-map-card .map-actions { margin-top: 8px; }
+
+/* 手機：隊伍／關卡的卡片式清單，內容一律在畫面寬度內換行，不要撐寬頁面 */
+@media (max-width: 760px) {
+  .table-wrap:has(#mon-sessions), .table-wrap:has(#stage-rows) { overflow-x: hidden; }
+  .table-wrap:has(#mon-sessions) > table, .table-wrap:has(#stage-rows) > table { display: block; width: 100%; min-width: 0; }
+  #mon-sessions td:not([data-l]):not(.td-act), #stage-rows td:not([data-l]):not(.td-act) { display: block; }
+  #mon-sessions td, #stage-rows td { min-width: 0; overflow-wrap: anywhere; }
+  #mon-sessions td.td-act .row, #stage-rows td.td-act .row { flex-wrap: wrap; }
+  #stage-rows td[data-l] > *, #mon-sessions td[data-l] > * { min-width: 0; }
+}
+
+/* 手機：欄位、按鈕列不撐寬頁面（輸入框預設有最小寬度，旁邊有按鈕時會超出畫面） */
+input, select, textarea { min-width: 0; max-width: 100%; }
+.row > .grow { min-width: 0; }
+.modal-body { overflow-x: hidden; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .grid3 { grid-template-columns: repeat(3, 1fr); gap: 0 8px; }
+  .page.wide > .row { flex-wrap: wrap; }
+  .project-grid { grid-template-columns: 1fr; }
+  .card .row.wrap > button { flex: 1 1 auto; }
+}

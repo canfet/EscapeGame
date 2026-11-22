@@ -168,10 +168,6 @@
   };
   KIND_INFO.custom = KIND_INFO.nature;
 
-  /** 預設的荒野自然名（49 個） */
-  var DEFAULT_NATURE_NAMES = ('海帶芽 隨風 老人星 蜈蚣 山嵐 大海雀 黑樹豆 李子 海豹 T-REX 馬陸 厚頭龍 小地鼠 小貓熊 皇帝企鵝 土星 滿天星 噴火龍 ' +
-    '長頸龍 雲豹 海蛞蝓 葡萄 海芋 大峽谷 天堂鳥 狐獴 豆腐鯊 相思豆 花枝 林雕鴞 小海馬 天狼星 小袋鼠 甜心兔 黑腳企鵝 虎鯨 星光 橘子 橡樹 ' +
-    '古代翼竜 海龜 豌豆 雙髻鯊 黃極光 星辰 魚龍 桂味荔枝 抹香鯨 砂糖橘').split(' ');
 
   /** 依名稱的關鍵字猜屬性（猜不到才用名稱雜湊決定） */
   var TYPE_HINTS = [
@@ -228,24 +224,13 @@
     } catch (e) { /* */ }
   }
 
-  /** 一鍵建立「荒野自然名圖鑑」（預設的 49 個自然名；之後可以再改、再加） */
-  async function createDefaultDeck() {
-    if (A.decks.some(function (d) { return d.title === '荒野自然名圖鑑'; }) && !confirm('已經有一本「荒野自然名圖鑑」了，還要再建立一本嗎？')) return;
-    var cards = DEFAULT_NATURE_NAMES.map(function (n) { return genCard(n, 'nature', 0); });
-    try {
-      await call('adminSaveDeck', { title: '荒野自然名圖鑑', kind: 'nature', style: 'foil', cards: cards });
-      Q.toast('已建立「荒野自然名圖鑑」，共 ' + cards.length + ' 張。可以再編輯每一張。', 'ok', 5000);
-      await loadDecks();
-    } catch (e) { /* */ }
-  }
-
-  function deckKindLabel(k) { return { nature: '🌿 荒野自然名角色', place: '🏯 在地景點／代表物', custom: '✏️ 自訂' }[k] || k; }
+  function deckKindLabel(k) { return { nature: '🌿 荒野自然名', place: '🏯 在地景點', custom: '✏️ 自訂' }[k] || k; }
   function deckStyleLabel(k) { return { foil: '✨ 閃卡', classic: '📜 古典標本', watercolor: '🎨 水彩', pixel: '👾 像素' }[k] || k; }
 
   function renderDecks() {
     var box = $('#deck-grid');
     if (!box) return;
-    if (!A.decks.length) { box.innerHTML = '<div class="card stack"><div class="muted">還沒有圖鑑本。可以按「新增圖鑑本」貼上多筆名稱自動產生，或直接使用預設的荒野自然名。</div><button id="btn-default-deck2">⚡ 一鍵建立「荒野自然名圖鑑」（' + DEFAULT_NATURE_NAMES.length + ' 張）</button></div>'; var b2 = $('#btn-default-deck2'); if (b2) b2.onclick = createDefaultDeck; return; }
+    if (!A.decks.length) { box.innerHTML = '<div class="card muted">還沒有圖鑑本。按「新增」貼上名稱即可建立。</div>'; return; }
     box.innerHTML = A.decks.map(function (d) {
       var first = d.cards.slice(0, 3).map(function (c, i) { return '<div class="dk-thumb">' + Q.cardHtml(Object.assign({ number: i + 1 }, c), { kind: d.kind, style: d.style, mini: true }) + '</div>'; }).join('');
       return '<div class="card stack" data-did="' + esc(d.deck_id) + '">' +
@@ -507,8 +492,6 @@
     $('#is-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') runImgSearch(); });
     $('#dk-auto-img').onclick = function () { readDeckForm(); autoFindImages(); };
     $('#dk-mirror').onclick = mirrorAllImages;
-    $('#btn-default-deck').onclick = createDefaultDeck;
-    $('#dk-load-default').onclick = function () { $('#dk-names').value = DEFAULT_NATURE_NAMES.join('\n'); Q.toast('已填入 ' + DEFAULT_NATURE_NAMES.length + ' 個預設自然名，按「產生卡牌」就會建立', 'ok'); };
     $('#dk-gen').onclick = genDeckFromNames;
     $('#dk-save').onclick = saveDeck;
     $('#dk-delete-deck').onclick = deleteDeck;
@@ -576,8 +559,8 @@
     var ids = {}, rnd = 0;
     A.stages.filter(function (s) { return s.enabled; }).forEach(function (s) { if (s.card_id) ids[s.card_id] = 1; rnd += s.card_random || 0; });
     var fixed = Object.keys(ids).filter(function (id) { return cards.some(function (c) { return c.id === id; }); }).length, can = Math.min(cards.length, fixed + rnd);
-    box.innerHTML = '🃏 使用圖鑑《' + esc(p.deck_title) + '》共 ' + cards.length + ' 張；目前關卡最多可給 <b>' + can + '</b> 張（固定 ' + fixed + '＋隨機 ' + rnd + '）' +
-      (can < cards.length ? ' <span style="color:var(--red)">⚠️ 玩家最多只能收集 ' + can + ' / ' + cards.length + ' 張，無法全收集。請增加「隨機抽幾張」或固定指定。</span>' : ' ✅ 可以全收集');
+    box.innerHTML = '🃏《' + esc(p.deck_title) + '》' + cards.length + ' 張，關卡最多可給 <b>' + can + '</b> 張' +
+      (can < cards.length ? ' <span style="color:var(--red)">⚠️ 無法全收集，請增加關卡的卡牌數。</span>' : ' ✅ 可全收集');
   }
 
   /* ---------- 圖片上傳（封面／關卡圖） ---------- */
