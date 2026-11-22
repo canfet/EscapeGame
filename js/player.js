@@ -745,6 +745,47 @@
       '<button class="sm ghost hidden" id="btn-compass" style="margin-top:8px">🧭 啟用指南針</button></div>';
   }
 
+  /* ---------- 關卡面板裡的小地圖：只顯示「我」和「這一關的目標與範圍」 ---------- */
+  function destroySheetMap() {
+    if (P.sMap) { try { P.sMap.remove(); } catch (e) { /* */ } }
+    P.sMap = null; P.sMe = null; P.sMeAcc = null;
+  }
+  function fitSheetMap(both) {
+    var st = findStage(P.openId), m = P.sMap;
+    if (!m || !st || st.lat == null) return;
+    var tgt = [st.lat, st.lng];
+    if (both && P.pos && Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng) < 20000) m.fitBounds([tgt, [P.pos.lat, P.pos.lng]], { padding: [34, 34], maxZoom: 18 });
+    else m.setView(tgt, 17);
+  }
+  function mountSheetMap() {
+    destroySheetMap();
+    var el = document.getElementById('sheet-map'), st = findStage(P.openId);
+    if (!el || !window.L || !st || st.lat == null) return;
+    var m = P.sMap = L.map(el, { zoomControl: true, attributionControl: false, dragging: !TOUCH, tap: false }).setView([st.lat, st.lng], 17);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(m);
+    var color = themeVar('--forest', '#265f46');
+    L.circle([st.lat, st.lng], { radius: st.radius_m, color: color, weight: 2, fillOpacity: .16 }).addTo(m);
+    var no = P.state.stages.indexOf(st) + 1;
+    L.marker([st.lat, st.lng], { icon: L.divIcon({ className: '', html: '<div class="pin cur" style="background:' + color + '">' + no + '</div>', iconSize: [36, 36], iconAnchor: [18, 18] }), interactive: false }).addTo(m);
+    updateSheetMap();
+    fitSheetMap(true);
+    var both = document.getElementById('sheet-map-both'), tgt = document.getElementById('sheet-map-target');
+    if (both) both.onclick = function () { if (P.pos) fitSheetMap(true); else toastGps(); };
+    if (tgt) tgt.onclick = function () { fitSheetMap(false); };
+    setTimeout(function () { if (P.sMap === m) { m.invalidateSize(); fitSheetMap(true); } }, 150);   // 面板剛打開時容器大小還沒定，補一次
+  }
+  function updateSheetMap() {
+    var m = P.sMap;
+    if (!m || !P.pos) return;
+    var ll = [P.pos.lat, P.pos.lng];
+    if (!P.sMe) {
+      P.sMeAcc = L.circle(ll, { radius: P.pos.acc, color: '#2f6690', weight: 1, fillOpacity: .1, interactive: false }).addTo(m);
+      var av = (P.state && P.state.session && P.state.session.avatar) || '🙂';
+      P.sMe = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me-pin">' + esc(av) + '</div>', iconSize: [38, 38], iconAnchor: [19, 19] }), interactive: false, zIndexOffset: 900 }).addTo(m);
+      fitSheetMap(true);
+    } else { P.sMe.setLatLng(ll); P.sMeAcc.setLatLng(ll).setRadius(P.pos.acc); }
+  }
+
   function updateCompass() {
     var arrow = document.getElementById('cmp-arrow');
     if (!arrow || !P.openId) return;
@@ -865,6 +906,7 @@
     }
     updateCompanions();
     updateLink();
+    updateSheetMap();
   }
 
   /** 隨行夥伴：每收集一個收藏品，就多一隻跟在你後面（在移動方向的反側排成一列） */
@@ -958,6 +1000,7 @@
 
   function closeStage() {
     P.openId = null;
+    destroySheetMap();
     updateLink();
     $('#sheet').classList.add('hidden');
     resetSheet();
@@ -1014,7 +1057,10 @@
 
     // 4) 前往中：指南針／通關碼；打卡按鈕固定在底部
     if (st.status === 'open') {
-      if (st.lat != null && st.require_gps) h.push(compassHtml(st)); // 不需要 GPS 的關卡不顯示方向與距離
+      if (st.lat != null && st.require_gps) {   // 不需要 GPS 的關卡不顯示方向、距離與地圖
+        h.push(compassHtml(st));
+        if (window.L) h.push('<div class="card sheet-map-card"><div id="sheet-map" class="map sheet-map" aria-label="這一關的位置地圖"></div><div class="map-actions"><button class="ghost" id="sheet-map-both" type="button">🎯 我與目標</button><button class="ghost" id="sheet-map-target" type="button">📍 只看目標</button></div></div>');
+      }
       if (playing) {
         // 需要 GPS 打卡、又要輸入文字／數字答案：到了現場可以直接填答案，一次完成「定位＋送答案」
         var combo = st.require_gps && st.question && !st.require_photo && !st.uses_fragments && (st.answer_type === 'text' || st.answer_type === 'number');
@@ -1062,6 +1108,7 @@
     });
     if (same && saved[focusId] !== undefined) { var fe = document.getElementById(focusId); if (fe) { try { fe.focus({ preventScroll: true }); } catch (e) { /* */ } } }
     bindStage(st);
+    mountSheetMap();
   }
 
   /** 照片挑選區：可以直接拍照，也可以從相簿選（相簿不會強制開相機） */

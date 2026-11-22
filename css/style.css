@@ -1156,3 +1156,8 @@ button:focus-visible, .btn:focus-visible, a:focus-visible { outline: 3px solid #
 .share-box .row { display: flex; gap: 8px; }
 .share-box .btn, .share-box button { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 #share-view.hidden .cv-x { display: none; }
+
+/* 關卡面板裡的小地圖 */
+.sheet-map-card { padding: 8px; }
+.sheet-map { height: 230px; }
+.sheet-map-card .map-actions { margin-top: 8px; }
