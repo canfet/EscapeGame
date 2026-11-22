@@ -28,6 +28,14 @@
     var d = document.createElement('div');
     d.id = id; d.className = 'ver-banner'; d.setAttribute('role', 'alert');
     d.innerHTML = html;
+    // 版本提醒：文字一行（點一下展開），按鈕固定在右側，不佔太多手機畫面
+    var txt = document.createElement('div'); txt.className = 'vb-text';
+    var btns = document.createElement('div'); btns.className = 'vb-btns';
+    Array.prototype.slice.call(d.querySelectorAll('button')).forEach(function (b) { btns.appendChild(b); });
+    while (d.firstChild) txt.appendChild(d.firstChild);
+    d.appendChild(txt); d.appendChild(btns);
+    d.classList.add('clamp');
+    txt.onclick = function () { d.classList.toggle('clamp'); };
     var stack = document.getElementById('ver-stack');
     if (!stack) { stack = document.createElement('div'); stack.id = 'ver-stack'; document.body.appendChild(stack); }
     stack.appendChild(d);
@@ -111,7 +119,7 @@
   function toast(msg, type, ms) {
     if (!msg) return;
     var box = document.getElementById('toast');
-    if (!box) { box = document.createElement('div'); box.id = 'toast'; document.body.appendChild(box); }
+    if (!box) { box = document.createElement('div'); box.id = 'toast'; box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box); }
     var t = document.createElement('div');
     t.className = 'toast ' + (type || '');
     t.textContent = msg;

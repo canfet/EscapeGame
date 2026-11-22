@@ -13,7 +13,7 @@
   var A = {
     key: '', decks: [], projects: [], pid: '', stages: [], editStage: null, editProjectNew: false,
     stagesMap: null, stagesLayer: null, edMap: null, edMarker: null, edCircle: null, edOthers: null,
-    monMap: null, monLayer: null, monTimer: null, tab: 'projects'
+    monMap: null, monLayer: null, monTimer: null, tab: 'live'
   };
 
   function call(action, payload) {
@@ -51,6 +51,9 @@
     $('#login-key').addEventListener('keydown', function (e) { if (e.key === 'Enter') login(); });
     $('#btn-logout').onclick = logout;
     $$('.tabs button').forEach(function (b) { b.onclick = function () { setTab(b.dataset.tab); }; });
+    $('#live-project').onchange = function () { A.pid = this.value; loadLive(); };
+    $('#live-refresh').onclick = function () { loadLive(); };
+    $('#live-auto').onchange = setLiveTimer;
     $$('[data-close]').forEach(function (b) { b.onclick = function () { b.closest('.modal').classList.add('hidden'); }; });
     $('#btn-new-project').onclick = function () { openProject(null); };
     $('#mp-save').onclick = saveProject;
@@ -655,6 +658,7 @@
       $('#v-login').classList.add('hidden');
       $('#v-app').classList.remove('hidden');
       await Promise.all([loadDecks(), loadProjects()]);   // 兩份清單同時讀，登入比較快
+      setTab('live');   // 預設進「現場」：手機上最常用的畫面
     } catch (e) { /* toast 已顯示 */ }
   }
 
@@ -669,11 +673,58 @@
   function setTab(tab) {
     A.tab = tab;
     $$('.tabs button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
-    ['projects', 'stages', 'decks', 'monitor'].forEach(function (t) { $('#t-' + t).classList.toggle('hidden', t !== tab); });
+    ['live', 'projects', 'stages', 'decks', 'monitor'].forEach(function (t) { $('#t-' + t).classList.toggle('hidden', t !== tab); });
     if (tab === 'decks') loadDecks();
     clearInterval(A.monTimer);
     if (tab === 'stages') { if (A.pid) selectProject(A.pid); else if (A.projects[0]) selectProject(A.projects[0].project_id); }
     if (tab === 'monitor') { if (A.pid) $('#mon-project').value = A.pid; loadMonitor(); setMonitorTimer(); }
+    if (tab === 'live') { if (A.pid) $('#live-project').value = A.pid; loadLive(); setLiveTimer(); }
+  }
+
+  /* ---------- 現場模式：關主手機上最常用的畫面 ---------- */
+  function setLiveTimer() {
+    clearInterval(A.monTimer);
+    if ($('#live-auto').checked && A.tab === 'live') A.monTimer = setInterval(function () { loadLive(true); }, 20000);
+  }
+  async function loadLive(silent) {
+    var pid = $('#live-project').value;
+    if (!pid) { $('#live-list').innerHTML = '<div class="card muted">還沒有專案，請先到「專案」新增。</div>'; return; }
+    A.pid = pid;
+    try {
+      var fn = function () { return Q.api('adminSessions', { adminKey: A.key, projectId: pid, runCode: '' }); };
+      renderLive(silent ? await fn() : await Q.run(fn));
+    } catch (e) { if (silent) Q.toast(e.message, 'err'); }
+  }
+  function renderLive(r) {
+    var ss = r.sessions.filter(function (s) { return !s.test; }), now = Date.now(), rts = r.routes || [];
+    var routeName = function (id) { var x = rts.filter(function (y) { return y.id === id; })[0]; return x ? x.name : ''; };
+    var stale = function (s) { return s.status === 'playing' && s.last_active_at && now - new Date(s.last_active_at).getTime() > 10 * 60000; };
+    ss.sort(function (a, b) { return (stale(b) - stale(a)) || (a.status === 'playing' ? 0 : 1) - (b.status === 'playing' ? 0 : 1) || String(b.last_active_at).localeCompare(String(a.last_active_at)); });
+    $('#live-playing').textContent = ss.filter(function (s) { return s.status === 'playing'; }).length;
+    $('#live-finished').textContent = ss.filter(function (s) { return s.status === 'finished'; }).length;
+    $('#live-stale').textContent = ss.filter(stale).length;
+    $('#live-updated').textContent = '更新於 ' + Q.fmtTime(new Date());
+    var stTxt = { playing: ['進行中', 'amber'], finished: ['完成', 'green'], timeup: ['超時', 'red'] };
+    $('#live-list').innerHTML = ss.length ? ss.map(function (s) {
+      var t = stTxt[s.status] || [s.status, 'gray'], mins = s.last_active_at ? Math.round((now - new Date(s.last_active_at).getTime()) / 60000) : null;
+      var pct = s.total ? Math.round(s.solved / s.total * 100) : 0;
+      return '<div class="live-card ' + esc(s.status) + (stale(s) ? ' stale' : '') + '">' +
+        '<div class="lc-head">' + (s.avatar ? esc(s.avatar) + ' ' : '') + '<b>' + esc(s.team_name) + '</b><span class="chip ' + t[1] + '">' + t[0] + '</span>' +
+        (routeName(s.route) ? '<span class="chip gray">' + esc(routeName(s.route)) + '</span>' : '') + '<span class="grow"></span><b>' + s.score + ' 分</b></div>' +
+        '<div class="bar" role="img" aria-label="完成 ' + s.solved + ' / ' + s.total + ' 關"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="small">' + s.solved + ' / ' + s.total + ' 關' + (s.current_stage ? '・目前：' + esc(s.current_stage) : '') + '</div>' +
+        '<div class="small ' + (stale(s) ? '' : 'muted') + '">' + (mins == null ? '' : (stale(s) ? '⚠️ ' : '') + (mins < 1 ? '剛剛' : mins + ' 分鐘前') + '有動作') + '・代碼 ' + esc(s.code) + '</div>' +
+        '<div class="lc-act">' +
+          (s.last_lat != null ? '<a class="btn ghost" target="_blank" rel="noopener" href="https://www.google.com/maps?q=' + s.last_lat + ',' + s.last_lng + '">📍 看位置</a>' : '') +
+          (s.failed ? '<button class="ghost" type="button" data-live-reset="' + esc(s.session_id) + '">🔄 還原未通過（' + s.failed + '）</button>' : '') +
+        '</div></div>';
+    }).join('') : '<div class="card muted">還沒有隊伍開始闖關。</div>';
+    $$('#live-list [data-live-reset]').forEach(function (b) {
+      b.onclick = async function () {
+        if (!confirm('還原這支隊伍所有「未通過」的關卡？\n\n作答次數會歸零，讓他們重新挑戰。')) return;
+        try { var rr = await call('adminResetFailed', { sessionId: b.dataset.liveReset }); Q.toast('已還原 ' + rr.reset + ' 個關卡', 'ok'); loadLive(); } catch (e) { /* */ }
+      };
+    });
   }
 
   function playerUrl(pid, run, route, team) {
@@ -689,7 +740,8 @@
     var opts = A.projects.map(function (p) { return '<option value="' + esc(p.project_id) + '">' + esc(p.name) + '（' + esc(p.project_id) + '）</option>'; }).join('');
     $('#stage-project').innerHTML = opts;
     $('#mon-project').innerHTML = opts;
-    if (A.pid) { $('#stage-project').value = A.pid; $('#mon-project').value = A.pid; }
+    $('#live-project').innerHTML = opts;
+    if (A.pid) { $('#stage-project').value = A.pid; $('#mon-project').value = A.pid; $('#live-project').value = A.pid; }
     renderProjects();
   }
 
@@ -1083,10 +1135,10 @@
       if (s.bypass_code) gps += ' <span class="chip">碼</span>';
       if (!s.show_location) gps += ' <span class="chip gray">隱藏</span>';
       return '<tr data-sid="' + esc(s.stage_id) + '"' + (s.enabled ? '' : ' style="opacity:.5"') + '>' +
-        '<td><b>' + (i + 1) + '</b></td>' +
+        '<td data-l="順序"><b>' + (i + 1) + '</b></td>' +
         '<td><b>' + esc(s.title) + '</b>' + (s.enabled ? '' : ' <span class="chip gray">停用</span>') + fragChip(s) + stageRouteChips(s, hasRoutes) + '<div class="small muted">' + esc(s.stage_id) + '・' + s.points + ' 分</div></td>' +
-        '<td>' + Q.TYPE_LABEL[s.answer_type] + '</td><td>' + gps + '</td>' +
-        '<td><div class="row"><button class="sm ghost" data-mv="-1" ' + (i && !filtered ? '' : 'disabled') + '>⬆</button>' +
+        '<td data-l="作答">' + Q.TYPE_LABEL[s.answer_type] + '</td><td data-l="定位">' + gps + '</td>' +
+        '<td class="td-act"><div class="row"><button class="sm ghost" data-mv="-1" ' + (i && !filtered ? '' : 'disabled') + '>⬆</button>' +
         '<button class="sm ghost" data-mv="1" ' + (i < n - 1 && !filtered ? '' : 'disabled') + '>⬇</button>' +
         '<button class="sm" data-edit>編輯</button></div></td></tr>';
     }).join('') : '<tr><td colspan="5" class="muted">這個專案還沒有關卡，按右上角「新增關卡」。</td></tr>';
@@ -1460,12 +1512,12 @@
     $('#mon-sessions').innerHTML = ss.length ? ss.map(function (s) {
       var t = stTxt[s.status] || [s.status, 'gray'];
       return '<tr><td>' + (s.avatar ? esc(s.avatar) + ' ' : '') + '<b>' + esc(s.team_name) + '</b> <span class="chip gray">' + esc(s.code) + '</span>' + (s.test ? ' <span class="chip blue">🧪 試玩</span>' : '') + '</td>' +
-        '<td>' + esc(s.run_code || '—') + '</td>' +
-        '<td>' + routeSelectHtml(s.route, s.session_id) + '</td>' +
-        '<td><span class="chip ' + t[1] + '">' + t[0] + '</span> ' + s.solved + '/' + s.total + '</td>' +
-        '<td><b>' + s.score + '</b></td><td>' + esc(s.current_stage || '—') + '</td>' +
-        '<td class="small">' + Q.fmtTime(s.last_active_at) + '</td>' +
-        '<td>' + (s.failed ? '<button class="sm ghost" data-resetfail="' + esc(s.session_id) + '" title="還原這隊未通過（作答次數用完）的關卡，讓他們重新挑戰">🔄 ' + s.failed + '</button> ' : '') +
+        '<td data-l="場次">' + esc(s.run_code || '—') + '</td>' +
+        '<td data-l="路線">' + routeSelectHtml(s.route, s.session_id) + '</td>' +
+        '<td data-l="進度"><span class="chip ' + t[1] + '">' + t[0] + '</span> ' + s.solved + '/' + s.total + '</td>' +
+        '<td data-l="分數"><b>' + s.score + '</b></td><td data-l="目前關卡">' + esc(s.current_stage || '—') + '</td>' +
+        '<td class="small" data-l="最後活動">' + Q.fmtTime(s.last_active_at) + '</td>' +
+        '<td class="td-act">' + (s.failed ? '<button class="sm ghost" data-resetfail="' + esc(s.session_id) + '" title="還原這隊未通過（作答次數用完）的關卡，讓他們重新挑戰">🔄 ' + s.failed + '</button> ' : '') +
         '<button class="sm ghost" data-del="' + esc(s.session_id) + '" title="刪除這支隊伍">🗑</button></td></tr>';
     }).join('') : '<tr><td colspan="8" class="muted">還沒有隊伍開始闖關</td></tr>';
     $$('#mon-sessions [data-resetfail]').forEach(function (b) {
@@ -1525,4 +1577,43 @@
     });
     if (pts.length && !A.monFitted) { A.monMap.fitBounds(pts, { padding: [30, 30], maxZoom: 17 }); A.monFitted = true; }
   }
+})();
+
+/* ---------- 手機版：表單分段收合、儲存列固定在底部、危險操作分開放 ---------- */
+(function () {
+  var mq = window.matchMedia ? matchMedia('(max-width: 760px)') : { matches: false };
+  // 1. 儲存／取消那一列固定在畫面底部（不用捲到最下面）；刪除按鈕移到最下面的「危險區」
+  document.querySelectorAll('.modal-body').forEach(function (mb) {
+    var last = mb.lastElementChild;
+    if (!last || !last.classList.contains('row') || !last.querySelector('button')) return;
+    last.classList.add('modal-actions');
+    var dg = last.querySelector('button.danger');
+    if (dg) {
+      var zone = document.createElement('div');
+      zone.className = 'danger-zone';
+      zone.innerHTML = '<div class="small muted">危險操作（刪除後無法復原）</div>';
+      zone.appendChild(dg);
+      mb.appendChild(zone);
+    }
+  });
+  // 2. 手機上把長表單依小標題分段，次要的段落預設收起來
+  var OPEN = /基本|抵達|題目|地點|卡牌|編輯這張/;
+  document.querySelectorAll('#m-stage .section-title, #m-deck .section-title').forEach(function (t) {
+    if (t.parentNode.classList && t.parentNode.classList.contains('sec-body')) return;
+    var kids = [], n = t.nextElementSibling;
+    while (n && !n.classList.contains('section-title')) { kids.push(n); n = n.nextElementSibling; }
+    if (!kids.length) return;
+    var d = document.createElement('details');
+    d.className = 'sec';
+    if (OPEN.test(t.textContent)) d.open = true;
+    var s = document.createElement('summary');
+    s.innerHTML = t.innerHTML;
+    if (t.id) { s.id = t.id; t.removeAttribute('id'); }
+    var body = document.createElement('div');
+    body.className = 'sec-body';
+    t.parentNode.insertBefore(d, t);
+    d.appendChild(s); d.appendChild(body);
+    kids.forEach(function (k) { body.appendChild(k); });
+    t.remove();
+  });
 })();

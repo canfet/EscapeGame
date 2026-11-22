@@ -1026,3 +1026,102 @@ body { font-size: 1rem; }
 /* 後台編輯閃卡的預覽：閃光強度和前台「放大檢視」一致（所見即所得） */
 #dk-preview .tcg.s-foil.r-rare::after { opacity: .3; }
 #dk-preview .tcg.s-foil.r-legend::after { opacity: .4; }
+
+/* ================= 手機操作優化 ================= */
+/* 放大卡片：右上角 ✕、關閉鈕固定在底部（拇指好按）、點旁邊或往下滑也能關 */
+.cv-x { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 12px; z-index: 5; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 1.2rem; background: rgba(255,255,255,.92); color: #222; border: 0; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+#card-view.hidden .cv-x { display: none; }
+#card-view .card-view-box { padding-bottom: 4px; }
+.cv-close { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); }
+
+/* 定位狀態：說明 + 重新定位按鈕 */
+.gps-help { display: flex; align-items: center; gap: 10px; }
+.gps-help #g-gps-text { flex: 1; line-height: 1.5; }
+.gps-help button { flex: 0 0 auto; min-height: 44px; }
+.gps-help.hidden { display: none !important; }
+
+/* 沒有網路 */
+
+/* 小連結也要好點 */
+.page a.small, p.small a, .center.small a { display: inline-block; padding: 10px 6px; }
+
+/* 戶外看得清楚：次要文字加深一點 */
+@media (pointer: coarse) {
+  .muted, .help { color: #3f4a44; }
+  .quest .muted, .quest .help { color: inherit; opacity: .9; }
+}
+
+/* ---- 版本提醒：一行，點一下展開 ---- */
+.ver-banner { display: flex; align-items: center; gap: 8px; text-align: left; font-size: .84rem; line-height: 1.45; }
+.ver-banner .vb-text { flex: 1; min-width: 0; cursor: pointer; }
+.ver-banner.clamp .vb-text { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.ver-banner .vb-btns { display: flex; gap: 6px; flex: 0 0 auto; }
+.ver-banner button { margin-left: 0; }
+
+/* ---- 後台：儲存列、危險區 ---- */
+.modal-actions { position: sticky; bottom: -20px; margin: 14px -20px -20px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line); z-index: 6; border-radius: 0 0 16px 16px; }
+.modal-actions button { min-height: 46px; }
+.danger-zone { margin-top: 26px; padding: 12px; border: 1px dashed var(--red); border-radius: 12px; display: grid; gap: 8px; }
+.danger-zone button.danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
+.modal-body > .danger-zone { margin-bottom: 40px; }
+details.sec { border: 1px solid var(--line); border-radius: 12px; margin: 10px 0; background: rgba(255,255,255,.5); }
+details.sec > summary { cursor: pointer; list-style: none; padding: 12px 14px; font-weight: 700; min-height: 48px; display: flex; align-items: center; justify-content: space-between; }
+details.sec > summary::after { content: "▾"; transition: transform .15s; }
+details.sec[open] > summary::after { transform: rotate(180deg); }
+details.sec > .sec-body { padding: 0 12px 12px; }
+
+@media (max-width: 760px) {
+  /* 分頁列移到畫面底部（單手好按） */
+  #v-app { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+  .topbar { flex-wrap: wrap; gap: 6px; }
+  .topbar .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1400; background: #1d2a2f; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); gap: 4px; box-shadow: 0 -2px 10px rgba(0,0,0,.3); }
+  .topbar .tabs button { flex: 1; min-height: 50px; font-size: .9rem; padding: 6px 4px; border-radius: 10px; }
+  /* 編輯視窗：整頁，不要留邊 */
+  .modal { padding: 0; }
+  .modal-body { border-radius: 0; min-height: 100%; padding: 14px 14px 0; }
+  .modal-actions { margin: 14px -14px 0; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); bottom: 0; border-radius: 0; }
+  /* 表格 → 卡片 */
+  #mon-sessions, #stage-rows { display: block; }
+  #mon-sessions tr, #stage-rows tr { display: block; padding: 10px 12px; border-bottom: 8px solid var(--paper); background: #fff; }
+  #mon-sessions td, #stage-rows td { display: flex; justify-content: space-between; gap: 10px; border: 0; padding: 4px 0; }
+  #mon-sessions td[data-l]::before, #stage-rows td[data-l]::before { content: attr(data-l); color: var(--muted); font-size: .8rem; flex: 0 0 4.5em; }
+  #mon-sessions td.td-act, #stage-rows td.td-act { padding-top: 8px; }
+  .table-wrap:has(#mon-sessions) thead, .table-wrap:has(#stage-rows) thead { display: none; }
+  .table-wrap { max-height: none; }
+  .stat-row[style] { grid-template-columns: repeat(2, 1fr) !important; }
+  .page.wide > .row.wrap select, .page.wide > .row.wrap button { flex: 1 1 100%; max-width: none !important; }
+}
+
+/* 打卡成功：整個畫面先閃一層綠色（強光下也看得到），再跳出「抵達！」 */
+.arrive-flash::before { content: ""; position: absolute; inset: 0; background: #1f8a4c; opacity: 0; }
+.arrive-flash.go::before { animation: arrive-wash 1.3s ease-out both; }
+@keyframes arrive-wash { 0% { opacity: 0; } 12% { opacity: .78; } 45% { opacity: .55; } 100% { opacity: 0; } }
+.arrive-flash > div { position: relative; }
+@media (prefers-reduced-motion: reduce) { .arrive-flash.go::before { animation: none; opacity: .5; } }
+
+/* 無障礙：鍵盤／輔助工具的焦點框、減少動態 */
+:focus-visible { outline: 3px solid #1d5fa8; outline-offset: 2px; }
+button:focus-visible, .btn:focus-visible, a:focus-visible { outline: 3px solid #1d5fa8; outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---- 後台：現場模式（手機首頁） ---- */
+.live-top { display: grid; gap: 8px; margin-bottom: 12px; }
+.live-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.live-sum .stat b { font-size: 1.5rem; }
+.live-list { display: grid; gap: 10px; }
+.live-card { background: var(--card); border: 1px solid var(--line); border-left: 6px solid #9aa; border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; }
+.live-card.playing { border-left-color: var(--amber); }
+.live-card.finished { border-left-color: #2fb766; }
+.live-card.stale { border-left-color: var(--red); background: #fdf0ec; }
+.live-card .lc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.live-card .lc-head b { font-size: 1.1rem; }
+.live-card .bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.live-card .bar > i { display: block; height: 100%; background: var(--forest); }
+.live-card .lc-act { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.live-card .lc-act button, .live-card .lc-act a { flex: 1 1 120px; min-height: 46px; display: inline-flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
+
+/* 手機：地圖縮放鈕、頂端連結加大到好點 */
+@media (pointer: coarse) {
+  .leaflet-touch .leaflet-bar a { width: 40px; height: 40px; line-height: 40px; font-size: 1.3rem; }
+  .topbar .chip[href] { min-height: 40px; display: inline-flex; align-items: center; }
+}

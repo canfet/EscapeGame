@@ -48,12 +48,13 @@
         .catch(function () { window.prompt('請複製這個連結，貼到 Safari／Chrome 開啟：', url); });
     };
     // 離線提示：山區訊號不穩時，頂部顯示「離線中」，輸入的答案會自動暫存
-    var syncOnline = function () { $('#offline-chip').classList.toggle('hidden', navigator.onLine !== false); };
+    var syncOnline = function () { queueChip(); };
     window.addEventListener('offline', syncOnline); window.addEventListener('online', syncOnline); syncOnline();
     // 大字模式（長輩友善）：整體字放大，設定會記住
     try { if (localStorage.getItem('escapegame:bigtext') === '1') document.documentElement.classList.add('big-text'); } catch (e) { /* */ }
     $('#btn-font').onclick = function () {
       var on = document.documentElement.classList.toggle('big-text');
+      this.setAttribute('aria-pressed', String(on));
       try { localStorage.setItem('escapegame:bigtext', on ? '1' : '0'); } catch (e) { /* */ }
       Q.toast(on ? '已開啟大字模式' : '已關閉大字模式', 'ok', 1800);
     };
@@ -90,13 +91,23 @@
     });
     $('#g-stages').addEventListener('scroll', updateStageMore, { passive: true });
     window.addEventListener('resize', updateStageMore);
-    window.addEventListener('online', function () { $('#retry-bar').classList.add('hidden'); Q.toast('已恢復連線', 'ok'); if (P.sid) refresh(); });
+    window.addEventListener('online', function () { $('#retry-bar').classList.add('hidden'); Q.toast('已恢復連線', 'ok'); if (P.sid) { queueFlush().then(refresh); } queueChip(); });
+    window.addEventListener('offline', queueChip);
+    setInterval(function () { if (P.sid && navigator.onLine !== false) queueFlush(); }, 15000);
     $('#next-step').onclick = function () { var st = nextStage(); if (st) openStage(st.stage_id); };
     $('#solved-next').onclick = goNextStage;
     $('#solved-close').onclick = hideSolved;
     $('#btn-board').onclick = openBoard;
     $('#btn-pack').onclick = openPack;
     $('#card-view-close').onclick = closeCardView;
+    $('#card-view-x').onclick = closeCardView;
+    (function () {   // 點背景空白處、或在卡片外往下滑，關閉放大的卡片
+      var cv = $('#card-view'), y0 = null;
+      cv.addEventListener('click', function (e) { if (e.target === cv || e.target.classList.contains('card-view-box')) closeCardView(); });
+      cv.addEventListener('touchstart', function (e) { y0 = e.target.closest && e.target.closest('.tcg, button') ? null : e.touches[0].clientY; }, { passive: true });
+      cv.addEventListener('touchend', function (e) { if (y0 != null && cv.scrollTop <= 0 && e.changedTouches[0].clientY - y0 > 80) closeCardView(); y0 = null; }, { passive: true });
+    })();
+    $('#gps-retry').onclick = retryGps;
     $('#pack-close').onclick = closePack;
     $('#board-close').onclick = closeBoard;
     $('#btn-locate').onclick = function () { if (P.pos && P.map) P.map.setView([P.pos.lat, P.pos.lng], 17); else toastGps(); };
@@ -429,7 +440,15 @@
   function tutNext() { if (P.tutI >= TUT.length - 1) return tutEnd(); P.tutI++; renderTut(); }
   function tutEnd() {
     $('#tutorial').classList.add('hidden');
-    try { localStorage.setItem('escapegame:tut', '1'); } catch (e) { /* */ }
+    var first = true;
+    try { first = localStorage.getItem('escapegame:tut') !== '1'; localStorage.setItem('escapegame:tut', '1'); } catch (e) { /* */ }
+    if (first && !document.documentElement.classList.contains('big-text')) {
+      askConfirm('文字大小', '在戶外太陽下看字吃力嗎？可以改成大字模式（之後也能在上方 Aa 隨時切換）。', '改成大字').then(function (yes) {
+        if (!yes) return;
+        document.documentElement.classList.add('big-text');
+        try { localStorage.setItem('escapegame:bigtext', '1'); } catch (e) { /* */ }
+      });
+    }
   }
 
   /* ---------- 抵達成功的明顯回饋 ---------- */
@@ -509,7 +528,7 @@
 
   function setGps(state) {
     P.gpsState = state;
-    var dot = $('#g-gps .gps-dot'), pill = $('#gps-pill'), pt = $('#gps-pill-text'), help = $('#g-gps-text');
+    var dot = $('#g-gps .gps-dot'), pill = $('#gps-pill'), pt = $('#gps-pill-text'), help = $('#g-gps-text'), box = $('#g-gps-box');
     var cls = '', text = '定位中…', tip = '';
     if (state === 'ok') {
       var acc = Math.round(P.pos.acc);
@@ -518,17 +537,29 @@
       if (acc > 100) tip = '⚠️ 誤差很大（電腦定位常見），地圖距離僅供參考，建議用手機到現場。';
     } else if (state === 'denied') {
       cls = 'bad'; text = '未允許定位';
-      tip = '請到手機設定 → 瀏覽器 → 位置，改成「允許」，再重新整理頁面。';
+      tip = (/iPhone|iPad|iPod/i.test(navigator.userAgent)
+        ? '📍 iPhone：設定 → 隱私權與安全性 → 定位服務 → 開啟，並把 Safari（或你用的瀏覽器）設為「使用 App 期間」；再回來按「重新定位」。'
+        : '📍 Android：點網址列左邊的 🔒 → 權限 → 位置 → 允許；再回來按「重新定位」。');
     } else if (state === 'none') {
       cls = 'bad'; text = '不支援定位'; tip = '這台裝置不支援定位。';
     } else if (state === 'error') {
-      cls = 'bad'; text = '無法定位'; tip = '暫時無法取得定位，請移到空曠處。';
+      cls = 'bad'; text = '無法定位'; tip = '📡 暫時抓不到定位，請走到空曠處、確認手機的定位已開啟，再按「重新定位」。';
     }
     dot.className = 'gps-dot ' + (cls === 'ok' || cls === 'warn' ? 'ok' : cls === 'bad' ? 'bad' : '');
     pill.className = 'gps-pill ' + cls;
     pt.textContent = text;
     help.textContent = tip;
-    help.classList.toggle('hidden', !tip);
+    box.classList.toggle('hidden', !tip);
+    $('#gps-retry').classList.toggle('hidden', state === 'none' || state === 'ok');
+  }
+
+  /** 重新要定位：清掉舊的監聽再重新開始（權限剛改過、定位卡住時用） */
+  function retryGps() {
+    try { if (P.watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(P.watchId); } catch (e) { /* */ }
+    P.watchId = null;
+    setGps('loading');
+    startWatch();
+    Q.toast('重新定位中…', 'warn', 2000);
   }
 
   function toastGps() {
@@ -686,6 +717,7 @@
     }).addTo(P.map);
     P.layers = L.layerGroup().addTo(P.map);
     P.map.on('zoomend', updateLink);
+    if (TOUCH) P.map.on('click', function () { if (!$('#map-card').classList.contains('full')) setFullscreen(true); });
     if (TOUCH) { var mh = $('#map-hint'); mh.classList.remove('hidden'); setTimeout(function () { mh.classList.add('hidden'); }, 6000); }
     drawStagesOnMap();
   }
@@ -966,7 +998,7 @@
       '<div class="row"><label class="btn ghost grow" for="s-file-cam">📷 拍照</label><label class="btn ghost grow" for="s-file">🖼 從相簿選擇</label></div>' +
       '<input type="file" id="s-file-cam" accept="image/*" capture="environment" class="hidden">' +
       '<input type="file" id="s-file" accept="image/*" class="hidden">' +
-      (P.photo ? '<div class="photo-wrap"><img class="photo-preview" src="' + P.photo + '" alt="已選的照片"><button type="button" class="sm ghost" id="s-photo-clear">移除照片</button></div>'
+      (P.photo ? '<div class="photo-wrap"><img class="photo-preview" src="' + P.photo + '" alt="已選的照片"><button type="button" class="sm ghost" id="s-photo-clear">🔄 重新選擇</button></div>'
         : '<div class="help">還沒有選擇照片</div>') +
       (withCaption ? '<input id="s-caption" placeholder="照片說明（選填）" maxlength="200">' : '') + '</div>';
   }
@@ -1081,8 +1113,14 @@
       var ans = st.answer_type === 'choice' ? P.choice : ($('#s-ans') && $('#s-ans').value.trim());
       if (!ans) return Q.toast(st.answer_type === 'choice' ? '請選擇一個答案' : '請輸入答案', 'warn');
       if (st.require_photo && !P.photo) return Q.toast('這一關要附上一張照片才能送出', 'warn');
-      act('submitAnswer', st.require_photo ? { stageId: st.stage_id, answer: ans, dataUrl: P.photo } : { stageId: st.stage_id, answer: ans })
-        .then(function (r) { if (r && r.correct) P.photo = null; });
+      var left = st.max_attempts ? st.max_attempts - (st.attempts || 0) : 99;
+      var go = left <= 1 ? askConfirm('最後一次機會', '這是這一關最後一次作答，確定要送出「' + (st.answer_type === 'choice' ? ans : String(ans).slice(0, 30)) + '」嗎？', '確定送出') : Promise.resolve(true);
+      go.then(function (okGo) {
+        if (!okGo) return;
+        var sb = $('#s-submit'); if (sb) { sb.disabled = true; sb.textContent = '送出中…'; }
+        return act('submitAnswer', st.require_photo ? { stageId: st.stage_id, answer: ans, dataUrl: P.photo } : { stageId: st.stage_id, answer: ans })
+          .then(function (r) { if (r && r.correct) P.photo = null; else { sb = $('#s-submit'); if (sb) { sb.disabled = false; sb.textContent = '送出答案'; } } });
+      });
     });
     Q.$$('[data-choice]').forEach(function (b) {
       b.onclick = function () { P.choice = st.choices[+b.dataset.choice]; renderStage(); };
@@ -1104,8 +1142,9 @@
     on('s-photo-clear', function () { P.photo = null; renderStage(); });
     on('s-upload', function () {
       if (!P.photo) return;
+      var ub = $('#s-upload'); if (ub) { ub.disabled = true; ub.textContent = '⏳ 上傳中，請不要離開…'; }
       act('uploadPhoto', { stageId: st.stage_id, dataUrl: P.photo, caption: ($('#s-caption') || {}).value || '' })
-        .then(function (ok) { if (ok) P.photo = null; });
+        .then(function (ok) { if (ok) P.photo = null; else { ub = $('#s-upload'); if (ub) { ub.disabled = false; ub.textContent = '上傳照片'; } } });
     });
     on('s-form', function () { act('checkForm', { stageId: st.stage_id }); });
   }
@@ -1129,9 +1168,11 @@
 
   /** 呼叫動作 API → 更新狀態 → 顯示訊息 */
   async function act(action, payload) {
+    if (P.busy) { Q.toast('處理中，請稍候…', 'warn', 1500); return false; }   // 防止連點重複送出
+    P.busy = true;
     $('#retry-bar').classList.add('hidden');
     try {
-      var r = await Q.run(function () { return api(action, Object.assign({ sessionId: P.sid }, payload)); });
+      var r = await Q.run(function () { return api(action, Object.assign({ sessionId: P.sid }, payload)); }, { noToast: true });
       var before = {};
       if (P.state) P.state.stages.forEach(function (x) { before[x.stage_id] = x.status; });
       if (action === 'getHint') {   // 剛按下「需要提示」解鎖的那則，自動展開
@@ -1157,8 +1198,60 @@
       return r;
     } catch (e) {
       if (['TIMEUP', 'FINISHED', 'CLOSED'].indexOf(e.code) >= 0) refresh();
-      if (e.code === 'NETWORK') showRetry(function () { act(action, payload); });
+      if (e.code === 'NETWORK') {
+        if (queueAdd(action, payload)) return false;
+        showRetry(function () { act(action, payload); });
+      }
+      Q.toast(e.message, 'err');
       return false;
+    } finally { P.busy = false; }
+  }
+
+  /* ---------- 離線暫存：斷線時「打卡、送答案」先存在手機，恢復網路後自動補送 ---------- */
+  var QUEUEABLE = ['arrive', 'submitAnswer'];
+  function queueKey() { return 'escapegame:queue:' + P.sid; }
+  function queueGet() { try { return JSON.parse(localStorage.getItem(queueKey()) || '[]') || []; } catch (e) { return []; } }
+  function queueSet(q) { try { if (q.length) localStorage.setItem(queueKey(), JSON.stringify(q)); else localStorage.removeItem(queueKey()); } catch (e) { /* */ } queueChip(); }
+  function queueChip() {
+    var n = P.sid ? queueGet().length : 0, c = $('#offline-chip');
+    if (!c) return;
+    c.textContent = n ? '📴 待送出 ' + n : '📴 離線中';
+    c.classList.toggle('hidden', !n && navigator.onLine !== false);
+  }
+  function queueAdd(action, payload) {
+    if (QUEUEABLE.indexOf(action) < 0 || !P.sid || (payload && payload.dataUrl)) return false;
+    var q = queueGet(), same = q.some(function (x) { return x.action === action && x.payload.stageId === payload.stageId && x.payload.answer === payload.answer; });
+    if (!same) q.push({ action: action, payload: payload, t: Date.now() });
+    queueSet(q);
+    Q.toast('📴 沒有訊號，已先存在手機；恢復連線後會自動送出', 'warn', 5000);
+    return true;
+  }
+  var flushing = false;
+  async function queueFlush() {
+    if (flushing || !P.sid || navigator.onLine === false) return;
+    var q = queueGet();
+    if (!q.length) return;
+    flushing = true;
+    var done = 0, dropped = 0;
+    try {
+      while (q.length) {
+        var it = q[0];
+        if (Date.now() - it.t > 6 * 3600 * 1000) { q.shift(); dropped++; continue; }   // 太舊的不補送
+        try {
+          var r = await api(it.action, Object.assign({ sessionId: P.sid }, it.payload));
+          if (r && r.state) applyState(r.state);
+          done++;
+        } catch (e) {
+          if (e.code === 'NETWORK') break;   // 還是沒訊號：留著下次再送
+          dropped++;                          // 其他錯誤（例如這關已完成）：丟掉，避免重複
+        }
+        q.shift();
+        queueSet(q);
+      }
+    } finally { queueSet(q); flushing = false; }
+    if (done || dropped) {
+      Q.toast('✅ 已自動補送 ' + done + ' 筆' + (dropped ? '（另有 ' + dropped + ' 筆已失效，略過）' : ''), 'ok', 5000);
+      refresh();
     }
   }
 
