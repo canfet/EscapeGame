@@ -306,7 +306,7 @@
 
   function renderDeckPreview() {
     var c = A.editDeck.cards[A.deckSel];
-    $('#dk-preview').innerHTML = c ? Q.cardHtml(Object.assign({ number: A.deckSel + 1 }, c), Object.assign(dkOpts(), { tilt: true })) : '';
+    $('#dk-preview').innerHTML = c ? Q.cardHtml(Object.assign({ number: A.deckSel + 1 }, c), Object.assign(dkOpts(), { big: true, tilt: true })) : '';
     Q.bindTilt($('#dk-preview'));
   }
 
