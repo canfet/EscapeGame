@@ -451,7 +451,7 @@
   async function autoFindImages() {
     var cards = A.editDeck.cards.filter(function (c) { return !/^(https?:|data:image)/i.test(c.art || ''); });
     if (!cards.length) return Q.toast('每張卡都已經有圖片了', 'ok');
-    if (!confirm('要為 ' + cards.length + ' 張還沒有圖片的卡，自動搜尋第一張合適的圖嗎？\n\n• 依名稱搜尋，找到的圖不一定符合，完成後請逐張檢查、不滿意的可以按 🔍 換圖。\n• 名稱如果是人的自然名（例如天狼星、隨風），搜到的圖可能和角色無關。\n• 約需 ' + Math.ceil(cards.length * 0.7 / 60 * 10) / 10 + ' 分鐘，可以隨時關閉視窗中斷。')) return;
+    if (!confirm('要為 ' + cards.length + ' 張還沒有圖片的卡，自動搜尋第一張合適的圖嗎？\n\n• 依名稱搜尋，找到的圖不一定符合，完成後請逐張檢查、不滿意的可以按 🔍 換圖。\n• 約需 ' + Math.ceil(cards.length * 0.7 / 60 * 10) / 10 + ' 分鐘，可以隨時關閉視窗中斷。')) return;
     var btn = $('#dk-auto-img'), old = btn.textContent, found = 0, i = 0;
     btn.disabled = true;
     A.stopAuto = false;
