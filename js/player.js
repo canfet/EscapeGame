@@ -304,8 +304,13 @@
     applyState(state);
     if (state.session.test) $('#test-banner').classList.remove('hidden');
     setTimeout(function () { maybeTutorial(state); }, 400);
-    if (stateNoGps(state)) noGpsMode(); else { initMap();
-    startWatch(); }
+    if (stateNoGps(state)) noGpsMode(); else {
+      initMap();
+      startWatch();
+      // 按「開始闖關」時就先要了定位權限，位置常常比地圖更早到；地圖建好後要立刻把「我」畫上去，
+      // 不能等下一次定位更新（省電定位模式下可能要等很久，玩家一開始就看不到自己的圖示）
+      if (P.pos) updateMe();
+    }
     clearInterval(P.timer);
     P.timer = setInterval(tick, 1000);
     tick();
