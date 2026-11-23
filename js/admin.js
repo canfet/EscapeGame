@@ -3,6 +3,8 @@
   'use strict';
   var $ = Q.$, $$ = Q.$$, esc = Q.esc;
   var KEY_STORE = 'escapegame-admin-key';
+  var REMEMBER_STORE = 'escapegame-admin-remember';   // 「記住這台裝置」：存在本機，30 天內免重新輸入
+  var REMEMBER_DAYS = 30;
   var PROJECT_FIELDS = ['project_id', 'name', 'status', 'unlock_mode', 'description', 'intro', 'finish_message', 'cover_url', 'theme',
     'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy', 'wrong_lock_after', 'wrong_lock_sec', 'is_default', 'show_leaderboard', 'leaderboard_live', 'require_run_code', 'collect_message', 'deck_id'];
   var STAGE_FIELDS = ['stage_id', 'enabled', 'clue', 'image_url', 'require_gps', 'show_location', 'bypass_code', 'question', 'show_question_early', 'require_photo', 'reward_code', 'reward_order', 'final_from_fragments', 'coop_final', 'item_name', 'item_icon', 'item_rarity', 'item_story', 'card_id', 'card_random',
@@ -117,9 +119,21 @@
     $('#mon-run').onchange = loadMonitor;
     $('#btn-mon-refresh').onclick = loadMonitor;
     $('#mon-auto').onchange = setMonitorTimer;
+    $('#sub-team').onchange = function () { A.subTeam = this.value; renderSubs(); };
+    $$('#sub-chips [data-f]').forEach(function (b) { b.onclick = function () { A.subFilter = b.dataset.f; renderSubs(); }; });
 
     var saved = '';
     try { saved = sessionStorage.getItem(KEY_STORE) || ''; } catch (e) { /* */ }
+    var fromRemember = false;
+    if (!saved) {
+      try {
+        var rm = JSON.parse(localStorage.getItem(REMEMBER_STORE) || 'null');
+        if (rm && rm.k && rm.exp > Date.now()) { saved = rm.k; fromRemember = true; } else localStorage.removeItem(REMEMBER_STORE);
+      } catch (e) { /* */ }
+    }
+    // 從主畫面圖示開啟時預設勾選「記住這台裝置」
+    var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+    var chk = $('#login-remember'); if (chk) chk.checked = !!standalone || fromRemember;
     if (saved) { A.key = saved; enter(); }
   });
 
@@ -282,6 +296,8 @@
     var c = dk.cards[A.deckSel];
     $('#dk-editor').classList.toggle('hidden', !c);
     if (c) {
+      $('#dk-pos').textContent = (A.deckSel + 1) + ' / ' + dk.cards.length + '　' + (c.name || '');
+      $('#dk-prev').disabled = A.deckSel <= 0; $('#dk-next').disabled = A.deckSel >= dk.cards.length - 1;
       $('#dk-name').value = c.name; $('#dk-rarity').value = c.rarity; $('#dk-type').value = c.type; $('#dk-art').value = c.art || '';
       $('#dk-art_fit').value = c.art_fit || 'contain'; $('#dk-art_pos').value = c.art_pos || 'center';
       $('#dk-hp').value = c.hp; $('#dk-atk').value = c.atk; $('#dk-def').value = c.def;
@@ -506,20 +522,19 @@
       A.editDeck.cards.forEach(function (c, i) { rerollCard(i); });
       renderDeckEditor();
     };
-    $('#dk-reroll').onclick = function () { if (A.deckSel >= 0) { rerollCard(A.deckSel); renderDeckEditor(); } };
+    var dkStep = function (dir) {   // 上一張／下一張：先把目前這張的修改存起來，再換
+      var j = A.deckSel + dir;
+      if (j < 0 || j >= A.editDeck.cards.length) return;
+      readDeckForm(); A.deckSel = j; renderDeckEditor();
+    };
+    $('#dk-prev').onclick = function () { dkStep(-1); };
+    $('#dk-next').onclick = function () { dkStep(1); };
     $('#dk-del').onclick = function () {
       if (A.deckSel < 0) return;
       A.editDeck.cards.splice(A.deckSel, 1);
       A.deckSel = Math.min(A.deckSel, A.editDeck.cards.length - 1);
       renderDeckEditor();
     };
-    var mv = function (dir) {
-      var cs = A.editDeck.cards, i = A.deckSel, j = i + dir;
-      if (i < 0 || j < 0 || j >= cs.length) return;
-      readDeckForm(); var t = cs[i]; cs[i] = cs[j]; cs[j] = t; A.deckSel = j; renderDeckEditor();
-    };
-    $('#dk-up').onclick = function () { mv(-1); };
-    $('#dk-down').onclick = function () { mv(1); };
     ['#dk-name', '#dk-rarity', '#dk-type', '#dk-art', '#dk-art_fit', '#dk-art_pos', '#dk-hp', '#dk-atk', '#dk-def', '#dk-skill_name', '#dk-skill_desc', '#dk-story'].forEach(function (sel) {
       var ev = function () {
         readDeckForm(); renderDeckPreview();
@@ -637,6 +652,11 @@
     try {
       var r = await call('adminLogin');
       try { sessionStorage.setItem(KEY_STORE, A.key); } catch (e) { /* */ }
+      try {
+        var chk = $('#login-remember');
+        if (chk && chk.checked) localStorage.setItem(REMEMBER_STORE, JSON.stringify({ k: A.key, exp: Date.now() + REMEMBER_DAYS * 86400000 }));
+        else if (chk) localStorage.removeItem(REMEMBER_STORE);
+      } catch (e) { /* */ }
       $('#link-sheet').href = r.spreadsheet_url;
       $('#v-login').classList.add('hidden');
       $('#v-app').classList.remove('hidden');
@@ -646,7 +666,7 @@
   }
 
   function logout() {
-    try { sessionStorage.removeItem(KEY_STORE); } catch (e) { /* */ }
+    try { sessionStorage.removeItem(KEY_STORE); localStorage.removeItem(REMEMBER_STORE); } catch (e) { /* */ }
     A.key = '';
     clearInterval(A.monTimer);
     $('#v-app').classList.add('hidden');
@@ -745,7 +765,6 @@
         '<button class="sm ghost" data-act="edit">設定</button>' +
         '<button class="sm ghost" data-act="link">連結／QR</button>' +
         '<button class="sm ghost" data-act="check">✅ 活動前檢查</button>' +
-        '<button class="sm ghost" data-act="trial">🧪 試玩</button>' +
         (p.leaderboard_live ? '<button class="sm ghost" data-act="board">🏆 排行榜</button>' : '') +
         '<button class="sm ghost" data-act="monitor">紀錄</button>' +
         '<button class="sm ghost" data-act="dup">複製</button>' +
@@ -760,7 +779,6 @@
         if (act === 'monitor') { A.pid = pid; setTab('monitor'); }
         if (act === 'link') openLink(pid);
         if (act === 'check') openCheck(pid);
-        if (act === 'trial') openTrial(pid);
         if (act === 'board') window.open(playerUrl(pid, '').replace('index.html', 'board.html'), '_blank');
         if (act === 'dup') duplicateProject(p);
         if (act === 'del') deleteProject(p);
@@ -989,16 +1007,6 @@
         else { A.pid = pid; setTab('stages'); if (w.indexOf('stage:') === 0) setTimeout(function () { var st = findStage(w.slice(6)); if (st) openStage(st); }, 700); }
       };
     });
-  }
-
-  /* ---------- 試玩（不計入排行榜與正式紀錄） ---------- */
-  async function openTrial(pid) {
-    try {
-      var r = await call('adminGetTestToken');
-      var url = playerUrl(pid, '') + '&test=1&tt=' + encodeURIComponent(r.token);
-      window.open(url, '_blank');
-      Q.toast('已開啟試玩：這支隊伍不會計入排行榜，準備中的專案也能玩。測完到「闖關紀錄」按「清除試玩紀錄」。', 'ok', 7000);
-    } catch (e) { /* */ }
   }
 
   /* ---------- 連結／QR ---------- */
@@ -1463,10 +1471,84 @@
     var run = $('#mon-run').value;
     try {
       var payload = { adminKey: A.key, projectId: pid, runCode: run };
-      var fn = function () { return Promise.all([Q.api('adminSessions', payload), Q.api('adminSubmissions', Object.assign({ limit: 100 }, payload))]); };
+      var fn = function () { return Promise.all([Q.api('adminSessions', payload), Q.api('adminSubmissions', Object.assign({ limit: 300 }, payload))]); };
       var res = silent ? await fn() : await Q.run(fn);
       renderMonitor(res[0], res[1], run);
     } catch (e) { if (silent) Q.toast(e.message, 'err'); }
+  }
+
+  /* ---------- 作答紀錄：手機用卡片，可以選一隊看「做到哪裡」 ---------- */
+  var SUB_ACT = { start: '開始', arrive: '打卡', answer: '作答', hint: '看提示', photo: '上傳照片', form: '表單' };
+  var SUB_RES = { ok: '✅ 成功', correct: '✅ 答對', wrong: '❌ 答錯', failed: '⛔ 次數用完', too_far: '📏 太遠', low_accuracy: '📡 定位不準', wrong_code: '❌ 通關碼錯', uploaded: '✅ 已上傳', not_found: '⏳ 未收到' };
+  var SUB_BAD = ['wrong', 'failed', 'too_far', 'low_accuracy', 'wrong_code', 'not_found'];
+  function subRel(ts) {
+    var t = new Date(ts).getTime();
+    if (!t) return '';
+    var m = Math.round((Date.now() - t) / 60000);
+    return m < 1 ? '剛剛' : m < 60 ? m + ' 分鐘前' : m < 1440 ? Math.floor(m / 60) + ' 小時前' : Q.fmtTime(ts);
+  }
+  function subTone(x) { return SUB_BAD.indexOf(x.result) >= 0 ? 'bad' : (x.result === 'correct' || x.result === 'uploaded' || x.result === 'ok') ? 'good' : ''; }
+
+  /** 某一隊每一關的進度：完成、已打卡、答錯幾次、看了幾次提示 */
+  function teamProgress(team, subs, stages, ses) {
+    var mine = subs.filter(function (x) { return x.team_name === team; });
+    var first = true;
+    var rows = stages.map(function (st, i) {
+      var rs = mine.filter(function (x) { return x.stage_id === st.stage_id; });
+      var solved = rs.some(function (x) { return ['answer', 'photo', 'form'].indexOf(x.action) >= 0 && ['correct', 'uploaded', 'ok'].indexOf(x.result) >= 0; });
+      var arrived = rs.some(function (x) { return x.action === 'arrive' && x.result === 'ok'; });
+      var wrong = rs.filter(function (x) { return x.result === 'wrong' || x.result === 'wrong_code'; }).length;
+      var hints = rs.filter(function (x) { return x.action === 'hint'; }).length;
+      var state = solved ? 'done' : (rs.length ? 'doing' : 'todo'), here = false;
+      if (!solved && first) { here = true; first = false; }
+      if (here && !rs.length) state = 'doing';
+      var txt = solved ? '✅ 完成' : arrived ? '📍 已打卡，作答中' : rs.length ? '🕐 進行中' : (here ? '👉 目前' : '—');
+      var bits = [];
+      if (wrong) bits.push('答錯 ' + wrong + ' 次');
+      if (hints) bits.push('看提示 ' + hints + ' 次');
+      if (rs.length) bits.push(subRel(rs[0].timestamp));
+      return '<div class="tp-row ' + state + (here ? ' here' : '') + '"><span class="tp-no">' + (i + 1) + '</span><div class="tp-main"><b>' + esc(st.title) + '</b>' +
+        '<small>' + bits.join('・') + '</small></div><span class="tp-st">' + txt + '</span></div>';
+    }).join('');
+    var s = ses.filter(function (x) { return x.team_name === team; })[0];
+    var head = s ? '<div class="tp-head"><b>' + esc(team) + '</b><span>完成 ' + s.solved + ' / ' + s.total + ' 關・' + s.score + ' 分' + (s.last_active_at ? '・' + subRel(s.last_active_at) + '有動作' : '') + '</span></div>' : '<div class="tp-head"><b>' + esc(team) + '</b></div>';
+    return head + rows;
+  }
+
+  function renderSubs() {
+    var c = A.monCache;
+    if (!c) return;
+    var subs = c.sub.submissions || [], team = A.subTeam || '', f = A.subFilter || 'all';
+    var names = {};
+    c.ss.forEach(function (s) { names[s.team_name] = 1; });
+    subs.forEach(function (x) { if (x.team_name) names[x.team_name] = 1; });
+    var list = Object.keys(names).sort();
+    if (team && !names[team]) team = A.subTeam = '';
+    $('#sub-team').innerHTML = '<option value="">全部隊伍</option>' + list.map(function (n) { return '<option>' + esc(n) + '</option>'; }).join('');
+    $('#sub-team').value = team;
+    $$('#sub-chips [data-f]').forEach(function (b) { b.classList.toggle('on', b.dataset.f === f); });
+    var pg = $('#sub-progress');
+    pg.classList.toggle('hidden', !team);
+    if (team) pg.innerHTML = teamProgress(team, subs, c.r.stages || [], c.ss);
+    var shown = subs.filter(function (x) {
+      if (team && x.team_name !== team) return false;
+      if (f === 'wrong') return SUB_BAD.indexOf(x.result) >= 0;
+      if (f === 'file') return !!x.file_url;
+      return true;
+    });
+    $('#sub-cards').innerHTML = shown.length ? shown.map(function (x) {
+      var dist = x.distance_m !== '' && x.distance_m != null ? '・距離目標 ' + x.distance_m + 'm' : '';
+      return '<div class="sub-card ' + subTone(x) + '">' +
+        '<div class="sc-l1"><b>' + (SUB_RES[x.result] || esc(x.result)) + '</b>' + (team ? '' : ' <span>' + esc(x.team_name) + '</span>') + '<em>' + esc(x.stage_title || '') + '</em></div>' +
+        '<div class="sc-l2">' + (SUB_ACT[x.action] || esc(x.action)) + (x.input ? '「' + esc(x.input) + '」' : '') + '</div>' +
+        '<div class="sc-l3">' + subRel(x.timestamp) + dist + (x.file_url ? '・<a href="' + esc(x.file_url) + '" target="_blank" rel="noopener">📎 開啟檔案</a>' : '') + '</div></div>';
+    }).join('') : '<div class="card muted">沒有符合的紀錄。</div>';
+    $('#mon-subs-rows').innerHTML = shown.map(function (x) {
+      return '<tr><td class="small">' + Q.fmtTime(x.timestamp) + '</td><td>' + esc(x.team_name) + '</td><td>' + esc(x.stage_title || '') + '</td>' +
+        '<td>' + (SUB_ACT[x.action] || esc(x.action)) + '</td><td>' + esc(x.input) + '</td><td>' + (SUB_RES[x.result] || esc(x.result)) + '</td>' +
+        '<td>' + (x.distance_m !== '' && x.distance_m != null ? x.distance_m + 'm' : '') + '</td>' +
+        '<td>' + (x.file_url ? '<a href="' + esc(x.file_url) + '" target="_blank" rel="noopener">開啟</a>' : '') + '</td></tr>';
+    }).join('') || '<tr><td colspan="8" class="muted">沒有符合的紀錄</td></tr>';
   }
 
   function renderMonitor(r, sub, run) {
@@ -1527,14 +1609,8 @@
       };
     });
 
-    var actTxt = { start: '開始', arrive: '打卡', answer: '作答', hint: '提示', photo: '照片', form: '表單' };
-    var resTxt = { ok: '✅ 成功', correct: '✅ 答對', wrong: '❌ 答錯', failed: '⛔ 次數用完', too_far: '📏 太遠', low_accuracy: '📡 定位不準', wrong_code: '❌ 通關碼錯', uploaded: '✅ 已上傳', not_found: '⏳ 未收到' };
-    $('#mon-subs-rows').innerHTML = sub.submissions.map(function (x) {
-      return '<tr><td class="small">' + Q.fmtTime(x.timestamp) + '</td><td>' + esc(x.team_name) + '</td><td>' + esc(x.stage_title || '') + '</td>' +
-        '<td>' + (actTxt[x.action] || esc(x.action)) + '</td><td>' + esc(x.input) + '</td><td>' + (resTxt[x.result] || esc(x.result)) + '</td>' +
-        '<td>' + (x.distance_m !== '' && x.distance_m != null ? x.distance_m + 'm' : '') + '</td>' +
-        '<td>' + (x.file_url ? '<a href="' + esc(x.file_url) + '" target="_blank" rel="noopener">開啟</a>' : '') + '</td></tr>';
-    }).join('') || '<tr><td colspan="8" class="muted">尚無紀錄</td></tr>';
+    A.monCache = { r: r, sub: sub, ss: ss };
+    renderSubs();
 
     if (!window.L) return;
     if (!A.monMap) {

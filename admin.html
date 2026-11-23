@@ -13,7 +13,7 @@
   <meta name="robots" content="noindex">
   <title>實境解謎 · 管理後台</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261122m">
+  <link rel="stylesheet" href="css/style.css?v=20261122s">
 </head>
 <body>
   <!-- 登入 -->
@@ -21,7 +21,9 @@
     <div class="card stack">
       <h1>🧩 管理後台</h1>
       <p class="muted small">請輸入管理密碼（在試算表選單「🧩 實境解謎 → 顯示管理密碼」可以查看）。</p>
+      <input type="text" name="username" value="admin" autocomplete="username" aria-hidden="true" tabindex="-1" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <input type="password" id="login-key" placeholder="管理密碼" autocomplete="current-password">
+      <label class="check small"><input type="checkbox" id="login-remember"> 記住這台裝置（30 天內免重新輸入；請只在自己的手機勾選）</label>
       <button class="big" id="btn-login">登入</button>
     </div>
   </section>
@@ -134,8 +136,18 @@
           <div id="mon-map" class="map tall"></div>
         </div>
       </div>
-      <h3 style="margin-top:18px">最新作答紀錄</h3>
-      <div class="table-wrap">
+      <h3 style="margin-top:18px">作答紀錄</h3>
+      <div class="sub-filter">
+        <select id="sub-team" aria-label="選擇隊伍"><option value="">全部隊伍</option></select>
+        <div class="sub-chips" id="sub-chips" role="group" aria-label="篩選">
+          <button type="button" class="sm on" data-f="all">全部</button>
+          <button type="button" class="sm" data-f="wrong">只看答錯／異常</button>
+          <button type="button" class="sm" data-f="file">有照片</button>
+        </div>
+      </div>
+      <div id="sub-progress" class="sub-progress hidden"></div>
+      <div id="sub-cards" class="sub-cards"></div>
+      <div class="table-wrap" id="sub-table">
         <table>
           <thead><tr><th>時間</th><th>隊伍</th><th>關卡</th><th>動作</th><th>輸入</th><th>結果</th><th>距離</th><th>檔案</th></tr></thead>
           <tbody id="mon-subs-rows"></tbody>
@@ -371,12 +383,12 @@
       <div class="sheet-head"><h2 id="ck-title">活動前檢查</h2><button class="close-x" data-close>✕</button></div>
       <div id="ck-summary" class="row wrap" style="margin-bottom:10px"></div>
       <div class="card" style="margin-bottom:10px;padding:12px 14px">
-        <b>📱 活動前，請用自己的手機走一遍試玩</b>
+        <b>📱 活動前，請用自己的手機實際走一遍</b>
         <ul class="small" style="margin:6px 0 0;padding-left:1.2em;line-height:1.7">
-          <li>在專案卡片按「🧪 試玩」，從開始玩到通關。</li>
-          <li>iPhone、Android 各一支更好；用現場會用的瀏覽器開。</li>
+          <li>用「連結／QR」的連結開啟，從開始玩到通關。</li>
+          <li>iPhone、Android 各一支更好；用現場會用的瀏覽器。</li>
           <li>確認：定位權限、聲音與震動、拍照上傳、卡片放大、畫面有沒有被截掉。</li>
-          <li>試玩紀錄不會計入排行榜，結束後可在「闖關紀錄」清除。</li>
+          <li>測試隊伍會留下紀錄，測完到「闖關紀錄」刪除。</li>
         </ul>
       </div>
       <div id="ck-list" class="ck-list"></div>
@@ -423,6 +435,7 @@
         <div>
           <div class="section-title">編輯這張卡</div>
           <div id="dk-editor" class="hidden">
+            <div class="dk-nav"><button type="button" class="ghost" id="dk-prev">‹ 上一張</button><span id="dk-pos" aria-live="polite"></span><button type="button" class="ghost" id="dk-next">下一張 ›</button></div>
             <div class="grid2">
               <div class="field"><label>名稱</label><input id="dk-name" maxlength="20"></div>
               <div class="field"><label>稀有度</label>
@@ -451,9 +464,6 @@
             <div class="field"><label>技能說明</label><input id="dk-skill_desc" maxlength="80"></div>
             <div class="field"><label>小故事</label><textarea id="dk-story" maxlength="200" style="min-height:64px"></textarea></div>
             <div class="row wrap">
-              <button type="button" class="ghost sm" id="dk-up">⬆ 往前</button>
-              <button type="button" class="ghost sm" id="dk-down">⬇ 往後</button>
-              <button type="button" class="ghost sm" id="dk-reroll">🎲 重抽</button>
               <button type="button" class="danger sm" id="dk-del">刪除</button>
             </div>
           </div>
@@ -501,8 +511,8 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/qrcode.min.js"></script>
-  <script src="config.js?v=20261122m"></script>
-  <script src="js/common.js?v=20261122m"></script>
-  <script src="js/admin.js?v=20261122m"></script>
+  <script src="config.js?v=20261122s"></script>
+  <script src="js/common.js?v=20261122s"></script>
+  <script src="js/admin.js?v=20261122s"></script>
 </body>
 </html>

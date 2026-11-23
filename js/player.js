@@ -378,7 +378,7 @@
     drawStagesOnMap();
     updateNextStep();
     updateStageMore();
-    if (se.status === 'playing') keepAwake();
+    if (se.status === 'playing') { keepAwake(); resumeSensors(); } else stopSensors();
   }
 
   function routeOf(state, id) {
@@ -566,7 +566,7 @@
 
   /* ---------- 定位 ---------- */
   function startWatch() {
-    if (P.watchId != null || P.noGps) return;
+    if (P.watchId != null || P.noGps || P.sensorsOff) return;
     if (!('geolocation' in navigator)) { setGps('none'); return; }
     var hi = P.gpsMode !== 'low';
     P.watchId = navigator.geolocation.watchPosition(function (p) {
@@ -612,6 +612,8 @@
       tip = (/iPhone|iPad|iPod/i.test(navigator.userAgent)
         ? '📍 iPhone：設定 → 隱私權與安全性 → 定位服務 → 開啟，並把 Safari（或你用的瀏覽器）設為「使用 App 期間」；再回來按「重新定位」。'
         : '📍 Android：點網址列左邊的 🔒 → 權限 → 位置 → 允許；再回來按「重新定位」。');
+    } else if (state === 'stopped') {
+      cls = ''; text = '定位已停止（任務已結束）';
     } else if (state === 'none') {
       cls = 'bad'; text = '不支援定位'; tip = '這台裝置不支援定位。';
     } else if (state === 'error') {
@@ -701,6 +703,28 @@
     } else {
       listenCompass();
     }
+  }
+
+  /* ---------- 任務結束（通關、時間到、關閉）後停掉定位與指南針，省電 ---------- */
+  function stopSensors() {
+    if (P.sensorsOff) return;
+    P.sensorsOff = true;
+    try { if (P.watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(P.watchId); } catch (e) { /* */ }
+    P.watchId = null;
+    P.compassWasOn = !!P.compassOn;
+    if (P.compassOn) {
+      var evt = ('ondeviceorientationabsolute' in window) ? 'deviceorientationabsolute' : 'deviceorientation';
+      window.removeEventListener(evt, onOrientation, true);
+      P.compassOn = false;
+    }
+    if (!P.noGps) setGps('stopped');
+  }
+  /** 結束後又有新關卡開放（隊伍重新開始闖關）時，把定位接回來 */
+  function resumeSensors() {
+    if (!P.sensorsOff) return;
+    P.sensorsOff = false;
+    if (!P.noGps) startWatch();
+    if (P.compassWasOn) listenCompass();
   }
 
   function listenCompass() {
