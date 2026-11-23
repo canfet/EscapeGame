@@ -189,6 +189,8 @@
         '<span class="chip">' + (p.unlock_mode === 'free' ? '🔓 自由順序' : '➡️ 依序解鎖') + '</span>'];
       if (p.time_limit_min) meta.push('<span class="chip amber">⏱ 限時 ' + p.time_limit_min + ' 分鐘</span>');
       $('#intro-meta').innerHTML = meta.join('');
+      // 專案要求場次代碼、但網址只帶了路線（專屬 QR Code）：直接拿路線代碼當場次，玩家不用再輸入
+      if (p.require_run_code && !P.runCode && P.urlRoute) P.runCode = P.urlRoute;
       $('#f-run').value = P.runCode;
       // 隊伍名稱：專案有「預設隊伍名單」就只能從名單選（路線由名單決定）；否則自由輸入
       var restrict = !!p.restrict_teams, tms = p.teams || [];
