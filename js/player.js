@@ -355,7 +355,7 @@
     var stageList = $('#g-stages'), keepLeft = stageList.scrollLeft;
     stageList.innerHTML = s.stages.map(function (st, i) {
       var dist = '';
-      if (st.lat != null && st.require_gps && P.pos && (st.status === 'open')) dist = distText(st);
+      if (P.pos && showsLoc(st)) dist = distText(st);
       var state = st.status === 'solved' ? '✓ 已完成 +' + st.earned
         : st.status === 'locked' ? '🔒 未解鎖'
         : st.status === 'failed' ? '✗ 未通過'
@@ -552,10 +552,16 @@
     } catch (e) { /* 靜默 */ }
   }
 
+  /**
+   * 這一關要不要顯示位置（方向、距離、小地圖）。後端只有在「在地圖上顯示位置」開啟時才會給座標，所以有座標就顯示。
+   * 不用打卡的關卡（打卡條件沒勾 GPS）也要顯示，玩家才知道去哪裡；只是不用按「我到了」。
+   */
+  function showsLoc(st) { return st.lat != null && (st.status === 'open' || (st.status === 'arrived' && !st.require_gps)); }
+
   /* ---------- 沒有任何定位關卡：不顯示地圖與定位標籤、不持續定位（權限仍照樣在進入時詢問） ---------- */
   function stateNoGps(state) {
     var ss = (state && state.stages) || [];
-    return !!ss.length && !ss.some(function (s) { return s.require_gps && s.lat != null; });
+    return !!ss.length && !ss.some(function (s) { return s.lat != null; });
   }
   function noGpsMode() {
     P.noGps = true;
@@ -665,7 +671,7 @@
   function updateDistances() {
     if (!P.state || !P.pos) return;
     P.state.stages.forEach(function (st) {
-      if (st.lat == null || !st.require_gps || st.status !== 'open') return;
+      if (!showsLoc(st)) return;
       var el = document.querySelector('[data-dist="' + st.stage_id + '"]');
       if (el) el.textContent = distText(st);
     });
@@ -767,7 +773,7 @@
       '<div class="distance" id="live-dist">定位中…</div>' +
       '<div id="live-dir" class="live-dir"></div>' +
       '<div class="help" id="cmp-mode"></div>' +
-      '<div class="help">進入 ' + st.radius_m + ' 公尺範圍內即可打卡</div>' +
+      '<div class="help">' + (st.require_gps ? '進入 ' + st.radius_m + ' 公尺範圍內即可打卡' : '這一關不用打卡，到這個位置附近就可以了') + '</div>' +
       '<button class="sm ghost hidden" id="btn-compass" style="margin-top:8px">🧭 啟用指南針</button></div>';
   }
 
@@ -816,7 +822,7 @@
     var arrow = document.getElementById('cmp-arrow');
     if (!arrow || !P.openId) return;
     var st = findStage(P.openId);
-    if (!st || st.status !== 'open' || st.lat == null) return;
+    if (!st || !showsLoc(st)) return;
     var ring = $('#cmp-ring'), dist = $('#live-dist'), dir = $('#live-dir'), mode = $('#cmp-mode'), box = $('#cmp');
     var btn = $('#btn-compass');
     var needBtn = !P.compassOn && !P.compassDenied && window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function';
@@ -832,7 +838,7 @@
     box.classList.toggle('inside', inside);
     dist.textContent = inside ? '已抵達！' : Q.fmtDist(d);
     if (inside) {
-      dir.textContent = '你已經在範圍內，按下方「我到了」打卡';
+      dir.textContent = st.require_gps ? '你已經在範圍內，按下方「我到了」打卡' : '你已經到這一關的位置了';
     } else {
       dir.innerHTML = '目標在你的 <b>' + dirName(b) + '方</b>（' + Math.round(b) + '°）' +
         (cur ? '・<b>' + relName(b - h) + '</b>' : '');
@@ -1081,12 +1087,13 @@
     // 最後一關（答案由碎片組成）：顯示碎片列
     if (st.uses_fragments && st.status !== 'solved' && st.status !== 'failed') h.push(fragStripHtml(st));
 
+    var pushLoc = function () {
+      h.push(compassHtml(st));
+      if (window.L) h.push('<div class="card sheet-map-card"><div id="sheet-map" class="map sheet-map" aria-label="這一關的位置地圖"></div><div class="map-actions"><button class="ghost" id="sheet-map-both" type="button">🎯 我與目標</button><button class="ghost" id="sheet-map-target" type="button">📍 只看目標</button></div></div>');
+    };
     // 4) 前往中：指南針／通關碼；打卡按鈕固定在底部
     if (st.status === 'open') {
-      if (st.lat != null && st.require_gps) {   // 不需要 GPS 的關卡不顯示方向、距離與地圖
-        h.push(compassHtml(st));
-        if (window.L) h.push('<div class="card sheet-map-card"><div id="sheet-map" class="map sheet-map" aria-label="這一關的位置地圖"></div><div class="map-actions"><button class="ghost" id="sheet-map-both" type="button">🎯 我與目標</button><button class="ghost" id="sheet-map-target" type="button">📍 只看目標</button></div></div>');
-      }
+      if (st.lat != null) pushLoc();   // 有座標就顯示方向、距離與地圖（不用打卡的關卡也一樣）
       if (playing) {
         // 需要 GPS 打卡、又要輸入文字／數字答案：到了現場可以直接填答案，一次完成「定位＋送答案」
         var combo = st.require_gps && st.question && !st.require_photo && !st.uses_fragments && (st.answer_type === 'text' || st.answer_type === 'number');
@@ -1100,6 +1107,7 @@
     }
 
     // 5) 作答區；送出按鈕固定在底部
+    if (st.status === 'arrived' && !st.require_gps && st.lat != null) pushLoc();   // 不用打卡：位置還是要讓玩家看到
     if (st.status === 'arrived' && playing) {
       var ui = answerUI(st);
       if (ui.body) h.push(ui.body);
