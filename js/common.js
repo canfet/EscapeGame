@@ -211,11 +211,15 @@
       }
       return null;
     }
-    m = s.match(/(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)/);
+    // 純文字座標：兩個數字都要有小數點（Google 地圖複製的座標一定有），避免把地址裡的「102 號 3 樓」誤當成座標
+    m = s.match(/(-?\d{1,3}\.\d+)\s*[,，\s]\s*(-?\d{1,3}\.\d+)/);
     return m ? llOk(parseFloat(m[1]), parseFloat(m[2])) : null;
   }
 
   /** 是 Google 地圖的短網址（手機「分享」產生的 maps.app.goo.gl/…）嗎？這種要請後端展開 */
+  /** 從一段貼上的文字裡找出第一個網址（Google 地圖「分享」複製的常是「地名＋換行＋網址」，不是單純網址） */
+  function firstUrl(s) { var m = String(s || '').match(/https?:\/\/[^\s<>"']+/i); return m ? m[0].replace(/[)\].,;，。]+$/, '') : ''; }
+
   function isMapShortLink(s) { return /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs)\//i.test(String(s || '').trim()); }
 
   /**
@@ -403,6 +407,6 @@
     boardHtml: boardHtml,
     api: api, FRONT_VERSION: FRONT_VERSION, $: $, $$: $$, esc: esc, linkify: linkify, toast: toast, loading: loading, run: run,
     distM: distM, fmtDist: fmtDist, fmtDuration: fmtDuration, fmtTime: fmtTime, toLocalInput: toLocalInput,
-    parseLatLng: parseLatLng, isMapShortLink: isMapShortLink, locate: locate, STATUS_LABEL: STATUS_LABEL, TYPE_LABEL: TYPE_LABEL, STATUS_COLOR: STATUS_COLOR
+    parseLatLng: parseLatLng, firstUrl: firstUrl, isMapShortLink: isMapShortLink, locate: locate, STATUS_LABEL: STATUS_LABEL, TYPE_LABEL: TYPE_LABEL, STATUS_COLOR: STATUS_COLOR
   };
 })(window);

@@ -101,19 +101,24 @@
     $('#ms-restore').onclick = function () {
       if (A.edOrig) { setEdPoint(A.edOrig.lat, A.edOrig.lng, true); Q.toast('已還原為原本位置', 'ok'); }
     };
-    $('#ms-paste').addEventListener('input', async function () {
-      var box = this, v = box.value.trim();
-      if (!v) return;
+    // 貼上座標或 Google 地圖網址。手機「分享」複製的常是「地名＋網址」兩行文字，所以先從文字裡把網址挑出來
+    $('#ms-paste').addEventListener('input', async function (ev) {
+      var box = this, raw = box.value.trim();
+      if (!raw) return;
+      var pasted = !ev.inputType || /paste|drop/i.test(ev.inputType) || raw.length >= 12;   // 一個字一個字打的時候不要一直跳提示
+      var url = Q.firstUrl(raw), v = url || raw;
       var ll = Q.parseLatLng(v);
-      if (!ll && Q.isMapShortLink(v)) {   // 手機「分享」的短網址：請後端展開成完整網址再解析
+      if (!ll && url && Q.isMapShortLink(url)) {   // 短網址：請後端展開成完整網址再解析
+        box.disabled = true; Q.toast('轉換網址中…', 'warn', 1500);
         try {
-          var rr = await Q.run(function () { return Q.api('adminResolveMapUrl', { adminKey: A.key, url: v }); }, { noToast: true });
+          var rr = await Q.run(function () { return Q.api('adminResolveMapUrl', { adminKey: A.key, url: url }); }, { noToast: true });
           ll = (rr.lat != null && rr.lng != null) ? { lat: rr.lat, lng: rr.lng } : Q.parseLatLng(rr.url);
         } catch (e) { /* 下面統一提示 */ }
-        if (!ll) { box.value = ''; return Q.toast('這個短網址無法轉成座標。請開啟後複製瀏覽器網址列的完整網址，或長按地點複製座標。', 'warn', 7000); }
+        box.disabled = false;
+        if (!ll) return Q.toast('短網址轉不出座標。如果還沒更新後端程式，請先更新；或到 Google 地圖長按地點，複製最上面的座標。', 'warn', 8000);
       }
       if (ll) { setEdPoint(ll.lat, ll.lng, true); box.value = ''; Q.toast('已套用座標 ' + ll.lat.toFixed(6) + ', ' + ll.lng.toFixed(6), 'ok'); }
-      else if (/^https?:\/\//i.test(v)) { box.value = ''; Q.toast('網址裡找不到座標。請改貼「地點」的網址，或長按地點複製座標。', 'warn', 6000); }
+      else if (pasted) Q.toast(url ? '網址裡找不到座標。請改貼「地點」的網址，或長按地點複製座標。' : '看不出座標。請貼 Google 地圖的網址，或像 25.0330, 121.5654 這樣的座標。', 'warn', 6000);
     });
     ['#ms-lat', '#ms-lng', '#ms-radius_m'].forEach(function (s) {
       $(s).addEventListener('change', function () {
