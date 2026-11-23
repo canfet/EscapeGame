@@ -126,7 +126,6 @@
         if (isFinite(lat) && isFinite(lng)) setEdPoint(lat, lng, s !== '#ms-radius_m');
       });
     });
-    $('#ml-run').addEventListener('input', updateLink);
     $('#ml-copy').onclick = function () {
       var el = $('#ml-url'); el.select();
       (navigator.clipboard ? navigator.clipboard.writeText(el.value) : Promise.reject()).then(function () { Q.toast('已複製', 'ok'); })
@@ -1065,7 +1064,6 @@
   /* ---------- 連結／QR ---------- */
   function openLink(pid) {
     A.linkPid = pid;
-    $('#ml-run').value = '';
     var teams = projTeams(pid), routes = projRoutes(pid);
     // 有隊伍名單：選隊伍（路線由名單決定）；沒有名單但有路線：選路線；都沒有：只有一般連結
     $('#ml-team-wrap').classList.remove('hidden');
@@ -1094,7 +1092,7 @@
 
   function updateLink() {
     var ch = linkChoice();
-    var url = playerUrl(A.linkPid, $('#ml-run').value.trim(), ch.route, ch.team);
+    var url = playerUrl(A.linkPid, '', ch.route, ch.team);
     $('#ml-url').value = url;
     $('#ml-open').href = url;
     drawQr($('#ml-qr'), url, 220);
@@ -1108,18 +1106,18 @@
 
   /** 一次產生全部 QR：有隊伍名單＝每隊一張；沒有名單但有路線＝每條路線一張；都沒有＝一張 */
   function openQrSheet() {
-    var pid = A.linkPid, run = $('#ml-run').value.trim();
+    var pid = A.linkPid;
     var proj = A.projects.filter(function (x) { return x.project_id === pid; })[0] || {};
     var teams = projTeams(pid), routes = projRoutes(pid), cards = [];
     if (teams.length) {
-      teams.forEach(function (t) { cards.push({ title: t.name, route: t.route, url: playerUrl(pid, run, t.route, t.name) }); });
+      teams.forEach(function (t) { cards.push({ title: t.name, route: t.route, url: playerUrl(pid, '', t.route, t.name) }); });
     } else if (routes.length) {
-      routes.forEach(function (r) { cards.push({ title: r.name, route: r.id, url: playerUrl(pid, run, r.id, '') }); });
+      routes.forEach(function (r) { cards.push({ title: r.name, route: r.id, url: playerUrl(pid, '', r.id, '') }); });
     } else {
-      cards.push({ title: proj.name || pid, route: '', url: playerUrl(pid, run, '', '') });
+      cards.push({ title: proj.name || pid, route: '', url: playerUrl(pid, '', '', '') });
     }
     $('#qs-title').textContent = (proj.name || pid) + '：' + (teams.length ? '各隊 QR Code' : routes.length ? '各路線 QR Code' : 'QR Code');
-    $('#qs-note').textContent = '共 ' + cards.length + ' 張' + (run ? '・場次 ' + run : '') + '。請用「列印」輸出，每張卡片剪下來發給對應的隊伍。';
+    $('#qs-note').textContent = '共 ' + cards.length + ' 張。請用「列印」輸出，每張卡片剪下來發給對應的隊伍。';
     $('#qs-grid').innerHTML = cards.map(function (c, i) {
       return '<div class="qs-card"><div class="qs-title">' + esc(c.title) + '</div>' +
         (c.route ? '<div>' + routeChip(pid, c.route) + '</div>' : '') +

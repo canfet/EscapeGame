@@ -218,9 +218,9 @@
         rb.textContent = info.bad === 'team' ? '⚠️ 連結裡的隊伍名稱不在名單內，請從下方選擇，或向關主確認 QR Code。' : '⚠️ 連結裡的路線代碼不正確，請向關主確認 QR Code。';
         rb.classList.remove('hidden'); rb.classList.add('bad'); rb.style.borderColor = '';
       }
-      $('#run-req').textContent = p.require_run_code ? ' *' : '（選填）';
-      // 網址已帶場次代碼就不用再填
-      $('#run-field').classList.toggle('hidden', !!P.runCode);
+      $('#run-req').textContent = ' *';
+      // 場次代碼只有「專案要求輸入」而且「網址沒帶」的時候才需要問玩家；其他情況不顯示這一欄，少一個要填的東西
+      $('#run-field').classList.toggle('hidden', !p.require_run_code || !!P.runCode);
       show('v-intro');
     } catch (e) { showError(e.message); }
   }

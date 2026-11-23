@@ -1161,7 +1161,7 @@ function checkProject_(p) {
   if (p.start_at && new Date(p.start_at) > now) add('info', '還沒到開放時間：玩家要等到開放後才能開始', 'project');
   if (p.end_at && new Date(p.end_at) < now) add('warn', '已經過了結束時間：玩家無法進入，排行榜也已關閉', 'project');
   if ((p.show_leaderboard || p.leaderboard_live) && !p.start_at && !p.end_at) add('info', '排行榜沒有設定開放／結束時間，會一直開放', 'project');
-  if (p.require_run_code) add('info', '需要場次代碼：記得把場次代碼放進連結，或告訴玩家', 'project');
+  if (p.require_run_code) add('info', '需要場次代碼：玩家開始前要自己輸入，記得在現場告訴玩家', 'project');
   // 關卡
   stages.forEach(function (s, i) {
     var tag = '第 ' + (i + 1) + ' 關「' + s.title + '」', w = 'stage:' + s.stage_id;
