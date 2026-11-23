@@ -13,7 +13,7 @@
   <meta name="robots" content="noindex">
   <title>實境解謎 · 管理後台</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261122s">
+  <link rel="stylesheet" href="css/style.css?v=20261122v">
 </head>
 <body>
   <!-- 登入 -->
@@ -349,8 +349,8 @@
             <div class="field"><label>經度</label><input id="ms-lng" inputmode="decimal"></div>
             <div class="field"><label>範圍（公尺）</label><input type="number" min="5" id="ms-radius_m"></div>
           </div>
-          <div class="field"><label>貼上座標</label><input id="ms-paste" placeholder="從 Google 地圖右鍵複製，例如 25.0330, 121.5654">
-            <div class="help">在 Google 地圖對地點按右鍵（手機長按），點最上面的座標就會複製。</div></div>
+          <div class="field"><label>貼上座標或 Google 地圖網址</label><input id="ms-paste" placeholder="Google 地圖網址，或 25.0330, 121.5654">
+            <div class="help">手機：在 Google 地圖點地點 →「分享」→ 複製連結，貼在這裡就會自動轉成座標。也可以貼座標。</div></div>
           <div class="row" style="margin-bottom:8px">
             <button class="ghost sm" id="ms-here">📍 使用我目前的位置</button>
             <button class="ghost sm hidden" id="ms-restore">↩ 還原原本位置</button>
@@ -371,7 +371,7 @@
     <div class="modal-body">
       <div class="sheet-head"><h2>🔍 搜尋圖片</h2><button class="close-x" data-close>✕</button></div>
       <div class="row" style="margin-bottom:6px"><input class="grow" id="is-q" placeholder="輸入名稱，例如：山羌（找不到可以改用英文或學名）"><button id="is-go">搜尋</button></div>
-      <div class="help">圖片來自「維基共享資源」，只收錄可以自由使用的授權（例如 CC BY、CC BY-SA、公有領域），使用時需要標示作者與授權；系統會自動記在這張卡上，並顯示在玩家的卡片檢視裡。名稱如果是人的自然名（例如天狼星、隨風），搜到的圖可能和角色無關，請自行挑選或改用自己的圖。</div>
+      <div class="help">圖片來自「維基共享資源」，只收錄可以自由使用的授權（例如 CC BY、CC BY-SA、公有領域），使用時需要標示作者與授權；系統會自動記在這張卡上，並顯示在玩家的卡片檢視裡。</div>
       <div id="is-status" class="small muted" style="margin:6px 0"></div>
       <div id="is-grid" class="is-grid"></div>
     </div>
@@ -436,6 +436,7 @@
           <div class="section-title">編輯這張卡</div>
           <div id="dk-editor" class="hidden">
             <div class="dk-nav"><button type="button" class="ghost" id="dk-prev">‹ 上一張</button><span id="dk-pos" aria-live="polite"></span><button type="button" class="ghost" id="dk-next">下一張 ›</button></div>
+            <div class="help dk-swipe-tip">💡 在卡片或欄位空白處左右滑動，也可以換張</div>
             <div class="grid2">
               <div class="field"><label>名稱</label><input id="dk-name" maxlength="20"></div>
               <div class="field"><label>稀有度</label>
@@ -511,8 +512,8 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/qrcode.min.js"></script>
-  <script src="config.js?v=20261122s"></script>
-  <script src="js/common.js?v=20261122s"></script>
-  <script src="js/admin.js?v=20261122s"></script>
+  <script src="config.js?v=20261122v"></script>
+  <script src="js/common.js?v=20261122v"></script>
+  <script src="js/admin.js?v=20261122v"></script>
 </body>
 </html>

@@ -2,6 +2,8 @@
 (function () {
   'use strict';
   var $ = Q.$, $$ = Q.$$, esc = Q.esc;
+  // 從主畫面圖示開啟時，標記一下：前台與排行榜頁面會顯示「← 回後台」（同一個視窗內跳轉沒有返回鍵）
+  try { if ((window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone) sessionStorage.setItem('escapegame-from-admin', '1'); } catch (e) { /* */ }
   var KEY_STORE = 'escapegame-admin-key';
   var REMEMBER_STORE = 'escapegame-admin-remember';   // 「記住這台裝置」：存在本機，30 天內免重新輸入
   var REMEMBER_DAYS = 30;
@@ -99,9 +101,19 @@
     $('#ms-restore').onclick = function () {
       if (A.edOrig) { setEdPoint(A.edOrig.lat, A.edOrig.lng, true); Q.toast('已還原為原本位置', 'ok'); }
     };
-    $('#ms-paste').addEventListener('input', function () {
-      var ll = Q.parseLatLng(this.value);
-      if (ll) { setEdPoint(ll.lat, ll.lng, true); this.value = ''; Q.toast('已套用座標', 'ok'); }
+    $('#ms-paste').addEventListener('input', async function () {
+      var box = this, v = box.value.trim();
+      if (!v) return;
+      var ll = Q.parseLatLng(v);
+      if (!ll && Q.isMapShortLink(v)) {   // 手機「分享」的短網址：請後端展開成完整網址再解析
+        try {
+          var rr = await Q.run(function () { return Q.api('adminResolveMapUrl', { adminKey: A.key, url: v }); }, { noToast: true });
+          ll = (rr.lat != null && rr.lng != null) ? { lat: rr.lat, lng: rr.lng } : Q.parseLatLng(rr.url);
+        } catch (e) { /* 下面統一提示 */ }
+        if (!ll) { box.value = ''; return Q.toast('這個短網址無法轉成座標。請開啟後複製瀏覽器網址列的完整網址，或長按地點複製座標。', 'warn', 7000); }
+      }
+      if (ll) { setEdPoint(ll.lat, ll.lng, true); box.value = ''; Q.toast('已套用座標 ' + ll.lat.toFixed(6) + ', ' + ll.lng.toFixed(6), 'ok'); }
+      else if (/^https?:\/\//i.test(v)) { box.value = ''; Q.toast('網址裡找不到座標。請改貼「地點」的網址，或長按地點複製座標。', 'warn', 6000); }
     });
     ['#ms-lat', '#ms-lng', '#ms-radius_m'].forEach(function (s) {
       $(s).addEventListener('change', function () {
@@ -529,6 +541,29 @@
     };
     $('#dk-prev').onclick = function () { dkStep(-1); };
     $('#dk-next').onclick = function () { dkStep(1); };
+    // 手機：在編輯區或卡片預覽上左右滑動換張（輸入欄位、按鈕上不觸發；要明顯的橫向滑動才算，不影響上下捲動）
+    (function () {
+      var x0 = null, y0 = 0, t0 = 0;
+      var begin = function (e) {
+        if (e.touches.length !== 1 || (e.target.closest && e.target.closest('input, textarea, select, button, label, a'))) { x0 = null; return; }
+        x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+      };
+      var finish = function (e) {
+        if (x0 == null) return;
+        var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0, fast = Date.now() - t0 < 900;
+        x0 = null;
+        if (!fast || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+        var ed = $('#dk-editor');
+        dkStep(dx < 0 ? 1 : -1);
+        ed.classList.remove('slide-l', 'slide-r'); void ed.offsetWidth;
+        ed.classList.add(dx < 0 ? 'slide-l' : 'slide-r');
+      };
+      ['#dk-editor', '#dk-preview'].forEach(function (s) {
+        var el = $(s);
+        el.addEventListener('touchstart', begin, { passive: true });
+        el.addEventListener('touchend', finish, { passive: true });
+      });
+    })();
     $('#dk-del').onclick = function () {
       if (A.deckSel < 0) return;
       A.editDeck.cards.splice(A.deckSel, 1);

@@ -1218,3 +1218,18 @@ input, select, textarea { min-width: 0; max-width: 100%; }
   .sub-cards { display: grid; }
   #sub-table { display: none; }
 }
+
+/* 從後台主畫面圖示跳來的頁面：回後台 */
+.back-admin { position: fixed; left: 10px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 2950; background: #1d2a2f; color: #fff; text-decoration: none; padding: 12px 16px; min-height: 46px; display: inline-flex; align-items: center; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.4); font-weight: 700; font-size: .95rem; }
+
+/* 圖鑑卡：滑動換張的提示與動畫（提示只在觸控裝置顯示） */
+.dk-swipe-tip { display: none; margin: -2px 0 8px; font-size: .78rem; }
+@media (pointer: coarse) { .dk-swipe-tip { display: block; } }
+#dk-editor.slide-l { animation: dk-in-l .22s ease-out; }
+#dk-editor.slide-r { animation: dk-in-r .22s ease-out; }
+@keyframes dk-in-l { from { transform: translateX(28px); opacity: .4; } }
+@keyframes dk-in-r { from { transform: translateX(-28px); opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { #dk-editor.slide-l, #dk-editor.slide-r { animation: none; } }
+
+/* 兩欄排版的格子預設不能縮得比內容窄，會把小螢幕（320px）撐出去 */
+.editor-grid > *, .grid2 > *, .grid3 > * { min-width: 0; }

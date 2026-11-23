@@ -95,6 +95,7 @@ var ROUTES = {
   adminResetFailed: admin_(adminResetFailed_),
   adminSaveDeck: admin_(adminSaveDeck_),
   adminImportImage: admin_(adminImportImage_),
+  adminResolveMapUrl: admin_(adminResolveMapUrl_),
   adminGetTestToken: admin_(adminGetTestToken_),
   adminClearTests: admin_(adminClearTests_),
   adminCheckProject: admin_(adminCheckProject_),
@@ -506,6 +507,35 @@ function adminImportImage_(b) {
   var file = im.dir.createFile(Utilities.newBlob(bytes, type.split(';')[0], 'wm_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + rand_(4, 'abcdefghjkmnpqrstuvwxyz23456789') + '.' + ext));
   if (!im.shared) file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return { url: 'https://lh3.googleusercontent.com/d/' + file.getId(), file_id: file.getId() };
+}
+
+/** 展開 Google 地圖的短網址（maps.app.goo.gl/…），讓後台能解析出座標。只允許 Google 自家網域，避免被當成任意網址代理。 */
+function adminResolveMapUrl_(b) {
+  var url = str_(b.url).trim();
+  var HOST = /^https:\/\/(?:maps\.app\.goo\.gl|goo\.gl|g\.co|(?:www\.|maps\.|consent\.)?google\.(?:com(?:\.(?:tw|hk|sg|au|my|ph|vn|br|mx|tr))?|co\.(?:jp|kr|uk|th|in|id|nz)|ca|de|fr|it|es|nl))(?:\/|$)/i;   // 明確列出網域，避免 google.com.evil.com 這類偽裝
+  if (!HOST.test(url)) throw appError_('只支援 Google 地圖的網址', 'BAD_INPUT');
+  var lastBody = '';
+  for (var i = 0; i < 6; i++) {
+    var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: false, headers: { 'User-Agent': 'Mozilla/5.0 (EscapeGame map resolver)' } });
+    var code = res.getResponseCode(), h = res.getHeaders(), loc = String(h['Location'] || h['location'] || '');
+    if (code >= 300 && code < 400 && loc) {
+      if (loc.charAt(0) === '/') loc = url.match(/^https:\/\/[^\/]+/)[0] + loc;
+      var cm = loc.match(/^https:\/\/consent\.google\.[a-z.]+\/.*[?&]continue=([^&]+)/i);   // 同意頁：取原本要去的網址
+      if (cm) { try { loc = decodeURIComponent(cm[1]); } catch (e) { /* 保持原樣 */ } }
+      if (!HOST.test(loc)) throw appError_('展開後的網址不是 Google 地圖', 'BAD_INPUT');
+      url = loc;
+      continue;
+    }
+    if (code === 200) lastBody = String(res.getContentText() || '').slice(0, 200000);
+    break;
+  }
+  var out = { url: url };
+  // 網址本身沒有座標時，從頁面內容找（og:image 的 center=緯度,經度）
+  if (!/(!3d-?\d|[?&](q|ll)=-?\d|@-?\d)/.test(url) && lastBody) {
+    var m = lastBody.match(/center=(-?\d+\.\d+)(?:%2C|,)(-?\d+\.\d+)/);
+    if (m) { out.lat = parseFloat(m[1]); out.lng = parseFloat(m[2]); }
+  }
+  return out;
 }
 
 /** Google 表單關卡：若有設定 form_verify_sheet，會去該工作表找隊伍代碼 */

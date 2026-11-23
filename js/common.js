@@ -186,14 +186,37 @@
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
 
-  /** 從 Google 地圖複製的「25.0330, 121.5654」解析成座標 */
+  function llOk(lat, lng) { return isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat: lat, lng: lng } : null; }
+
+  /**
+   * 解析座標，支援：
+   *  ‧ 從 Google 地圖複製的「25.0330, 121.5654」
+   *  ‧ Google 地圖網址：地點頁的 !3d緯度!4d經度（標記位置，最準）、?q= / ?ll= / @緯度,經度 / place/緯度,經度
+   */
   function parseLatLng(s) {
-    var m = String(s || '').match(/(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)/);
-    if (!m) return null;
-    var lat = parseFloat(m[1]), lng = parseFloat(m[2]);
-    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
-    return { lat: lat, lng: lng };
+    s = String(s || '').trim();
+    var m;
+    if (/^https?:\/\//i.test(s)) {
+      try { s = decodeURIComponent(s); } catch (e) { /* 保持原樣 */ }
+      var N = '(-?\\d+(?:\\.\\d+)?)';
+      var pats = [
+        new RegExp('!3d' + N + '!4d' + N),
+        new RegExp('[?&](?:q|ll|query|destination|daddr|center|sll)=(?:loc:)?\\s*' + N + '\\s*,\\s*' + N),
+        new RegExp('/(?:place|search|dir)/+' + N + ',[+\\s]*' + N),
+        new RegExp('/@' + N + ',' + N)   // 畫面中心（沒有標記時的備用）
+      ];
+      for (var i = 0; i < pats.length; i++) {
+        m = s.match(pats[i]);
+        if (m) return llOk(parseFloat(m[1]), parseFloat(m[2]));
+      }
+      return null;
+    }
+    m = s.match(/(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)/);
+    return m ? llOk(parseFloat(m[1]), parseFloat(m[2])) : null;
   }
+
+  /** 是 Google 地圖的短網址（手機「分享」產生的 maps.app.goo.gl/…）嗎？這種要請後端展開 */
+  function isMapShortLink(s) { return /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs)\//i.test(String(s || '').trim()); }
 
   /**
    * 取得一次定位：先試高精度（GPS），逾時或失敗再改用一般精度（Wi-Fi／網路）重試。
@@ -340,12 +363,26 @@
     });
   }
 
+  /** 從主畫面圖示開啟的後台跳到前台／排行榜時，左下角固定一顆「← 回後台」 */
+  (function () {
+    var show = function () {
+      try {
+        if (!/index\.html$|board\.html$|\/$/.test(location.pathname)) return;
+        if (sessionStorage.getItem('escapegame-from-admin') !== '1' || document.getElementById('back-admin')) return;
+        var a = document.createElement('a');
+        a.id = 'back-admin'; a.className = 'back-admin'; a.href = 'admin.html'; a.textContent = '← 回後台';
+        document.body.appendChild(a);
+      } catch (e) { /* */ }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show); else show();
+  })();
+
   global.Q = {
     cardHtml: cardHtml, cardBackHtml: cardBackHtml, bindTilt: bindTilt, cardArt: cardArt,
     CARD_TYPE_LABEL: CARD_TYPE_LABEL, CARD_STAT_LABEL: CARD_STAT_LABEL, RARITY_LABEL: RARITY_LABEL,
     boardHtml: boardHtml,
     api: api, FRONT_VERSION: FRONT_VERSION, $: $, $$: $$, esc: esc, linkify: linkify, toast: toast, loading: loading, run: run,
     distM: distM, fmtDist: fmtDist, fmtDuration: fmtDuration, fmtTime: fmtTime, toLocalInput: toLocalInput,
-    parseLatLng: parseLatLng, locate: locate, STATUS_LABEL: STATUS_LABEL, TYPE_LABEL: TYPE_LABEL, STATUS_COLOR: STATUS_COLOR
+    parseLatLng: parseLatLng, isMapShortLink: isMapShortLink, locate: locate, STATUS_LABEL: STATUS_LABEL, TYPE_LABEL: TYPE_LABEL, STATUS_COLOR: STATUS_COLOR
   };
 })(window);

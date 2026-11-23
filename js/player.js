@@ -33,8 +33,6 @@
     P.runCode = q.get('run') || '';
     P.urlRoute = (q.get('route') || '').trim();   // 專屬 QR Code 帶的路線代碼
     P.urlTeam = (q.get('team') || '').trim().slice(0, 30);
-    P.test = q.get('test') === '1'; P.tt = (q.get('tt') || '').trim();   // 後台「試玩」連結：不計入排行榜與正式紀錄
-    if (P.test) $('#test-banner').classList.remove('hidden');   // 專屬 QR Code 可預填隊伍名稱
 
     // LINE／Facebook／Instagram 等內建瀏覽器常常拿不到定位與指南針：提醒改用 Safari／Chrome
     try {
@@ -69,7 +67,7 @@
       var code = prompt('請輸入你們的隊伍代碼\n（闖關畫面頂部、隊伍名稱旁邊的英數字，例如 AB12CD）：');
       if (!code || !code.trim()) return;
       try {
-        var r = await Q.run(function () { return api('resumeSession', { projectId: P.projectId, code: code.trim(), tt: P.tt }); });
+        var r = await Q.run(function () { return api('resumeSession', { projectId: P.projectId, code: code.trim() }); });
         P.sid = r.state.session.session_id;
         try { localStorage.setItem(LS(P.projectId), P.sid); } catch (x) { /* */ }
         startGame(r.state);
@@ -175,7 +173,7 @@
 
   async function showIntro(pid) {
     try {
-      var r = await Q.run(function () { return api('getProject', { projectId: pid, route: P.urlRoute, team: P.urlTeam, tt: P.tt }); }, { noToast: true });
+      var r = await Q.run(function () { return api('getProject', { projectId: pid, route: P.urlRoute, team: P.urlTeam }); }, { noToast: true });
       var p = P.project = r.project;
       applyTheme(p.theme);
       document.title = p.name;
@@ -253,7 +251,7 @@
     try {
       var r = await Q.run(function () {
         return api('startSession', {
-          projectId: P.projectId, teamName: team, route: P.urlRoute, avatar: P.avatar || '', test: P.test, tt: P.tt,
+          projectId: P.projectId, teamName: team, route: P.urlRoute, avatar: P.avatar || '',
           runCode: run, userAgent: navigator.userAgent
         });
       });
