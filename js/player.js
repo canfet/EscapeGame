@@ -108,8 +108,6 @@
       cv.addEventListener('touchend', function (e) { if (y0 != null && cv.scrollTop <= 0 && e.changedTouches[0].clientY - y0 > 80) closeCardView(); y0 = null; }, { passive: true });
     })();
     $('#gps-retry').onclick = retryGps;
-    $('#btn-link').onclick = copyQuestLink;
-    $('#link-copy-url').onclick = function (e) { e.preventDefault(); copyQuestLink(); };
     $('#btn-copy-code').onclick = function () { copyText((P.state && P.state.session && P.state.session.code) || '').then(function (ok) { Q.toast(ok ? '已複製隊伍代碼' : '複製失敗，請手動抄下代碼', ok ? 'ok' : 'warn'); }); };
     $('#time-banner').onclick = function () { this.classList.add('hidden'); };
     $('#btn-share').onclick = openShare;
@@ -210,7 +208,7 @@
         var preset = P.urlTeam && tms.filter(function (t) { return t.name === P.urlTeam; })[0];
         sel.disabled = !!preset;          // 專屬 QR Code 進來：隊伍已鎖定
         sel.value = preset ? preset.name : '';
-        sel.onchange = function () { var tt = tms.filter(function (t) { return t.name === sel.value; })[0]; showRoute(tt); renderAvatarPicker(p, tt); };
+        sel.onchange = function () { var tt = tms.filter(function (t) { return t.name === sel.value; })[0]; showRoute(tt); renderAvatarPicker(p, tt); refreshRunField(); };
         showRoute(preset || null);
         renderAvatarPicker(p, preset || null);
       } else {
@@ -224,7 +222,7 @@
       }
       $('#run-req').textContent = ' *';
       // 場次代碼只有「專案要求輸入」而且「網址沒帶」的時候才需要問玩家；其他情況不顯示這一欄，少一個要填的東西
-      $('#run-field').classList.toggle('hidden', !p.require_run_code || !!P.runCode);
+      refreshRunField();
       show('v-intro');
     } catch (e) { showError(e.message); }
   }
@@ -245,12 +243,24 @@
     });
   }
 
+  /** 專案有預設隊伍名單、選到的隊伍有指定路線：後端會自動用那條路線的代碼當場次，不用玩家輸入 */
+  function runDerivable() {
+    var pj = P.project || {};
+    if (!pj.restrict_teams) return false;
+    var name = $('#f-team-select').value, t = (pj.teams || []).filter(function (x) { return x.name === name; })[0];
+    return !!(t && t.route_name);
+  }
+  function refreshRunField() {
+    var pj = P.project || {};
+    $('#run-field').classList.toggle('hidden', !pj.require_run_code || !!P.runCode || runDerivable());
+  }
+
   async function startSession() {
     var restrict = !!(P.project && P.project.restrict_teams);
     var team = restrict ? $('#f-team-select').value : $('#f-team').value.trim();
     if (!team) { Q.toast(restrict ? '請先選擇你們的隊伍' : '請輸入隊伍名稱', 'warn'); (restrict ? $('#f-team-select') : $('#f-team')).focus(); return; }
     var run = $('#f-run').value.trim();
-    if (P.project && P.project.require_run_code && !run) { Q.toast('請輸入場次代碼', 'warn'); return; }
+    if (P.project && P.project.require_run_code && !run && !runDerivable()) { Q.toast('請輸入場次代碼', 'warn'); return; }
     // 在使用者按下按鈕時要定位權限（iOS 比較穩）
     startWatch();
     startCompass(true);   // 一律在第一次進來、按下開始的當下就要定位權限（iOS 在使用者按鈕當下比較穩）
@@ -422,25 +432,6 @@
       (first ? '隊伍建立成功！請先把這組代碼截圖或抄下來。\n\n' : '') +
       '如果手機沒電、換手機、或瀏覽器資料被清掉，在開始頁面按「用隊伍代碼接續」輸入它，就能接回原本的進度。\n（代碼已複製到剪貼簿）',
       '我記下了', true);
-  }
-
-  /**
-   * 這個任務的連結（加到主畫面後沒有網址列，沒辦法自己複製）：
-   * 帶專案，以及原本網址上的隊伍、路線、場次；不含「從後台來」的記號，也不含個人的隊伍代碼。
-   */
-  function questLink() {
-    var cur = new URLSearchParams(location.search), q = new URLSearchParams();
-    q.set('p', P.projectId || cur.get('p') || '');
-    ['team', 'route', 'run'].forEach(function (k) { if (cur.get(k)) q.set(k, cur.get(k)); });
-    return location.origin + location.pathname + '?' + q.toString();
-  }
-  function copyQuestLink() {
-    var url = questLink();
-    copyText(url).then(function (ok) {
-      if (ok) return Q.toast('已複製任務連結，可以貼到訊息或瀏覽器', 'ok', 3500);
-      if (navigator.share) return navigator.share({ title: document.title, url: url }).catch(function () { /* 取消分享 */ });
-      askConfirm('任務連結', url, '關閉', true);   // 複製和分享都不行時，把連結顯示出來讓玩家自己長按複製
-    });
   }
 
   function copyText(text) {

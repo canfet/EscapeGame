@@ -176,7 +176,6 @@ function startSession_(b) {
     if (!team) throw appError_('請輸入隊伍名稱（不能以 = + - @ 開頭）', 'BAD_INPUT');
     if (rateHit_('st_' + p.project_id, RATE.startPerMin, 60)) throw appError_('現在太多人同時開始了，請稍等幾秒再按一次', 'RATE');
     var run = str_(b.runCode).slice(0, 30);
-    if (p.require_run_code && !run) throw appError_('請輸入場次代碼（請向關主索取）', 'NEED_RUN_CODE');
     var now = new Date();
     // 隊伍與路線：
     //  ‧ 專案有「預設隊伍名單」：只能選名單內的隊伍，路線由名單決定（網址上的 route 一律不採用，避免被改）
@@ -186,6 +185,8 @@ function startSession_(b) {
       preset = find_(p.teams, function (t) { return t.name === team; });
       if (!preset) throw appError_('請從名單中選擇隊伍名稱', 'BAD_TEAM');
       team = preset.name;
+      // 專案要求場次代碼、玩家沒填：用這支隊伍的路線代碼當場次（選隊伍時就知道路線，不用再問玩家）
+      if (p.require_run_code && !run && preset.route) run = preset.route;
       // 同一場次、同一個隊伍名稱已經開始：直接接續（同隊的其他手機也能加入）
       var dup = find_(readRows_('Sessions'), function (r) {
         return str_(r.project_id) === p.project_id && str_(r.run_code) === run && str_(r.team_name) === team && bool_(r.test) === isTest;
@@ -200,6 +201,9 @@ function startSession_(b) {
       route = preset.route;
       avatarWant = preset.avatar || avatarWant;
     }
+    // 沒有隊伍名單、但連結（專屬 QR Code）帶了有效的路線代碼：同樣用路線代碼當場次
+    if (p.require_run_code && !run && !preset && str_(b.route) && routeById_(p, str_(b.route).slice(0, 20))) run = str_(b.route).slice(0, 20);
+    if (p.require_run_code && !run) throw appError_('請輸入場次代碼（請向關主索取）', 'NEED_RUN_CODE');
     if (p.routes.length) {
       if (!route) {
         var want = str_(b.route).slice(0, 20);
