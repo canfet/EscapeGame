@@ -63,7 +63,7 @@
     $('#mp-save').onclick = saveProject;
     $('#stage-project').onchange = function () { selectProject(this.value); };
     $('#btn-new-stage').onclick = function () { openStage(null); };
-    $('#btn-preview').onclick = function () { if (A.pid) window.open(playerUrl(A.pid), '_blank'); };
+    $('#btn-preview').onclick = function () { if (A.pid) window.open(fromAdmin(playerUrl(A.pid)), '_blank'); };
     $('#ms-save').onclick = saveStage;
     $('#ms-delete').onclick = deleteStage;
     $('#ms-answer_type').onchange = toggleTypeFields;
@@ -782,6 +782,9 @@
     });
   }
 
+  /** 後台自己開前台用的網址：多帶 from=admin，前台才會顯示「← 回後台」（複製給玩家的連結不要用這個） */
+  function fromAdmin(u) { return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'from=admin'; }
+
   function playerUrl(pid, run, route, team) {
     var base = location.href.replace(/admin\.html.*$/, '').replace(/[?#].*$/, '');
     return base + 'index.html?p=' + encodeURIComponent(pid) + (run ? '&run=' + encodeURIComponent(run) : '') +
@@ -831,7 +834,7 @@
         if (act === 'monitor') { A.pid = pid; setTab('monitor'); }
         if (act === 'link') openLink(pid);
         if (act === 'check') openCheck(pid);
-        if (act === 'board') window.open(playerUrl(pid, '').replace('index.html', 'board.html'), '_blank');
+        if (act === 'board') window.open(fromAdmin(playerUrl(pid, '').replace('index.html', 'board.html')), '_blank');
         if (act === 'dup') duplicateProject(p);
         if (act === 'del') deleteProject(p);
       };
@@ -1094,7 +1097,7 @@
     var ch = linkChoice();
     var url = playerUrl(A.linkPid, '', ch.route, ch.team);
     $('#ml-url').value = url;
-    $('#ml-open').href = url;
+    $('#ml-open').href = fromAdmin(url);   // 「開啟前台」要能回得來；上面的複製連結、QR Code 維持乾淨的網址
     drawQr($('#ml-qr'), url, 220);
   }
 

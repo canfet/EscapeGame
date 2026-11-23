@@ -387,12 +387,27 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
   })();
 
-  /** 從主畫面圖示開啟的後台跳到前台／排行榜時，左下角固定一顆「← 回後台」 */
+  /**
+   * 從後台跳到前台／排行榜時（網址帶 from=admin，或從主畫面圖示開啟的後台），左下角固定一顆「← 回後台」。
+   * 後台加到主畫面後，點開前台會直接在同一個視窗裡跳轉，沒有返回鍵，所以要自己放一顆。
+   * from=admin 只用在後台自己的「開啟」按鈕；複製給玩家的連結、QR Code 都不會帶。
+   */
   (function () {
+    var fromAdmin = false;
+    try {
+      var q = new URLSearchParams(location.search);
+      if (q.get('from') === 'admin') {
+        fromAdmin = true;
+        sessionStorage.setItem('escapegame-from-admin', '1');
+        q.delete('from');   // 網址列不要留著，避免被複製給玩家
+        history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : '') + location.hash);
+      }
+    } catch (e) { /* */ }
     var show = function () {
       try {
         if (!/index\.html$|board\.html$|\/$/.test(location.pathname)) return;
-        if (sessionStorage.getItem('escapegame-from-admin') !== '1' || document.getElementById('back-admin')) return;
+        if (!fromAdmin && sessionStorage.getItem('escapegame-from-admin') !== '1') return;
+        if (document.getElementById('back-admin')) return;
         var a = document.createElement('a');
         a.id = 'back-admin'; a.className = 'back-admin'; a.href = 'admin.html'; a.textContent = '← 回後台';
         document.body.appendChild(a);

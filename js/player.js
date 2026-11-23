@@ -108,6 +108,8 @@
       cv.addEventListener('touchend', function (e) { if (y0 != null && cv.scrollTop <= 0 && e.changedTouches[0].clientY - y0 > 80) closeCardView(); y0 = null; }, { passive: true });
     })();
     $('#gps-retry').onclick = retryGps;
+    $('#btn-link').onclick = copyQuestLink;
+    $('#link-copy-url').onclick = function (e) { e.preventDefault(); copyQuestLink(); };
     $('#btn-copy-code').onclick = function () { copyText((P.state && P.state.session && P.state.session.code) || '').then(function (ok) { Q.toast(ok ? '已複製隊伍代碼' : '複製失敗，請手動抄下代碼', ok ? 'ok' : 'warn'); }); };
     $('#time-banner').onclick = function () { this.classList.add('hidden'); };
     $('#btn-share').onclick = openShare;
@@ -420,6 +422,25 @@
       (first ? '隊伍建立成功！請先把這組代碼截圖或抄下來。\n\n' : '') +
       '如果手機沒電、換手機、或瀏覽器資料被清掉，在開始頁面按「用隊伍代碼接續」輸入它，就能接回原本的進度。\n（代碼已複製到剪貼簿）',
       '我記下了', true);
+  }
+
+  /**
+   * 這個任務的連結（加到主畫面後沒有網址列，沒辦法自己複製）：
+   * 帶專案，以及原本網址上的隊伍、路線、場次；不含「從後台來」的記號，也不含個人的隊伍代碼。
+   */
+  function questLink() {
+    var cur = new URLSearchParams(location.search), q = new URLSearchParams();
+    q.set('p', P.projectId || cur.get('p') || '');
+    ['team', 'route', 'run'].forEach(function (k) { if (cur.get(k)) q.set(k, cur.get(k)); });
+    return location.origin + location.pathname + '?' + q.toString();
+  }
+  function copyQuestLink() {
+    var url = questLink();
+    copyText(url).then(function (ok) {
+      if (ok) return Q.toast('已複製任務連結，可以貼到訊息或瀏覽器', 'ok', 3500);
+      if (navigator.share) return navigator.share({ title: document.title, url: url }).catch(function () { /* 取消分享 */ });
+      askConfirm('任務連結', url, '關閉', true);   // 複製和分享都不行時，把連結顯示出來讓玩家自己長按複製
+    });
   }
 
   function copyText(text) {
