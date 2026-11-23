@@ -977,10 +977,10 @@
   function focusStage() {
     if (!P.state) return null;
     var st = P.openId ? findStage(P.openId) : null;
-    if (st && st.status === 'open' && st.lat != null && st.require_gps) return st;
+    if (st && showsLoc(st)) return st;   // 有位置就算（不用打卡的關卡也一樣，否則「我與目標」會找不到目標）
     var best = null, bd = Infinity;
     P.state.stages.forEach(function (s) {
-      if (s.lat == null || !s.require_gps || s.status !== 'open') return;
+      if (!showsLoc(s)) return;
       var d = P.pos ? Q.distM(P.pos.lat, P.pos.lng, s.lat, s.lng) : 0;
       if (d < bd) { bd = d; best = s; }
     });
@@ -998,7 +998,7 @@
     P.inside = P.inside || {};
     if (inside && !P.inside[st.stage_id]) {
       P.inside[st.stage_id] = true;
-      if (P.state && P.state.session.status === 'playing') { sfx('near'); Q.toast('已進入「' + st.title + '」範圍，可以打卡了', 'ok'); }
+      if (P.state && P.state.session.status === 'playing') { sfx('near'); Q.toast('已進入「' + st.title + '」範圍' + (st.require_gps ? '，可以打卡了' : ''), 'ok'); }
     } else if (!inside && d > st.radius_m * 1.3) P.inside[st.stage_id] = false;
     var ll = [[P.pos.lat, P.pos.lng], [st.lat, st.lng]];
     var label = '距離「' + st.title + '」' + Q.fmtDist(d) + (P.pos.acc > 100 ? ' ⚠️誤差大' : '');
@@ -1530,7 +1530,7 @@
     if (!P.pos) return opens[0];
     var best = opens[0], bd = Infinity;
     opens.forEach(function (s) {
-      if (s.lat == null || !s.require_gps) return;
+      if (s.lat == null) return;
       var d = Q.distM(P.pos.lat, P.pos.lng, s.lat, s.lng);
       if (d < bd) { bd = d; best = s; }
     });
@@ -1546,12 +1546,12 @@
     var no = P.state.stages.indexOf(st) + 1, sub;
     btn.classList.toggle('arrived', st.status === 'arrived');
     $('#ns-main').textContent = '第 ' + no + ' 關・' + st.title;
-    if (st.status === 'arrived') sub = '已抵達，點這裡作答';
-    else if (st.lat != null && st.require_gps && P.pos) {
+    if (st.status === 'arrived' && !(st.lat != null && !st.require_gps)) sub = '已抵達，點這裡作答';
+    else if (st.lat != null && P.pos) {   // 前往中；不用打卡的關卡也顯示方向與距離
       var d = Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng);
-      sub = d <= st.radius_m ? '✅ 已在範圍內，點這裡打卡' : dirName(bearing(P.pos.lat, P.pos.lng, st.lat, st.lng)) + '方 ' + Q.fmtDist(d);
+      sub = d <= st.radius_m ? (st.require_gps ? '✅ 已在範圍內，點這裡打卡' : '✅ 已在這一關的位置，點這裡作答') : dirName(bearing(P.pos.lat, P.pos.lng, st.lat, st.lng)) + '方 ' + Q.fmtDist(d);
     }
-    else if (st.lat != null && st.require_gps) sub = '定位中…';
+    else if (st.lat != null) sub = '定位中…';
     else sub = '點這裡看線索';
     $('#ns-sub').textContent = sub;
   }
