@@ -137,20 +137,20 @@
           '<div class="meta">' + p.stage_count + ' 個關卡' + (p.time_limit_min ? '・限時 ' + p.time_limit_min + ' 分鐘' : '') + '</div></div>' +
           '<span>›</span></button>';
       }).join('');
-      Q.$$('#project-list [data-id]').forEach(function (b) { b.onclick = function () { goProject(b.dataset.id); }; });
+      Q.$$('#project-list [data-id]').forEach(function (b) { b.onclick = function () { goProject(b.dataset.id, true); }; });
       show('v-projects');
     } catch (e) { showError(e.message); }
   }
 
-  function goProject(id) {
+  function goProject(id, fromList) {
     var q = new URLSearchParams(location.search);
     q.set('p', id);
     history.replaceState(null, '', location.pathname + '?' + q.toString());
     P.projectId = id;
-    enterProject(id);
+    enterProject(id, fromList);
   }
 
-  async function enterProject(pid) {
+  async function enterProject(pid, fromList) {
     var sid = '';
     try { sid = localStorage.getItem(LS(pid)) || ''; } catch (e) { /* 無痕模式 */ }
     if (sid) {
@@ -161,6 +161,14 @@
         var otherTeam = P.urlTeam && P.urlTeam !== ss.team_name;
         var otherRoute = !P.urlTeam && P.urlRoute && ss.route && P.urlRoute !== ss.route;
         if (!otherTeam && !otherRoute) {
+          // 玩家自己從專案列表點進來、而且這支手機已經有進度：先問要接續還是換隊伍，不要直接丟進遊戲（會讓人困惑「怎麼不用選隊伍」）
+          // 重新整理、用主畫面圖示或帶專案的連結開啟時不問，直接接續，避免玩到一半被打斷
+          if (fromList && ss.status === 'playing') {
+            var go = await askConfirm('接續上次的進度？',
+              '這支手機有「' + ss.team_name + '」的進度（完成 ' + r.state.summary.solved + ' / ' + r.state.summary.total + ' 關・' + ss.score + ' 分）。\n要接續，還是換一支隊伍？',
+              '接續「' + ss.team_name + '」', false, '換一支隊伍');
+            if (!go) { P.prevTeam = ss.team_name; return showIntro(pid); }
+          }
           P.sid = sid;
           return startGame(r.state);
         }
@@ -1862,12 +1870,13 @@
   }
 
   /** 頁面內的確認視窗，回傳 Promise<boolean>；返回鍵／Esc 等於取消 */
-  function askConfirm(title, msg, okText, noCancel) {
+  function askConfirm(title, msg, okText, noCancel, cancelText) {
     return new Promise(function (resolve) {
       var box = $('#confirm'), ok = $('#cf-ok'), cancel = $('#cf-cancel');
       $('#cf-title').textContent = title;
       $('#cf-msg').textContent = msg;
       ok.textContent = okText || '確定';
+      cancel.textContent = cancelText || '取消';
       cancel.classList.toggle('hidden', !!noCancel);
       box.classList.remove('hidden');
       function done(v) {
