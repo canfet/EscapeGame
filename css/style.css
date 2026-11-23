@@ -44,6 +44,9 @@ img { max-width: 100%; display: block; }
   padding: 16px; box-shadow: var(--shadow);
 }
 .card + .card { margin-top: 12px; }
+/* 並排的格狀清單（專案、圖鑑本）：卡片之間用 gap 隔開，不要再加上方間距，否則第二張會被往下推、看起來比較矮 */
+.project-grid > .card, .project-grid > .card + .card { margin-top: 0; }
+.project-grid { align-items: stretch; }
 .topbar {
   position: sticky; top: 0; z-index: 500; background: var(--ink); color: #fff;
   padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top)); display: flex; align-items: center; gap: 10px;
