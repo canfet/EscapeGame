@@ -536,8 +536,9 @@
     };
     var dkStep = function (dir) {   // 上一張／下一張：先把目前這張的修改存起來，再換
       var j = A.deckSel + dir;
-      if (j < 0 || j >= A.editDeck.cards.length) return;
+      if (j < 0 || j >= A.editDeck.cards.length) return false;
       readDeckForm(); A.deckSel = j; renderDeckEditor();
+      return true;
     };
     $('#dk-prev').onclick = function () { dkStep(-1); };
     $('#dk-next').onclick = function () { dkStep(1); };
@@ -553,10 +554,21 @@
         var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0, fast = Date.now() - t0 < 900;
         x0 = null;
         if (!fast || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
-        var ed = $('#dk-editor');
-        dkStep(dx < 0 ? 1 : -1);
-        ed.classList.remove('slide-l', 'slide-r'); void ed.offsetWidth;
-        ed.classList.add(dx < 0 ? 'slide-l' : 'slide-r');
+        var dir = dx < 0 ? 1 : -1, changed = dkStep(dir);
+        if (!changed) { swipeBadge(dir > 0 ? '已經是最後一張' : '已經是第一張', true); return; }
+        ['#dk-editor', '#dk-preview'].forEach(function (s) {   // 編輯欄位與卡片預覽都滑一下，看得出有換張
+          var el = $(s); el.classList.remove('slide-l', 'slide-r'); void el.offsetWidth; el.classList.add(dx < 0 ? 'slide-l' : 'slide-r');
+        });
+        swipeBadge('‹ ' + (A.deckSel + 1) + ' / ' + A.editDeck.cards.length + '　' + (A.editDeck.cards[A.deckSel].name || '') + ' ›');
+        try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* */ }
+      };
+      // 換張提示：畫面中央短暫顯示「第幾張／共幾張＋名稱」（編輯欄位和卡片不一定同時在畫面上，要有明顯回饋）
+      var badgeT = null;
+      var swipeBadge = function (text, warn) {
+        var b = document.getElementById('dk-swipe-badge');
+        if (!b) { b = document.createElement('div'); b.id = 'dk-swipe-badge'; b.setAttribute('role', 'status'); document.body.appendChild(b); }
+        b.textContent = text; b.className = 'dk-swipe-badge show' + (warn ? ' warn' : '');
+        clearTimeout(badgeT); badgeT = setTimeout(function () { b.classList.remove('show'); }, 1100);
       };
       ['#dk-editor', '#dk-preview'].forEach(function (s) {
         var el = $(s);
@@ -710,6 +722,7 @@
 
   function setTab(tab) {
     A.tab = tab;
+    window.scrollTo(0, 0);   // 換分頁一律回到最上面
     $$('.tabs button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
     ['live', 'projects', 'stages', 'decks', 'monitor'].forEach(function (t) { $('#t-' + t).classList.toggle('hidden', t !== tab); });
     if (tab === 'decks') loadDecks();

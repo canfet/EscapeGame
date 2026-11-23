@@ -18,6 +18,7 @@
     ['v-projects', 'v-intro', 'v-game', 'v-finish', 'v-error'].forEach(function (v) {
       $('#' + v).classList.toggle('hidden', v !== id);
     });
+    $('#app-head').classList.toggle('hidden', id === 'v-game');   // 闖關畫面有自己的頂端列
     window.scrollTo(0, 0);
     if (id === 'v-game' && P.map) setTimeout(function () { P.map.invalidateSize(); }, 50);
   }
@@ -27,6 +28,7 @@
   async function init() {
     var name = '實境解謎';
     $('#site-name').textContent = name;
+    $('#app-head-title').textContent = '🧭 ' + name;
     document.title = name;
     var q = new URLSearchParams(location.search);
     P.projectId = q.get('p') || '';

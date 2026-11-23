@@ -13,7 +13,7 @@
   <meta name="robots" content="noindex">
   <title>實境解謎 · 管理後台</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261122v">
+  <link rel="stylesheet" href="css/style.css?v=20261123c">
 </head>
 <body>
   <!-- 登入 -->
@@ -195,7 +195,7 @@
       <div class="field"><label>路線（選填）</label>
         <div id="mp-routes"></div>
         <button type="button" class="ghost sm" id="mp-route-add">＋ 新增路線</button>
-        <div class="help">同一個專案，讓不同隊伍走不同的關卡。每條路線的「代碼」由系統隨機產生（不好猜），會放進 QR Code 裡，玩家看不到也改不了。沒有設定路線＝所有隊伍走一樣的關卡。</div></div>
+        <div class="help">同一個專案，讓不同隊伍走不同的關卡。每條路線的「代碼」由系統隨機產生，會放進 QR Code 裡。沒有設定路線＝所有隊伍走一樣的關卡。</div></div>
       <div class="field"><label>隊伍名單（選填）</label>
         <div id="mp-teams"></div>
         <div class="row wrap">
@@ -237,7 +237,7 @@
       <div class="field">
         <label class="check"><input type="checkbox" id="mp-is_default"> 設為首頁預設專案</label>
         <label class="check"><input type="checkbox" id="mp-show_leaderboard"> 完成後顯示排行榜</label>
-        <label class="check"><input type="checkbox" id="mp-leaderboard_live"> 即時排行榜（闖關中也能看各隊進度，並提供大螢幕用的排行榜頁面；排行榜只在上面設定的「開放時間～結束時間」期間可看）</label>
+        <label class="check"><input type="checkbox" id="mp-leaderboard_live"> 即時排行榜</label>
         <label class="check"><input type="checkbox" id="mp-require_run_code"> 必須輸入場次代碼</label>
       </div>
       <div class="row"><div class="grow"></div><button class="ghost" data-close>取消</button><button id="mp-save">儲存</button></div>
@@ -255,11 +255,11 @@
             <div class="field"><label>關卡名稱 *</label><input id="ms-title-input"></div>
             <div class="field"><label>關卡代碼</label><input id="ms-stage_id" placeholder="留空自動產生"></div>
           </div>
-          <label class="check field"><input type="checkbox" id="ms-enabled"> 啟用這個關卡</label>
-          <div class="field"><label>線索（抵達前就看得到）</label><textarea id="ms-clue" placeholder="引導闖關者找到地點的文字"></textarea></div>
-          <div class="field"><label>關卡圖片（選填，關卡面板頂部大圖；沒設定就不顯示）</label>
+          <label class="check field"><input type="checkbox" id="ms-enabled"> 啟用這一關（取消勾選＝暫時不出現）</label>
+          <div class="field"><label>線索（幫玩家找到地點）</label><textarea id="ms-clue" placeholder="例如：沿著河邊走，找到有雕花欄杆的橋"></textarea></div>
+          <div class="field"><label>關卡圖片（選填）</label>
             <div class="row">
-              <input class="grow" id="ms-image_url" placeholder="上傳後自動填入，也可以直接貼圖片網址">
+              <input class="grow" id="ms-image_url" placeholder="按右邊上傳，或貼圖片網址">
               <button type="button" class="ghost sm" id="ms-image_url-pick">⬆ 上傳圖片</button>
               <button type="button" class="ghost sm" id="ms-image_url-clear">移除</button>
             </div>
@@ -269,22 +269,22 @@
           <div class="field hidden" id="ms-routes-wrap">
             <label>所屬路線</label>
             <div id="ms-routes"></div>
-            <div class="help">勾選哪些路線會經過這一關；<b>都不勾＝所有路線共用</b>。右邊「順序」可選填：這一關在該路線裡排第幾個（沒填就依關卡列表的順序）。</div>
+            <div class="help">勾選這一關屬於哪些路線；<b>都不勾＝所有路線都會經過</b>。「順序」可以不填，是這一關在該路線裡排第幾個。</div>
           </div>
           <div class="section-title">抵達條件</div>
-          <label class="check"><input type="checkbox" id="ms-require_gps"> 需要 GPS 定位打卡</label>
-          <label class="check field"><input type="checkbox" id="ms-show_location"> 在地圖上顯示位置（不勾＝只靠線索找）</label>
+          <label class="check"><input type="checkbox" id="ms-require_gps"> 要走到地點，用 GPS 打卡</label>
+          <label class="check field"><input type="checkbox" id="ms-show_location"> 在地圖上顯示這一關的位置（不勾＝只能靠線索找）</label>
           <div class="field"><label>現場通關碼（選填）</label><input id="ms-bypass_code" placeholder="例如貼在現場的 4 位數">
-            <div class="help">定位不準或室內時可改輸入通關碼。不需要 GPS 時，設了通關碼就必須輸入才能作答。</div></div>
+            <div class="help">GPS 不準或在室內時，玩家可以改輸入這組碼來打卡。沒有用 GPS 的關卡，設了通關碼就要輸入才能作答。</div></div>
 
           <div class="field hidden" id="ms-card-wrap">
-            <div class="section-title">過關給的卡牌（此專案使用圖鑑本時）</div>
+            <div class="section-title">過關給的卡牌（專案有選圖鑑本才會出現）</div>
             <div class="grid2">
               <div class="field"><label>固定給一張</label><select id="ms-card_id"></select></div>
-              <div class="field"><label>再隨機抽幾張</label><input type="number" min="0" max="5" id="ms-card_random" placeholder="0"><div class="help">依稀有度機率抽（普通 70％、稀有 25％、傳說 5％），不會重複，也不會抽到其他關卡「固定給」的卡。</div></div>
+              <div class="field"><label>再隨機抽幾張</label><input type="number" min="0" max="5" id="ms-card_random" placeholder="0"><div class="help">隨機抽卡，不會重複；越稀有越難抽到。不會抽到其他關「固定給」的卡。</div></div>
             </div>
           </div>
-          <div class="section-title">收藏品（過關後收進玩家的收藏冊，選填；專案有使用圖鑑本時以卡牌為主）</div>
+          <div class="section-title">收藏品（過關後放進玩家的收藏冊，選填）</div>
           <div class="grid2">
             <div class="field"><label>收藏品名稱</label><input id="ms-item_name" maxlength="30" placeholder="例如：古燈籠"></div>
             <div class="field"><label>稀有度</label>
@@ -298,21 +298,21 @@
             </div>
             <input type="file" accept="image/*" id="ms-item_icon-file" class="hidden">
             <img id="ms-item_icon-prev" class="img-prev hidden" alt="圖示預覽" style="max-height:80px">
-            <div class="help">玩家過關會看到收藏品與故事，沒收集到的在收藏冊顯示成剪影。每收集一個，地圖上就多一隻跟在玩家後面的夥伴。</div></div>
+            <div class="help">玩家過關後會看到收藏品和小故事；還沒收集到的顯示成黑影。每收集一個，地圖上就多一隻小夥伴跟著玩家。專案有選圖鑑本時以卡牌為主，這裡可以不填。</div></div>
           <div class="field"><label>一句小故事（選填）</label><textarea id="ms-item_story" maxlength="300" style="min-height:56px" placeholder="例如：它曾點亮河運夜路的燈火。"></textarea></div>
 
-          <div class="section-title">密碼碎片（關卡連動解謎，選填）</div>
+          <div class="section-title">密碼碎片（讓各關連動解謎，選填）</div>
           <div class="grid2">
             <div class="field"><label>過關後給玩家的碎片</label><input id="ms-reward_code" maxlength="40" placeholder="例如 7、K、甲"></div>
             <div class="field"><label>在最終密碼裡排第幾碼</label><input type="number" min="1" step="1" id="ms-reward_order" placeholder="1、2、3…"></div>
           </div>
-          <label class="check field"><input type="checkbox" id="ms-final_from_fragments"> 這是最後一關：答案由前面關卡的碎片，依「第幾碼」的順序組成（會忽略下方「正確答案」）</label>
-          <label class="check field"><input type="checkbox" id="ms-coop_final"> 這是「合作最後關」：答案＝每條路線各自的碎片，依路線順序接起來。需要和其他路線的隊伍交換密碼（專案至少要有 2 條路線）</label>
+          <label class="check field"><input type="checkbox" id="ms-final_from_fragments"> 這是最後一關：答案是前面各關的碎片，依「第幾碼」接起來（下方的「正確答案」不會用到）</label>
+          <label class="check field"><input type="checkbox" id="ms-coop_final"> 這是「合作最後關」：答案是每條路線的碎片依路線順序接起來，需要和其他路線的隊伍交換碎片（專案至少要有 2 條路線）</label>
           <div class="help" id="ms-frag-preview" style="margin-bottom:10px"></div>
-          <div class="help" style="margin-bottom:10px">玩家過關才拿到碎片（作答次數用完、未通過的關卡不給），收進前台的「🎒 線索背包」。最後一關要集齊才能作答。若有隊伍因為失敗缺碎片，可到「闖關紀錄」按 🔄 還原失敗關卡。</div>
+          <div class="help" style="margin-bottom:10px">玩家過關才拿得到碎片（作答次數用完、沒過關的不給），碎片會收進前台的「🎒 線索背包」。最後一關要集齊碎片才能作答。如果有隊伍因為失敗缺碎片，可以到「闖關紀錄」按 🔄 還原。</div>
           <div class="section-title">題目與作答</div>
           <div class="field"><label>題目</label><textarea id="ms-question"></textarea></div>
-          <label class="check field"><input type="checkbox" id="ms-show_question_early"> 抵達前就顯示題目（不勾＝抵達後才看得到題目）</label>
+          <label class="check field"><input type="checkbox" id="ms-show_question_early"> 先顯示題目（不勾＝走到地點後才看得到題目）</label>
           <div class="grid2">
             <div class="field"><label>作答方式</label>
               <select id="ms-answer_type">
@@ -325,18 +325,19 @@
               </select></div>
             <div class="field"><label>分數</label><input type="number" id="ms-points" min="0"></div>
           </div>
-          <div class="field" data-show="choice"><label>選項（用 | 分隔）</label><input id="ms-choices" placeholder="選項A|選項B|選項C"></div>
-          <div class="field" data-show="text number choice"><label>正確答案（多個可接受答案用 | 分隔）</label><input id="ms-answer" placeholder="例如：台北|臺北|Taipei">
-            <div class="help">不分大小寫、全半形，會忽略空白與標點。留空＝開放式作答，送出就過關。</div></div>
-          <label class="check field" data-show="text number choice"><input type="checkbox" id="ms-require_photo"> 同時要求上傳照片（作答時要附一張照片才能送出，照片會存到雲端硬碟）</label>
-          <div class="field" data-show="text number choice"><label>最多作答次數</label><input type="number" min="0" id="ms-max_attempts"><div class="help">0 = 不限次數</div></div>
+          <div class="field" data-show="choice"><label>選項（用 | 隔開）</label><input id="ms-choices" placeholder="選項A|選項B|選項C"></div>
+          <div class="field" data-show="text number choice"><label>正確答案（可以有多個，用 | 隔開）</label><input id="ms-answer" placeholder="例如：台北|臺北|Taipei">
+            <div class="help">不分大小寫和全半形，空白與標點會忽略。留空＝任何答案都算對。</div></div>
+          <label class="check field" data-show="text number choice"><input type="checkbox" id="ms-require_photo"> 作答時還要附一張照片（照片會存到雲端硬碟）</label>
+          <div class="field" data-show="text number choice"><label>最多作答次數</label><input type="number" min="0" id="ms-max_attempts"><div class="help">填 0＝不限次數</div></div>
           <div class="field" data-show="form"><label>Google 表單網址</label><input id="ms-form_url" placeholder="https://docs.google.com/forms/d/e/…/viewform?usp=pp_url&entry.123={code}">
-            <div class="help">可用 {code} 隊伍代碼、{team} 隊名、{run} 場次、{project} 專案代碼，會自動替換。</div></div>
-          <div class="field" data-show="form"><label>表單回應工作表名稱（選填，用來驗證）</label><input id="ms-form_verify_sheet" placeholder="表單回應 1">
-            <div class="help">把表單回應連到同一份試算表後填入工作表名稱，系統會檢查是否真的有送出。</div></div>
+            <div class="help">網址裡可以放 {code}（隊伍代碼）、{team}（隊名）、{run}（場次）、{project}（專案代碼），系統會自動換成真的內容。</div></div>
+          <div class="field" data-show="form"><label>表單回應工作表名稱（選填）</label><input id="ms-form_verify_sheet" placeholder="表單回應 1">
+            <div class="help">把表單回應連到這份試算表，再填工作表名稱，系統就能確認玩家真的有送出。</div></div>
           <div class="field"><label>過關訊息</label><input id="ms-success_message" placeholder="答對了！下一站是…"></div>
 
-          <div class="section-title">提示</div>
+          <div class="section-title">提示（選填）</div>
+          <div class="help" style="margin-bottom:8px">玩家按「需要提示」才會依序看到，每看一則會扣分。</div>
           <div class="field"><input id="ms-hint1" placeholder="提示 1"></div>
           <div class="field"><input id="ms-hint2" placeholder="提示 2"></div>
           <div class="field"><input id="ms-hint3" placeholder="提示 3"></div>
@@ -354,11 +355,11 @@
           <div class="row" style="margin-bottom:8px">
             <button class="ghost sm" id="ms-here">📍 使用我目前的位置</button>
             <button class="ghost sm hidden" id="ms-restore">↩ 還原原本位置</button>
-            <span class="small muted">或直接在地圖上點一下／拖曳標記</span>
+            <span class="small muted">也可以直接點地圖，或拖曳標記</span>
           </div>
           <div class="help hidden" id="ms-orig-info"></div>
           <div id="ms-map" class="map tall"></div>
-          <p class="help">建議範圍：戶外空曠處 30–50 公尺；建築物旁 50–80 公尺（GPS 在高樓旁會飄）。</p>
+          <p class="help">建議：空曠的戶外 30–50 公尺；建築物旁 50–80 公尺（高樓旁 GPS 容易漂移）。</p>
         </div>
       </div>
       <div class="row" style="margin-top:12px"><button class="danger hidden" id="ms-delete">刪除關卡</button><div class="grow"></div><button class="ghost" data-close>取消</button><button id="ms-save">儲存關卡</button></div>
@@ -469,6 +470,7 @@
             </div>
           </div>
           <div class="center" style="margin-top:14px"><div id="dk-preview"></div></div>
+          <div class="help center dk-swipe-tip">‹ 在卡片上左右滑動，換上一張／下一張 ›</div>
         </div>
       </div>
       <div class="row" style="margin-top:12px"><button class="danger hidden" id="dk-delete-deck">刪除這本圖鑑</button><div class="grow"></div><button class="ghost" data-close>取消</button><button id="dk-save">儲存圖鑑</button></div>
@@ -512,8 +514,8 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/qrcode.min.js"></script>
-  <script src="config.js?v=20261122v"></script>
-  <script src="js/common.js?v=20261122v"></script>
-  <script src="js/admin.js?v=20261122v"></script>
+  <script src="config.js?v=20261123c"></script>
+  <script src="js/common.js?v=20261123c"></script>
+  <script src="js/admin.js?v=20261123c"></script>
 </body>
 </html>

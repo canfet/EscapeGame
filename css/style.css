@@ -354,7 +354,7 @@ body.quest { background: #f3ead4; }
 .quest .card, .quest .stat { border-color: #d9c9a3; }
 .quest .hero { background: linear-gradient(135deg, #3b2d17, #5a4527); border: 2px solid #8a6d3b; box-shadow: var(--shadow); }
 .quest .hero .hero-img { border: 0; border-radius: 0; box-shadow: none; max-height: 70vh; max-height: 70dvh; }
-.quest .topbar { background: #3b2d17; border-bottom: 2px solid #8a6d3b; }
+.quest .topbar { background: #1d2a2f; border-bottom: 2px solid #8a6d3b; }
 .quest .sheet-body { background: #f3ead4; }
 .quest .sheet-actions { background: linear-gradient(to bottom, rgba(243,234,212,0), #f3ead4 28%); }
 .quest .solved-card { background: #f3ead4; border: 2px solid #8a6d3b; }
@@ -393,7 +393,7 @@ body.quest {
 
 /* ---- 共用規則：全部改吃變數 ---- */
 .quest h1, .quest h2, .quest h3, .quest .sc-title, .quest .ns-main, .quest .sheet-title, .quest .solved-title { font-family: var(--font-h); }
-.quest .topbar { background: var(--topbar); border-bottom: 2px solid var(--edge); }
+.quest .topbar { background: #1d2a2f; border-bottom: 2px solid var(--edge); }   /* 前台頂端列統一用深藍黑（跟後台一致）；各風格只換頁面配色與邊框 */
 .quest .hero { background: var(--hero); border-color: var(--edge); }
 .quest .card, .quest .stat { background: var(--card); border-color: var(--line); color: var(--ink); }
 .quest .map-wrap { background: var(--frame); border-color: var(--edge); }
@@ -1225,11 +1225,20 @@ input, select, textarea { min-width: 0; max-width: 100%; }
 /* 圖鑑卡：滑動換張的提示與動畫（提示只在觸控裝置顯示） */
 .dk-swipe-tip { display: none; margin: -2px 0 8px; font-size: .78rem; }
 @media (pointer: coarse) { .dk-swipe-tip { display: block; } }
-#dk-editor.slide-l { animation: dk-in-l .22s ease-out; }
-#dk-editor.slide-r { animation: dk-in-r .22s ease-out; }
-@keyframes dk-in-l { from { transform: translateX(28px); opacity: .4; } }
-@keyframes dk-in-r { from { transform: translateX(-28px); opacity: .4; } }
-@media (prefers-reduced-motion: reduce) { #dk-editor.slide-l, #dk-editor.slide-r { animation: none; } }
+#dk-editor.slide-l, #dk-preview.slide-l { animation: dk-in-l .28s ease-out; }
+#dk-editor.slide-r, #dk-preview.slide-r { animation: dk-in-r .28s ease-out; }
+@keyframes dk-in-l { from { transform: translateX(60px); opacity: .25; } }
+@keyframes dk-in-r { from { transform: translateX(-60px); opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { #dk-editor.slide-l, #dk-editor.slide-r, #dk-preview.slide-l, #dk-preview.slide-r { animation: none; } }
 
 /* 兩欄排版的格子預設不能縮得比內容窄，會把小螢幕（320px）撐出去 */
 .editor-grid > *, .grid2 > *, .grid3 > * { min-width: 0; }
+
+/* 換張提示：畫面中央短暫出現 */
+.dk-swipe-badge { position: fixed; left: 50%; top: 42%; transform: translate(-50%, 8px); z-index: 1800; max-width: 86vw; background: rgba(29,42,47,.94); color: #fff; padding: 14px 20px; border-radius: 16px; font-size: 1.05rem; font-weight: 700; text-align: center; box-shadow: 0 8px 28px rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; }
+.dk-swipe-badge.show { opacity: 1; transform: translate(-50%, 0); }
+.dk-swipe-badge.warn { background: rgba(181,69,47,.95); }
+
+/* 從主畫面圖示開啟時，內容會延伸到狀態列（時間、電量）下方，所以頁面頂端一律要有避開它的頂端列 */
+/* 前台：非闖關畫面用共用的深色頂端列（#app-head，已含狀態列的安全區域）；排行榜頁面自己讓開 */
+.app-head { min-height: 52px; }

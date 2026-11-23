@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <title>實境解謎</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261122v">
+  <link rel="stylesheet" href="css/style.css?v=20261123c">
 </head>
 <body class="quest">
   <div id="test-banner" class="inapp test hidden" role="status">🧪 <b>試玩模式</b>：這支隊伍不會計入排行榜與正式紀錄。</div>
@@ -21,9 +21,12 @@
     <div class="grow"><b>建議改用 Safari／Chrome 開啟</b><br><span class="small">你正在用 LINE、Facebook 等內建瀏覽器，定位和指南針可能無法使用。請點右上角選單選「用瀏覽器開啟」，或複製連結貼到瀏覽器。</span></div>
     <div class="col"><button class="sm" id="inapp-copy" type="button">複製連結</button><button class="sm ghost" id="inapp-x" type="button">知道了</button></div>
   </div>
+  <!-- 非闖關畫面共用的頂端列（跟後台一樣：深色底，自動避開手機狀態列的時間與電量） -->
+  <header class="topbar app-head hidden" id="app-head"><div class="title" id="app-head-title">🧭 實境解謎</div></header>
+
   <!-- 選擇專案 -->
   <section id="v-projects" class="page hidden">
-    <h1 id="site-name">實境解謎</h1>
+    <h1 id="site-name" class="sr-only">實境解謎</h1>
     <p class="muted">選擇這次要挑戰的任務</p>
     <div id="project-list" class="stack"></div>
   </section>
@@ -266,8 +269,8 @@
   <div id="retry-bar" class="retry-bar hidden" role="alert"><span class="grow">連線失敗，請確認訊號後再試</span><button class="sm" id="retry-btn">重試</button><button class="sm ghost" id="retry-x" aria-label="關閉">✕</button></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="config.js?v=20261122v"></script>
-  <script src="js/common.js?v=20261122v"></script>
-  <script src="js/player.js?v=20261122v"></script>
+  <script src="config.js?v=20261123c"></script>
+  <script src="js/common.js?v=20261123c"></script>
+  <script src="js/player.js?v=20261123c"></script>
 </body>
 </html>

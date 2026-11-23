@@ -363,6 +363,26 @@
     });
   }
 
+  /** 任何視窗、面板、浮層「打開」的那一刻（hidden 被拿掉），內容一律從最上面開始看，不要停在上次捲到的位置 */
+  (function () {
+    var SEL = '.modal, .solved-overlay, .sheet';
+    var reset = function (el) {
+      el.scrollTop = 0;
+      Array.prototype.forEach.call(el.querySelectorAll('.sheet-body, .board-card, .modal-body, .card-view-box'), function (x) { x.scrollTop = 0; });
+    };
+    var start = function () {
+      if (!window.MutationObserver) return;
+      var mo = new MutationObserver(function (list) {
+        list.forEach(function (m) {
+          var el = m.target, was = (m.oldValue || '').split(/\s+/).indexOf('hidden') >= 0, now = el.classList.contains('hidden');
+          if (was && !now) reset(el);
+        });
+      });
+      Array.prototype.forEach.call(document.querySelectorAll(SEL), function (el) { mo.observe(el, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }); });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  })();
+
   /** 從主畫面圖示開啟的後台跳到前台／排行榜時，左下角固定一顆「← 回後台」 */
   (function () {
     var show = function () {
