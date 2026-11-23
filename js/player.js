@@ -272,7 +272,7 @@
         });
       });
       P.sid = r.state.session.session_id;
-      try { localStorage.setItem(LS(P.projectId), P.sid); } catch (e) { /* */ }
+      try { localStorage.setItem(LS(P.projectId), P.sid); if (P.avatar) localStorage.setItem('escapegame:avatar:' + P.sid, P.avatar); } catch (e) { /* */ }
       startGame(r.state);
       Q.toast(r.resumed ? '這支隊伍已經開始過了，已接續原本的進度' : '隊伍建立成功，出發吧！', 'ok', r.resumed ? 5000 : 3000);
       // 新隊伍：教學（含隊伍代碼）只在這支手機第一次玩時出現；其餘情況單獨提醒記下代碼
@@ -589,7 +589,7 @@
     if (P.watchId != null || P.noGps || P.sensorsOff) return;
     if (!('geolocation' in navigator)) { setGps('none'); return; }
     var hi = P.gpsMode !== 'low';
-    P.watchId = navigator.geolocation.watchPosition(function (p) {
+    var onPos = function (p) {
       var prevPos = P.pos;
       P.pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
       // 走路時 GPS 會提供移動方向，沒有指南針的手機可以拿來用
@@ -601,9 +601,18 @@
       updateMe();
       updateDistances();
       adaptGps();
-    }, function (err) {
-      setGps(err.code === 1 ? 'denied' : 'error');
-    }, hi ? { enableHighAccuracy: true, maximumAge: 5000, timeout: 25000 } : { enableHighAccuracy: false, maximumAge: 30000, timeout: 40000 });
+    };
+    var onErr = function (err) { setGps(err.code === 1 ? 'denied' : 'error'); };
+    P.watchId = navigator.geolocation.watchPosition(onPos, onErr,
+      hi ? { enableHighAccuracy: true, maximumAge: 5000, timeout: 25000 } : { enableHighAccuracy: false, maximumAge: 30000, timeout: 40000 });
+    // 衛星定位（GPS）第一次定位常要等十幾秒甚至更久：同時先用 Wi-Fi／基地台要一個「概略位置」，一兩秒內就能在地圖上顯示「我」，
+    // 之後 GPS 有精準位置了會自動取代它（已經有位置就不會被概略位置蓋掉）
+    if (hi && !P.pos) {
+      try {
+        navigator.geolocation.getCurrentPosition(function (p) { if (!P.pos) onPos(p); }, function () { /* 失敗就等 GPS */ },
+          { enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 });
+      } catch (e) { /* */ }
+    }
   }
 
   /** 離下一個定位關卡超過 600 公尺 → 省電模式（不開高精度、更新較慢）；進到 350 公尺內就切回高精度 */
@@ -824,8 +833,7 @@
     var ll = [P.pos.lat, P.pos.lng];
     if (!P.sMe) {
       P.sMeAcc = L.circle(ll, { radius: P.pos.acc, color: '#2f6690', weight: 1, fillOpacity: .1, interactive: false }).addTo(m);
-      var av = (P.state && P.state.session && P.state.session.avatar) || '🙂';
-      P.sMe = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me-pin">' + esc(av) + '</div>', iconSize: [38, 38], iconAnchor: [19, 19] }), interactive: false, zIndexOffset: 900 }).addTo(m);
+      P.sMe = L.marker(ll, { icon: meIcon(myAvatar()), interactive: false, zIndexOffset: 900 }).addTo(m);
       fitSheetMap(true);
     } else { P.sMe.setLatLng(ll); P.sMeAcc.setLatLng(ll).setRadius(P.pos.acc); }
   }
@@ -936,17 +944,27 @@
     updateLink();
   }
 
+  /** 地圖上代表「我」的圖示：隊伍資料裡的造型，其次是這支手機開始時選的，最後才用預設的笑臉 */
+  function myAvatar() {
+    var s = P.state && P.state.session, av = s && s.avatar;
+    if (!av && s) { try { av = localStorage.getItem('escapegame:avatar:' + s.session_id) || ''; } catch (e) { /* */ } }
+    return av || P.avatar || '🙂';
+  }
+  function meIcon(av) { return L.divIcon({ className: '', html: '<div class="me-pin">' + esc(av) + '</div>', iconSize: [38, 38], iconAnchor: [19, 19] }); }
+
   function updateMe() {
     if (P.noGps || !P.map || !P.pos) return;
     $('#map-card').classList.remove('hidden');
     var ll = [P.pos.lat, P.pos.lng];
     if (!P.me) {
       P.meAcc = L.circle(ll, { radius: P.pos.acc, color: '#2f6690', weight: 1, fillOpacity: .1, interactive: false }).addTo(P.map);
-      var av = (P.state && P.state.session && P.state.session.avatar) || '🙂';
-      P.me = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me-pin">' + esc(av) + '</div>', iconSize: [38, 38], iconAnchor: [19, 19] }), interactive: false, zIndexOffset: 900 }).addTo(P.map);
+      P.meAv = myAvatar();
+      P.me = L.marker(ll, { icon: meIcon(P.meAv), interactive: false, zIndexOffset: 900 }).addTo(P.map);
       if (!P.fitted) { P.map.setView(ll, 17); }
     } else {
       P.me.setLatLng(ll); P.meAcc.setLatLng(ll).setRadius(P.pos.acc);
+      var av2 = myAvatar();
+      if (av2 !== P.meAv) { P.meAv = av2; P.me.setIcon(meIcon(av2)); }   // 圖示後來才知道（例如一開始還沒載入隊伍資料）時，補上
     }
     updateCompanions();
     updateLink();
@@ -996,7 +1014,7 @@
     var d = Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng);
     var inside = d <= st.radius_m;
     P.inside = P.inside || {};
-    if (inside && !P.inside[st.stage_id]) {
+    if (inside && P.pos.acc <= 100 && !P.inside[st.stage_id]) {   // 定位誤差太大（例如剛開始的概略位置）時先不要通知
       P.inside[st.stage_id] = true;
       if (P.state && P.state.session.status === 'playing') { sfx('near'); Q.toast('已進入「' + st.title + '」範圍' + (st.require_gps ? '，可以打卡了' : ''), 'ok'); }
     } else if (!inside && d > st.radius_m * 1.3) P.inside[st.stage_id] = false;
