@@ -22,7 +22,7 @@ const AV = {
   academy: ['🧙‍♀️', '📚', '🪄', '🦉', '🔮', '⭐', '🧪', '🎓']
 };
 const SUGGEST = { classic: 'retro', rpg: 'forest', detective: 'history', agent: 'neon', pirate: 'ocean', academy: 'campus' };
-const cfg = { tpl: 'classic', theme: '', sw: false };
+const cfg = { tpl: 'classic', theme: '', sw: false, early: false };
 const sessions = {};
 
 const STAGES = [
@@ -63,6 +63,7 @@ function pubStage(def, s) {
   ['arrive', 'wrong', 'hint'].forEach(k => { if (def[k]) o['npc_' + k] = def[k]; });
   o.lat = def.lat; o.lng = def.lng; o.radius_m = 30;
   if (status === 'arrived' || status === 'solved') { o.question = def.question; o.choices = []; }
+  else if (cfg.early && status === 'open') o.question = def.question;   // 「抵達前就顯示題目」（可在現場直接作答）
   if (status === 'solved') { o.success_message = def.ok; o.file_url = ''; }
   return o;
 }
@@ -164,6 +165,7 @@ function start(port) {
       if (u.searchParams.has('tpl')) cfg.tpl = u.searchParams.get('tpl');
       cfg.theme = u.searchParams.get('theme') || '';
       cfg.sw = u.searchParams.get('switch') === '1';
+      cfg.early = u.searchParams.get('early') === '1';
       res.writeHead(200, cors); return res.end(JSON.stringify(cfg));
     }
     if (u.pathname === '/__reset') { Object.keys(sessions).forEach(k => delete sessions[k]); res.writeHead(200, cors); return res.end('ok'); }

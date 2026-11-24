@@ -1279,6 +1279,28 @@ main:focus, h1:focus, h2:focus { outline: none; }
 /* 關卡面板：大圖不要占掉大半個畫面，題目才是重點 */
 .sheet-hero .hero-img { max-height: 34vh; max-height: 34dvh; }
 
+/* ===== 剩餘作答次數、卡關提醒 ===== */
+.attempts { font-size: .9rem; font-weight: 700; color: var(--muted); }
+.attempts.low { color: var(--red); background: var(--c-red-bg, #f3d6cf); border-radius: 8px; padding: 6px 10px; display: inline-block; }
+#s-hint.nudge { animation: nudge 1.2s ease-in-out 6; box-shadow: 0 0 0 3px var(--amber, #e09f3e); }
+@keyframes nudge { 50% { transform: scale(1.03); } }
+@media (prefers-reduced-motion: reduce) { #s-hint.nudge { animation: none; } }
+
+/* ===== 高對比模式（戶外）：純白底黑字、粗框、全部達 WCAG AAA 7:1 ===== */
+#btn-hc::after { content: "高對比（戶外）"; }
+html.hc body.quest {
+  --paper: #ffffff; --bg: #ffffff; --card: #ffffff; --surface2: #ffffff; --frame: #ffffff; --note: #ffffff; --clue: #ffffff; --sel: #ffffff;
+  --ink: #000000; --muted: #1a1a1a; --line: #000000; --edge: #000000; --chip: #eeeeee; --track: #d9d9d9;
+  --accent: #8a0000; --accent-soft: #ffffff; --forest: #00522b; --forest-dark: #003d20; --blue: #003a80; --red: #9b0000; --amber: #6b3f00;
+  --btn-text: #ffffff; --topbar: #000000; --hero: #000000; --map-filter: none;
+  --c-green-bg: #ffffff; --c-green-fg: #003d20; --c-amber-bg: #ffffff; --c-amber-fg: #5a3300; --c-red-bg: #ffffff; --c-red-fg: #7a0000; --c-blue-bg: #ffffff; --c-blue-fg: #00306b; --c-gray-bg: #ffffff; --c-gray-fg: #1a1a1a;
+}
+html.hc .quest .topbar { background: #000; }
+html.hc .quest .card, html.hc .quest .stage-card, html.hc .quest .clue, html.hc .quest .question, html.hc .quest .sheet-body { border: 2px solid #000; }
+html.hc .quest .chip { border: 1.5px solid #000; }
+html.hc .quest button.ghost { border: 2px solid #000; }
+html.hc :focus-visible { outline: 4px solid #0033cc; outline-offset: 2px; }
+
 /* ===== 地圖圖磚載入前的骨架底色 ===== */
 .map.map-skel { background: linear-gradient(100deg, #e4dcc8 30%, #f1ead9 50%, #e4dcc8 70%); background-size: 200% 100%; animation: skel 1.3s linear infinite; }
 @keyframes skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }

@@ -82,6 +82,6 @@ test('player template switch, inline arrive bubble and new sfx', () => {
   const fn = player.match(/function npcArriveShow\([^)]*\) \{[\s\S]*?\r?\n  \}\r?\n/);
   assert.ok(fn, 'npcArriveShow found');
   assert.ok(fn[0].indexOf('showDialog') < 0, 'npcArriveShow must not use showDialog');
-  ['levelup', 'stamp', 'coin', 'blip', 'chime'].forEach((k) => assert.ok(player.includes(k + ': [['), 'sfx ' + k));
+  ['levelup', 'stamp', 'coin', 'blip', 'chime'].forEach((k) => assert.ok(read('js/sound.js').includes(k + ': [['), 'sfx ' + k));
   assert.ok(/#fx-canvas\.fx-top/.test(read('css/templates.css')));
 });

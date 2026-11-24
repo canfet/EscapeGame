@@ -45,26 +45,29 @@ test('arrival prompt, direction arrow, short hint confirm', () => {
 
 test('stage panel: question and answer come before the (collapsed) clue while answering', () => {
   const p = read('js/player.js');
-  assert.ok(/var answering = st\.status === 'arrived' && playing && !!st\.question/.test(p));
+  assert.ok(/var answering = st\.status === 'arrived' && playing;/.test(p), 'rule depends on state only, not on whether a question text exists');
+  assert.ok(/if \(clueHtml\) \{\s+P\.clueOpen = P\.clueOpen \|\| \{\};/.test(p), 'no empty clue accordion');
+  assert.ok(/到了再填答案，會和打卡一起送出/.test(p));
   assert.ok(/再看一次線索/.test(p) && /data-ck=/.test(p));
   assert.ok(!/目前總分 '/.test(p.split('function renderStage')[1].split('function bindStage')[0] || ''), 'duplicate score chip removed');
 });
 
 test('offline: service worker, snapshot fallback, tile prefetch, map skeleton', () => {
-  const sw = read('sw.js'), p = read('js/player.js');
+  const sw = read('sw.js'), p = read('js/player.js'), off = read('js/offline.js');
   assert.ok(/networkFirst\(req, 3000\)/.test(sw) && /tileFirst/.test(sw) && /TILE_MAX/.test(sw));
   assert.ok(/openstreetmap\\\.org/.test(sw));
   assert.ok(/\/\\\/__\//.test(sw), 'skips test endpoints');
-  assert.ok(/register\('sw\.js'\)/.test(p) && /function saveSnapshot\(state\)/.test(p) && /function prefetchStages\(state\)/.test(p));
+  assert.ok(/register\('sw\.js'\)/.test(off) && /function save\(sid, state\)/.test(off) && /function prefetch\(state, memo\)/.test(off));
+  assert.ok(/function saveSnapshot\(state\)/.test(p) && /function prefetchStages\(state\)/.test(p) && /function registerSw\(\)/.test(p), 'player.js keeps thin wrappers');
   assert.ok(/e\.code === 'NETWORK' && loadSnapshot\(sid\)/.test(p));
   assert.ok(/function mapSkeleton\(layer, el\)/.test(p) && /\.map\.map-skel/.test(read('css/style.css')));
   // 登出／換隊伍時要清掉快照，避免留下別隊的資料
-  assert.ok(/removeItem\(snapKey\(P\.sid\)\)/.test(p));
+  assert.ok(/EGOffline\.remove\(P\.sid\)/.test(p));
   new vm.Script(sw);   // 語法正確
 });
 
 test('tile math used for prefetch matches the standard slippy-map formula', () => {
-  const m = read('js/player.js').match(/function tileXY\(lat, lng, z\) \{[\s\S]*?\n  \}\n/);
+  const m = read('js/offline.js').match(/function tileXY\(lat, lng, z\) \{[\s\S]*?\n  \}\n/);
   assert.ok(m);
   const tileXY = new Function(m[0] + '; return tileXY;')();
   assert.deepStrictEqual(tileXY(0, 0, 1), { x: 1, y: 1 });
@@ -75,4 +78,13 @@ test('tile math used for prefetch matches the standard slippy-map formula', () =
   };
   [16, 17].forEach((z) => assert.deepStrictEqual(tileXY(25.033, 121.5654, z), ref(25.033, 121.5654, z)));
   assert.deepStrictEqual(tileXY(25.033, 121.5654, 16), { x: 54898, y: 28058 });
+});
+
+test('player.js was split: sound and offline helpers live in their own files, loaded before player.js', () => {
+  const index = read('index.html'), i = (x) => index.indexOf(x);
+  assert.ok(i('js/sound.js') > 0 && i('js/sound.js') < i('js/player.js') && i('js/offline.js') > 0 && i('js/offline.js') < i('js/player.js'));
+  const p = read('js/player.js');
+  assert.ok(!/function sfx\(kind\)/.test(p) && !/new AC\(\)/.test(p), 'audio engine is no longer inlined');
+  assert.ok(/EGSound\.sfx/.test(p) && /EGOffline\./.test(p));
+  new vm.Script(read('js/sound.js')); new vm.Script(read('js/offline.js'));
 });

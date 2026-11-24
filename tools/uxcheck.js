@@ -49,7 +49,7 @@ const chrome = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Applica
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await send('Emulation.setTouchEmulationEnabled', { enabled: true });
     await send('Browser.grantPermissions', { origin: base, permissions: ['geolocation'] }).catch(() => { });
-    await fetch(base + '/__reset'); await fetch(base + '/__set?tpl=' + tpl);
+    await fetch(base + '/__reset'); await fetch(base + '/__set?early=1&tpl=' + tpl);
     await send('Page.navigate', { url: base + '/index.html?p=demo' }); await sleep(600);
     await ev('try{localStorage.clear()}catch(e){}');
     await send('Page.navigate', { url: base + '/index.html?p=demo' });
@@ -84,6 +84,12 @@ const chrome = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Applica
     const sub = await text('#ns-sub');
     ok('下一站顯示方向箭頭與距離', /[↑↗→↘↓↙←↖]/.test(sub) && /公尺|公里/.test(sub), sub);
 
+    // ---- 4a) 前往中：線索 → 方向與地圖 → 現場作答欄（附說明）；答案欄在地圖之後
+    await click('#g-stages .stage-card.open'); await sleep(900);
+    const openOrder = await ev(`(function(){var b=document.querySelector('#sheet-body');var m=b.querySelector('.sheet-map-card,.compass'),a=b.querySelector('#s-ans');if(!a)return 'no answer field';if(!m)return 'no map';return (m.compareDocumentPosition(a)&4)?'map<answer':'answer<map'})()`);
+    ok('前往中：答案欄在方向／地圖之後', openOrder === 'map<answer', openOrder);
+    ok('前往中：現場作答欄有說明', /到了再填答案/.test(await ev('document.querySelector("#sheet-body").textContent')));
+    await click('#s-close'); await sleep(400);
     // ---- 2) 走進範圍：一鍵打卡提示
     await send('Emulation.setGeolocationOverride', { latitude: 25.0330, longitude: 121.5654, accuracy: 10 });
     const popped = await waitFor('#arrive-prompt', 8000);
@@ -103,6 +109,19 @@ const chrome = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Applica
       ok('線索預設收合', await ev('(function(){var d=document.querySelector("#sheet-body details[data-ck]");return !!d&&!d.open})()'));
       ok('晶片列不再重複顯示總分／題型', !(await ev('/目前總分/.test(document.querySelector("#sheet-body").textContent)')));
       ok('答案欄在第一個畫面內（不用捲動）', await ev('(function(){var a=document.querySelector("#s-ans");var r=a.getBoundingClientRect();return r.top<window.innerHeight&&r.bottom>0})()'));
+      // ---- 剩餘作答次數：明顯的提示（答錯後少一次）
+      ok('作答區顯示剩餘次數', /還有 5 次機會/.test(await text('#sheet-body .attempts')), await text('#sheet-body .attempts'));
+      await ev('(function(){var e=document.querySelector("#s-ans");e.value="9999";e.dispatchEvent(new Event("input",{bubbles:true}))})()');
+      await click('#s-submit'); await sleep(1500);
+      ok('答錯後剩餘次數減一', /還有 4 次機會/.test(await text('#sheet-body .attempts')), await text('#sheet-body .attempts'));
+      // ---- 高對比模式（設定選單內）
+      await click('#btn-hc'); await sleep(200);
+      const hc = await ev('(function(){var cs=getComputedStyle(document.body);return document.documentElement.classList.contains("hc")+"|"+cs.backgroundColor+"|"+cs.color})()');
+      ok('高對比：純白底黑字', /^true\|rgb\(255, 255, 255\)\|rgb\(0, 0, 0\)$/.test(hc), hc);
+      { const sp = await send('Page.captureScreenshot', { format: 'png' }); fs.mkdirSync(path.join(__dirname, '..', 'shots'), { recursive: true }); fs.writeFileSync(path.join(__dirname, '..', 'shots', 'hc-' + tpl + '.png'), Buffer.from(sp.result.data, 'base64')); }
+      ok('高對比鈕狀態 aria-pressed=true', (await ev('document.querySelector("#btn-hc").getAttribute("aria-pressed")')) === 'true');
+      await click('#btn-hc'); await sleep(150);
+      ok('可再關閉高對比', !(await ev('document.documentElement.classList.contains("hc")')));
       // ---- 5) 提示確認：簡短
       if (await vis('#s-hint')) {
         await click('#s-hint'); await sleep(400);
@@ -110,6 +129,24 @@ const chrome = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Applica
         ok('提示確認文字簡短（≤ 40 字）', msg.length > 0 && msg.length <= 40, msg);
         await click('#cf-cancel'); await sleep(300);
       }
+      // ---- 卡關協助：3 分鐘沒操作 → 提醒看提示（把時間快轉 200 秒來驗證）
+      await ev('window.__dn = Date.now; Date.now = function(){return window.__dn() + 200000}');
+      let nudged = false;
+      for (let t = 0; t < 18000 && !nudged; t += 500) { nudged = /卡住了嗎/.test(await text('#toast')); if (!nudged) await sleep(500); }
+      await ev('if (window.__dn) Date.now = window.__dn');
+      ok('卡關 3 分鐘後提醒看提示', nudged, await text('#toast'));
+      ok('提示鈕有閃動提示', await ev('!!document.querySelector("#s-hint.nudge")'));
+      // ---- 同隊另一支手機完成這關：這支手機要收到通知並同步
+      const sidNow = await ev('(function(){var k=Object.keys(localStorage).filter(function(k){return k.indexOf("escapegame:snap:")===0})[0];return k?k.slice("escapegame:snap:".length):""})()');
+      const other = await ev(`(async function(){var sid=${JSON.stringify(sidNow)};
+        await fetch('/api',{method:'POST',body:JSON.stringify({action:'arrive',sessionId:sid,stageId:'s1',code:'0000'})});
+        var r=await fetch('/api',{method:'POST',body:JSON.stringify({action:'submitAnswer',sessionId:sid,stageId:'s1',answer:'1111'})});
+        return (await r.json()).ok})()`);
+      ok('（模擬另一支手機）送出正確答案', other === true || other === undefined, String(other));
+      await ev('document.dispatchEvent(new Event("visibilitychange"))');
+      let mate = false;
+      for (let t = 0; t < 8000 && !mate; t += 400) { mate = /隊友在另一支手機完成了/.test(await text('#toast')); if (!mate) await sleep(400); }
+      ok('收到「隊友在另一支手機完成」通知', mate, await text('#toast'));
       // 答完三關 → 完賽
       const ans = { s1: '1111', s2: '2222', s3: '3333' };
       for (const sid of ['s1', 's2', 's3']) {
