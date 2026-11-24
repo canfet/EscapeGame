@@ -1395,6 +1395,8 @@
     var lab = Q.STATUS_LABEL[st.status];
     var h = [], acts = [];
     P.hintOpen = P.hintOpen || {};
+    // 套版：NPC 氣泡放在面板最上方並黏頂（電腦版大圖很高，放在內容裡會被擠到畫面外看不到）
+    if (isThemed()) h.push(bubbleForStage(st));
     // 關卡有上傳圖片才顯示頂部大圖；沒設定就不顯示
     if (st.image_url) h.push('<div class="sheet-hero"><img class="hero-img" src="' + esc(st.image_url) + '" alt="" onerror="this.parentNode.remove()"></div>');
     var no = P.state.stages.indexOf(st) + 1;
@@ -1411,7 +1413,6 @@
       '<span class="chip">' + Q.TYPE_LABEL[st.answer_type] + '</span>' + ptsChip +
       '<span class="chip blue">⭐ 目前總分 ' + se.score + '</span></div>');
     h.push('<div class="sheet-content stack">');
-    if (themed) h.push(bubbleForStage(st));   // 套版：答錯／提示後的內嵌 NPC 氣泡
 
     // 1) 線索 → 2) 題目 → 3) 提示（可收合）
     var contentStart = h.length;

@@ -147,6 +147,10 @@ body[class*="tpl-"] .npc-bubble {
   display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 14px; position: relative;
   background: var(--accent-soft, var(--card)); color: var(--ink); border: 1.5px solid var(--accent, var(--edge, var(--line)));
   animation: nb-in .25s ease-out both;
+  /* 黏在面板頂端：捲動或大圖很高時也一直看得到 NPC 說的話 */
+  position: sticky; top: 0; z-index: 5; margin-bottom: 12px;
+  background: linear-gradient(var(--accent-soft, var(--card)), var(--accent-soft, var(--card))), var(--card, #fff);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .12);
 }
 body[class*="tpl-"] .npc-bubble .nb-av {
   flex: none; width: 34px; height: 34px; display: grid; place-items: center; font-size: 1.3rem; line-height: 1;
