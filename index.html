@@ -78,6 +78,7 @@
       <span class="chip hidden" id="offline-chip" role="status">📴 離線中</span>
       <span class="chip hidden" id="g-timer">⏱ --:--</span>
       <button class="icon-btn hidden" id="btn-pack" aria-label="線索背包" title="線索背包（密碼碎片）">🎒</button>
+      <button class="icon-btn hidden" id="btn-tpl" aria-label="切換呈現套版" aria-haspopup="menu" aria-expanded="false" title="切換呈現套版">🎭</button>
       <button class="icon-btn hidden" id="btn-fx" aria-label="特效開關" aria-pressed="true" title="特效開關">✨</button>
       <button class="icon-btn" id="btn-font"aria-label="大字模式" title="大字模式">Aa</button>
       <button class="icon-btn" id="btn-sound" aria-label="音效開關" title="音效開關">🔊</button>
@@ -218,7 +219,7 @@
   <!-- 即時排行榜（闖關中） -->
   <div id="board" class="solved-overlay hidden" role="dialog" aria-modal="true" aria-label="即時排行榜">
     <div class="board-card">
-      <div class="sheet-head"><h2 class="grow" style="margin:0">🏆 即時排行榜</h2><button class="close-x" id="board-close" aria-label="關閉">✕</button></div>
+      <div class="sheet-head"><h2 class="grow" id="board-title" style="margin:0">🏆 即時排行榜</h2><button class="close-x" id="board-close" aria-label="關閉">✕</button></div>
       <div class="help" id="board-note" style="margin:4px 0 8px"></div>
       <div id="board-rows" class="lb"></div>
     </div>
@@ -240,6 +241,7 @@
   <div id="arrive-flash" class="arrive-flash hidden" role="status" aria-live="assertive"><div><span>📍</span><b>抵達！</b></div></div>
 
   <!-- 套版：NPC 對話框、LEVEL UP、SOLVED 印章 -->
+  <div id="tpl-menu" class="tpl-menu hidden" role="menu" aria-label="呈現套版"></div>
   <div id="dialog" class="dialog hidden" role="dialog" aria-label="對話" tabindex="0"><span class="dlg-avatar" aria-hidden="true"></span><div class="dlg-body"><b class="dlg-name"></b><div class="dlg-text"></div></div><span class="dlg-next" aria-hidden="true">▼</span></div>
   <div id="levelup" class="levelup hidden" role="status" aria-live="polite"><div class="lu-box"><span class="lu-title">LEVEL UP!</span><span class="lu-lv" id="levelup-lv"></span><span class="lu-sub">點一下繼續</span></div></div>
   <div id="stamp" class="stamp hidden" aria-hidden="true"><span>SOLVED</span></div>

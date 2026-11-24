@@ -29,6 +29,15 @@ test('cleanProject_ defaults (old row without template)', () => {
   assert.strictEqual(q.npc_name.length, 20);
 });
 
+test('allow_tpl_switch defaults false and passes through when true', () => {
+  const d = B.cleanProject_({ project_id: 'a', name: 'n' });
+  assert.strictEqual(d.allow_tpl_switch, false);
+  assert.strictEqual(B.publicProject_(d, []).allow_tpl_switch, false);
+  const t = B.cleanProject_({ project_id: 'a', name: 'n', allow_tpl_switch: true });
+  assert.strictEqual(t.allow_tpl_switch, true);
+  assert.strictEqual(B.publicProject_(t, []).allow_tpl_switch, true);
+});
+
 test('publicProject_ exposes template and avatars', () => {
   const p = B.cleanProject_({ project_id: 'a', name: 'n', template: 'pirate' });
   const o = B.publicProject_(p, []);

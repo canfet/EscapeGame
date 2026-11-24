@@ -96,3 +96,19 @@ test('hearts: max_attempts>0 ? max_attempts : 3, capped at 5, lost = attempts', 
   assert.deepStrictEqual(T.hearts({ max_attempts: 2, attempts: 7 }), { total: 2, lost: 2 });
   assert.deepStrictEqual(T.hearts({}), { total: 3, lost: 0 });
 });
+
+test('hpIcon/hpLost, hintOk, boardTitle: present on every template; classic keeps old strings and has no hpIcon', () => {
+  T.IDS.forEach((id) => {
+    const t = T.get(id);
+    ['hintOk', 'boardTitle'].forEach((k) => {
+      assert.ok(t.vocab[k] && T.vocab(id, k).length > 0, id + '.' + k);
+    });
+    if (id === 'classic') assert.ok(!t.hpIcon && !t.hpLost, 'classic has no hp icons');
+    else assert.ok(t.hpIcon && t.hpLost && t.hpIcon !== t.hpLost, id + ' hpIcon/hpLost');
+  });
+  assert.strictEqual(T.vocab('classic', 'hintOk'), '看提示');
+  assert.strictEqual(T.vocab('classic', 'boardTitle'), '即時排行榜');
+  assert.strictEqual(T.get('detective').hpIcon, '🔍');
+  assert.strictEqual(T.get('agent').hpIcon, '🔋');
+  assert.deepStrictEqual(T.hearts({ max_attempts: 3, attempts: 1 }), { total: 3, lost: 1 });
+});

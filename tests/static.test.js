@@ -67,3 +67,21 @@ test('stage-panel NPC/battle code is guarded and gated to non-classic', () => {
   assert.ok(/function isThemed\(\)/.test(player) && /if \(themed\) h\.push\(sheetStatusHtml/.test(player));
   assert.ok(read('css/templates.css').indexOf('prefers-reduced-motion') > 0 && /#sheet\.shake/.test(read('css/templates.css')));
 });
+
+test('admin has allow_tpl_switch checkbox and deploy workflow runs tests / strips docs', () => {
+  assert.ok(admin.indexOf('id="mp-allow_tpl_switch"') > 0);
+  assert.ok(/allow_tpl_switch/.test(adminJs));
+  const y = read('.github/workflows/deploy.yml');
+  assert.ok(y.indexOf('rm -rf tools .github docs tests') > 0 && y.indexOf('node --test') > 0);
+});
+
+test('player template switch, inline arrive bubble and new sfx', () => {
+  const m = index.match(/<[^>]*id="btn-tpl"[^>]*>/);
+  assert.ok(m && /\bhidden\b/.test(m[0]), 'btn-tpl exists and hidden by default');
+  assert.ok(player.includes('escapegame:tpl:'));
+  const fn = player.match(/function npcArriveShow\([^)]*\) \{[\s\S]*?\r?\n  \}\r?\n/);
+  assert.ok(fn, 'npcArriveShow found');
+  assert.ok(fn[0].indexOf('showDialog') < 0, 'npcArriveShow must not use showDialog');
+  ['levelup', 'stamp', 'coin', 'blip', 'chime'].forEach((k) => assert.ok(player.includes(k + ': [['), 'sfx ' + k));
+  assert.ok(/#fx-canvas\.fx-top/.test(read('css/templates.css')));
+});

@@ -22,7 +22,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: 取得程式碼
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: 設定 Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: 執行自動測試（失敗就不部署）
+        run: node --test tests/*.test.js
 
       - name: 產生 config.js（後端網址來自 Repository variable）
         env:
@@ -31,16 +39,16 @@ jobs:
         run: node .github/scripts/make-config.js
 
       - name: 移除不需要放上網站的檔案
-        run: rm -rf tools .github
+        run: rm -rf tools .github docs tests
 
       - name: 設定 Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: 打包網站
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: .
 
       - name: 部署
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

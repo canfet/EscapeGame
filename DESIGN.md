@@ -687,4 +687,7 @@ Apps Script 部署時「誰可以存取」不是「所有人」，或修改程�
 - 套版定義在 `js/templates.js`（用語、隊伍造型清單、NPC 預設、建議主題、特效），樣式在 `css/templates.css`，特效與逐字輸出在 `js/fx.js`。職業清單在 `Code.gs` 與 `templates.js` 各一份，必須一致（`tests/backend.test.js` 檢查）。
 - RPG：Lv = 1 + 已完成關卡數；EXP = 目前分數 / 全部關卡總分；前台即時計算，不另存。
 - 特效可由玩家關閉（`localStorage escapegame:fx`），並尊重 `prefers-reduced-motion`。
+- 關卡 NPC 台詞（選填，各 ≤200 字）：`npc_arrive` 為「關卡開場台詞」，每次點進關卡都會出現；`npc_wrong` 答錯台詞；`npc_hint` 提示台詞。留空使用套版預設。
+- Projects 欄位 `allow_tpl_switch`（布林，預設 false）：關主開放後，玩家可自行切換呈現套版；只影響前台用語與特效，不影響計分與資料。`publicProject_` 回傳 `allow_tpl_switch`。
+- 部署流程（`.github/workflows/deploy.yml`）會先執行 `node --test tests/*.test.js`，失敗就不部署；發佈時移除 `tools .github docs tests`，不放上網站。
 - 詳細需求與設計見 `docs/`。

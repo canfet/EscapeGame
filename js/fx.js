@@ -179,9 +179,11 @@
     lastT = t;
     g.clearRect(0, 0, W, H);
     var spec = ambientKind ? particleSpec(ambientKind) : null;
-    if (spec && ambient.length) { g.textAlign = 'start'; g.textBaseline = 'alphabetic'; stepAmbient(spec, dt, t); }
+    // 爆發粒子出現時，畫布提到過關／升級畫面之上；此時環境粒子調淡，避免蓋住文字
+    cv.classList.toggle('fx-top', bursts.length > 0);
+    if (spec && ambient.length) { g.globalAlpha = bursts.length ? 0.3 : 1; g.textAlign = 'start'; g.textBaseline = 'alphabetic'; stepAmbient(spec, dt, t); g.globalAlpha = 1; }
     if (bursts.length) stepBursts(dms);
-    if (!ambient.length && !bursts.length) { running = false; g.clearRect(0, 0, W, H); cv.classList.add('hidden'); return; }
+    if (!ambient.length && !bursts.length) { running = false; g.clearRect(0, 0, W, H); cv.classList.remove('fx-top'); cv.classList.add('hidden'); return; }
     raf = requestAnimationFrame(frame);
   }
 
@@ -209,7 +211,7 @@
     try {
       if (raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
       raf = 0; running = false;
-      if (cv) { if (g) g.clearRect(0, 0, W, H); cv.classList.add('hidden'); }
+      if (cv) { if (g) g.clearRect(0, 0, W, H); cv.classList.remove('fx-top'); cv.classList.add('hidden'); }
     } catch (e) { /* */ }
   }
 
@@ -265,6 +267,7 @@
       if (h.done) return;
       i++;
       el.textContent = steps.slice(0, i).join('');
+      if (typeof opts.onTick === 'function') { try { opts.onTick(i); } catch (e) { /* */ } }
       if (i >= steps.length) return finish();
       timer = setTimeout(next, speed);
     })();

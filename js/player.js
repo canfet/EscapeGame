@@ -27,6 +27,8 @@
 
   /* ---------- 啟動 ---------- */
   async function init() {
+    // 浮層開關會用 history.pushState／back；瀏覽器預設會在 back 時還原舊捲動位置（介紹頁往下捲過再開始闖關，主畫面就被推下去一截）
+    try { history.scrollRestoration = 'manual'; } catch (e) { /* */ }
     var name = '實境解謎';
     $('#site-name').textContent = name;
     $('#app-head-title').textContent = '🧭 ' + name;
@@ -67,6 +69,9 @@
     $('#tut-next').onclick = tutNext; $('#tut-skip').onclick = tutEnd;
     try {
       $('#btn-fx').onclick = toggleFx;
+      $('#btn-tpl').onclick = function (e) { e.stopPropagation(); toggleTplMenu(); };
+      document.addEventListener('click', function (e) { var m = $('#tpl-menu'); if (m && !m.classList.contains('hidden') && !m.contains(e.target)) closeTplMenu(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeTplMenu(); });
       $('#levelup').onclick = hideLevelUp;
       var dl = $('#dialog');
       dl.onclick = dlgAdvance;
@@ -252,7 +257,7 @@
   /** 隊伍造型挑選；名單指定了造型的隊伍就固定，不能改 */
   function renderAvatarPicker(proj, team) {
     var list = proj.avatars || [], box = $('#avatar-picker'), field = $('#avatar-field'), names = {};
-    try { list = Q.Tpl.avatars(P.tplId, proj.avatars) || []; names = Q.Tpl.get(P.tplId).avatarNames || {}; } catch (e) { list = proj.avatars || []; }
+    try { var baseId = Q.Tpl.norm(proj.template); list = Q.Tpl.avatars(baseId, proj.avatars) || []; names = Q.Tpl.get(baseId).avatarNames || {}; } catch (e) { list = proj.avatars || []; }   // 玩家自選呈現套版時，造型清單仍用專案原套版
     field.classList.toggle('hidden', !list.length);
     if (!list.length) return;
     var fixed = team && team.avatar;
@@ -948,20 +953,76 @@
 
   /** 依專案的 template／theme 套用外觀；舊後端沒有 template 欄位、或任何錯誤都當 classic */
   function applyTemplate(project) {
-    var theme = project && project.theme, tid = 'classic';
+    var theme = project && project.theme, tid = 'classic', baseTid = 'classic';
     try {
-      tid = Q.Tpl.norm(project && project.template);
+      baseTid = tid = Q.Tpl.norm(project && project.template);
+      var ov = tplOverride(project);
+      if (ov) tid = ov;
       P.tpl = Q.Tpl.get(tid);
     } catch (e) { tid = 'classic'; P.tpl = null; }
     try {
-      if (THEMES.indexOf(theme) < 0 && tid !== 'classic') theme = Q.Tpl.themeHint(tid);
+      // 色彩主題不隨呈現套版覆蓋而變：缺主題時一律依專案原套版決定
+      if (THEMES.indexOf(theme) < 0 && baseTid !== 'classic') theme = Q.Tpl.themeHint(baseTid);
       applyLook(theme, tid);
       applyVocab();
       updateFxBtn();
+      updateTplBtn(project);
     } catch (e) {
       P.tpl = null;
       try { applyLook(theme, 'classic'); applyVocab(); } catch (x) { /* */ }
     }
+  }
+
+  /* ---------- 玩家自選呈現套版（專案 allow_tpl_switch 為 true 才可用） ---------- */
+  function tplSwitchPid(project) {
+    var pid = project && (project.project_id || P.projectId);
+    return project && project.allow_tpl_switch === true && pid ? String(pid) : '';
+  }
+  function tplOverride(project) {
+    try {
+      var pid = tplSwitchPid(project);
+      if (!pid) return '';
+      var v = localStorage.getItem('escapegame:tpl:' + pid);
+      return v && Q.Tpl.IDS.indexOf(v) >= 0 ? v : '';
+    } catch (e) { return ''; }
+  }
+  function updateTplBtn(project) {
+    try {
+      var b = $('#btn-tpl'), ok = !!tplSwitchPid(project);
+      b.classList.toggle('hidden', !ok);
+      if (!ok) closeTplMenu();
+    } catch (e) { /* */ }
+  }
+  function closeTplMenu() { try { $('#tpl-menu').classList.add('hidden'); $('#btn-tpl').setAttribute('aria-expanded', 'false'); } catch (e) { /* */ } }
+  function toggleTplMenu() {
+    try {
+      var m = $('#tpl-menu');
+      if (!m.classList.contains('hidden')) return closeTplMenu();
+      var pj = P.project || (P.state && P.state.project) || {};
+      if (!tplSwitchPid(pj)) return;
+      var base = Q.Tpl.norm(pj.template), cur = P.tplId, hasOv = !!tplOverride(pj);
+      m.innerHTML = Q.Tpl.IDS.map(function (id) {
+        var t = Q.Tpl.get(id);
+        return '<button type="button" role="menuitemradio" aria-checked="' + (id === cur) + '" data-tpl="' + id + '"' + (id === cur ? ' class="on"' : '') + '>' + esc(t.icon + ' ' + t.name) + (id === cur ? ' ✓' : '') + '</button>';
+      }).join('') + '<button type="button" role="menuitem" data-tpl="" class="reset"' + (hasOv ? '' : ' disabled') + '>↩ 還原為專案預設（' + esc(Q.Tpl.get(base).name) + '）</button>';
+      Q.$$('#tpl-menu [data-tpl]').forEach(function (bt) { bt.onclick = function () { chooseTpl(bt.dataset.tpl); }; });
+      m.classList.remove('hidden');
+      $('#btn-tpl').setAttribute('aria-expanded', 'true');
+    } catch (e) { /* */ }
+  }
+  function chooseTpl(id) {
+    try {
+      var pj = P.project || (P.state && P.state.project) || {}, pid = tplSwitchPid(pj);
+      if (!pid) return;
+      try { if (id) localStorage.setItem('escapegame:tpl:' + pid, id); else localStorage.removeItem('escapegame:tpl:' + pid); } catch (e) { /* 無法儲存時只對這次有效 */ }
+      closeTplMenu();
+      P.bubble = null; P.miniPct = null;
+      hideLevelUp();
+      if (P.state) { renderGame(); if (P.openId) renderStage(); } else applyTemplate(pj);
+      fxEnter();
+      if (P.tplId === 'classic') closeDialog(false);
+      Q.toast('已切換為「' + Q.Tpl.get(P.tplId).name + '」', 'ok', 1500);
+    } catch (e) { /* */ }
   }
 
   function setText(sel, text) { var el = $(sel); if (el && text) el.textContent = text; }
@@ -971,6 +1032,7 @@
     setText('#intro-heading', V('introHeading'));
     setText('#avatar-label', V('avatarLabel'));
     setText('#btn-start', V('startBtn'));
+    setText('#board-title', '🏆 ' + V('boardTitle'));
     setText('#g-finished-title', '🎉 ' + V('finishTitle'));
     setText('#fin-h1', V('finishTitle'));
     if (!P.solvedNext) setText('#solved-next', V('goNext'));
@@ -1029,6 +1091,11 @@
       if (!f || !P.tpl || P.tpl.id === 'classic') return;
       var cx = (window.innerWidth || 360) / 2, cy = (window.innerHeight || 640) * 0.4;
       var ch = P.tplId === 'pirate' ? 'coin' : 'star';
+      var snd = { pirate: 'coin', academy: 'chime', agent: 'blip' }[P.tplId];
+      if (snd && kind !== 'arrive') {
+        sfx(snd);
+        if (snd === 'blip') setTimeout(function () { sfx('blip'); }, 90);
+      }
       if (kind === 'finish') { f.confetti(); f.burst(cx, cy, ch); }
       else if (kind === 'solved') {
         f.burst(cx, cy, ch);
@@ -1041,6 +1108,7 @@
   function showLevelUp(from, to) {
     try {
       $('#levelup-lv').textContent = 'Lv.' + from + ' → Lv.' + to;
+      sfx('levelup');
       $('#levelup').classList.remove('hidden');
       layerOpen('levelup');
       clearTimeout(P.luT);
@@ -1060,6 +1128,7 @@
       clearTimeout(P.stT);
       el.classList.remove('hidden');
       if (sp) { sp.style.animation = 'none'; void sp.offsetWidth; sp.style.animation = ''; }
+      sfx('stamp');
       P.stT = setTimeout(function () { el.classList.add('hidden'); }, 1800);
     } catch (e) { /* */ }
   }
@@ -1084,7 +1153,7 @@
   };
   function typeText(el, text, onDone) {
     var f = FX();
-    if (f && f.typewriter) return f.typewriter(el, text, { speed: 32, onDone: onDone });
+    if (f && f.typewriter) return f.typewriter(el, text, { speed: 32, onDone: onDone, onTick: blipTick });
     el.textContent = text;
     if (onDone) onDone();
     return { done: true, skip: function () { /* */ } };
@@ -1296,13 +1365,14 @@
   function openStage(id) {
     startCompass(true); // 點擊關卡是使用者手勢，iOS 可在這時詢問方向權限
     if (P.openId !== id) { P.choice = null; P.photo = null; P.bubble = null; }
+    var wasOpen = P.openId === id && !$('#sheet').classList.contains('hidden');
     P.openId = id;
     updateLink();
+    if (!wasOpen) npcOnOpen(id);
     renderStage();
     $('#sheet').classList.remove('hidden');
     layerOpen('sheet');
     fitSheet();
-    npcOnOpen(id);
     if (!P.prevFocus) P.prevFocus = document.activeElement;
     var sb = $('#sheet-body');
     sb.setAttribute('tabindex', '-1');
@@ -1436,14 +1506,13 @@
   function secHeadHtml(which) {
     try { return '<div class="sx-h" data-sx="' + which + '">' + esc(V(which === 'clue' ? 'clueHeading' : 'questionHeading')) + '</div>'; } catch (e) { return ''; }
   }
-  var HEART_TPL = ['rpg', 'pirate', 'academy'];
   /** 面板頂端：體力（純視覺，不影響計分）＋ RPG 迷你 EXP 條 */
   function sheetStatusHtml(st) {
     try {
       var hp = Q.Tpl.hearts(st), left = hp.total - hp.lost, label = V('hpLabel'), out = '';
-      if (HEART_TPL.indexOf(P.tplId) >= 0) {
-        var hs = '', i;
-        for (i = 0; i < hp.total; i++) hs += i < left ? '❤️' : '💔';
+      if (P.tpl && P.tpl.hpIcon) {
+        var hs = '', i, full = P.tpl.hpIcon, gone = P.tpl.hpLost || '💔';
+        for (i = 0; i < hp.total; i++) hs += i < left ? full : gone;
         out = '<span class="sx-hp-l">' + esc(label) + '</span><span class="sx-hearts" role="img" aria-label="' + esc(label) + '：剩 ' + left + '，共 ' + hp.total + '">' + hs + '</span>';
       } else {
         out = '<span class="sx-hp-l">' + esc(label) + '</span><span class="sx-hp-t" aria-label="' + esc(label) + '：剩 ' + left + '，共 ' + hp.total + '">' + left + ' / ' + hp.total + '</span>';
@@ -1479,7 +1548,14 @@
       if (b && b.fresh && b.sid === st.stage_id) {
         b.fresh = false;
         var el = document.querySelector('#sheet-body .npc-bubble .nb-text'), f = FX();
-        if (el && f && f.typewriter && !reduced()) f.typewriter(el, b.text, { speed: 28 });
+        if (el && f && f.typewriter && !reduced()) f.typewriter(el, b.text, { speed: 28, onTick: blipTick });
+      }
+      var nb = document.querySelector('#sheet-body .npc-bubble');
+      if (nb && !nb.getAttribute('data-bound')) {
+        nb.setAttribute('data-bound', '1');
+        nb.style.cursor = 'pointer';
+        nb.title = '點一下收合';
+        nb.onclick = function () { P.bubble = null; if (nb.parentNode) nb.parentNode.removeChild(nb); };
       }
       if (P.tpl && P.tpl.hud === 'rpg') {
         var li = levelOf(P.state), bar = document.querySelector('#sheet-body .sx-exp .hud-exp-bar > i');
@@ -1518,23 +1594,14 @@
       if (f && f.burst) f.burst(ctx.x, ctx.y, P.tplId === 'pirate' ? 'coin' : 'star');
     } else if (ctx.wrong) flash('shake', 500);
   }
-  /** 打卡成功後 NPC 講一句（每關一次；點一下關閉、數秒後自動關閉，不擋作答） */
-  /** 顯示關卡開場台詞（欄位 npc_arrive）：每次點進關卡都會出現；面板還開著才出現；點一下關閉、8 秒後自動關閉 */
+  /** 關卡開場台詞（欄位 npc_arrive）：每次 openStage 設定一次內嵌氣泡（輪詢重繪不重播）；點氣泡可收合 */
   function npcArriveShow(sid, ns, delay) {
     if (!isThemed() || !ns) return;
     var text = Q.Tpl.npcLine(P.tplId, 'arrive', ns);
     if (!text) return;
-    setTimeout(function () {
-      try {
-        if (P.openId !== sid) return;
-        if (showDialog([text], null)) {
-          var d = DLG;
-          setTimeout(function () { if (DLG === d && d.open) closeDialog(true); }, 8000);
-        }
-      } catch (e) { /* */ }
-    }, delay);
+    P.bubble = { sid: sid, text: text, fresh: true };   // 由 renderStage 在面板頂端以內嵌氣泡呈現（逐字一次）
   }
-  /** 點進關卡（前往中或已抵達）時，NPC 說開場台詞；每次進來都會說 */
+  /** 點進關卡（前往中或已抵達）時，NPC 說開場台詞；每次進來都會說（需在 renderStage 之前呼叫） */
   function npcOnOpen(id) {
     try {
       var st = findStage(id);
@@ -1656,7 +1723,7 @@
       var msg = pen
         ? '⚠️ 看提示會扣分！\n\n這一關答對可得的分數：' + a0 + ' 分 → ' + a1 + ' 分（每則提示少 ' + pen + ' 分）。\n\n你們目前總分 ' + P.state.session.score + ' 分，不會馬上被扣，會在這一關過關時少算。'
         : '這則提示不會扣分，可以放心使用。\n\n（你們目前總分 ' + P.state.session.score + ' 分）';
-      var ok = await askConfirm(V('hintTitle'), msg, pen ? '看提示（少 ' + pen + ' 分）' : '看提示');
+      var ok = await askConfirm(V('hintTitle'), msg, pen ? V('hintOk', null, '看提示') + '（少 ' + pen + ' 分）' : V('hintOk', null, '看提示'));
       if (ok) act('getHint', { stageId: st.stage_id });
     });
     on('s-submit', function () {
@@ -1870,22 +1937,38 @@
   function sfx(kind) {
     if (!Snd.on) return;
     try {
+      if (kind === 'blip' && !Snd.ctx) return;   // 逐字 blip 不主動建立音訊（需先被手勢解鎖）
       var vib = { ok: [60], win: [80, 50, 80, 50, 120], bad: [200], arrive: [60, 40, 60], near: [40] }[kind];
       if (vib && navigator.vibrate) navigator.vibrate(vib);
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       Snd.ctx = Snd.ctx || new AC();
       if (Snd.ctx.state === 'suspended') Snd.ctx.resume();
-      var seq = { ok: [[660, .12], [880, .18]], win: [[523, .12], [659, .12], [784, .26]], bad: [[220, .28]], arrive: [[587, .1], [784, .18]], near: [[740, .14], [988, .14]] }[kind] || [];
+      var seq = { ok: [[660, .12], [880, .18]], win: [[523, .12], [659, .12], [784, .26]], bad: [[220, .28]], arrive: [[587, .1], [784, .18]], near: [[740, .14], [988, .14]],
+        levelup: [[392, .09], [494, .09], [587, .09], [784, .09], [988, .09], [1175, .26]], stamp: [[150, .07], [75, .16]],
+        coin: [[1319, .06], [1760, .22]], blip: [[1040, .03]], chime: [[1568, .14], [2093, .34]] }[kind] || [];
+      var wave = { bad: 'sawtooth', stamp: 'square', blip: 'square', coin: 'triangle' }[kind] || 'sine';
+      var vol = kind === 'blip' ? .07 : kind === 'stamp' ? .45 : .3;
       var t = Snd.ctx.currentTime;
       seq.forEach(function (n) {
         var o = Snd.ctx.createOscillator(), g = Snd.ctx.createGain();
-        o.type = kind === 'bad' ? 'sawtooth' : 'sine'; o.frequency.value = n[0];
-        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.3, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + n[1]);
+        o.type = wave; o.frequency.value = n[0];
+        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + n[1]);
         o.connect(g); g.connect(Snd.ctx.destination); o.start(t); o.stop(t + n[1] + .02);
         t += n[1];
       });
     } catch (e) { /* 不支援就略過 */ }
+  }
+
+  /** 逐字輸出的 blip（僅特務套版；每 3 字一聲且至少間隔 70ms，避免吵雜） */
+  var blipAt = 0;
+  function blipTick(i) {
+    try {
+      if (P.tplId !== 'agent' || i % 3 !== 1) return;
+      var now = Date.now();
+      if (now - blipAt < 70) return;
+      blipAt = now; sfx('blip');
+    } catch (e) { /* */ }
   }
 
   function renderSoundBtn() {
@@ -2283,7 +2366,9 @@
     var H = 760 + (fb.length ? 150 : 0) + (got.length ? 120 + rows * 250 : 0) + 120;
     var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     var g = cv.getContext('2d'), FONT = '"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
-    var bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#1d2a2f'); bg.addColorStop(1, '#265f46');
+    var themed = isThemed();
+    var bg = g.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, themed ? themeVar('--topbar', '#1d2a2f') : '#1d2a2f'); bg.addColorStop(1, themed ? themeVar('--forest', '#265f46') : '#265f46');
     g.fillStyle = bg; g.fillRect(0, 0, W, H);
     function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
     function wrap(text, x, y, maxW, lh, maxLines) {
@@ -2294,11 +2379,18 @@
       }
       if (line) g.fillText(line, x, y + n * lh);
     }
-    g.textAlign = 'center'; g.fillStyle = '#e8c97a'; g.font = '700 34px ' + FONT; g.fillText('實境解謎', W / 2, 90);
+    g.textAlign = 'center'; g.fillStyle = '#e8c97a'; g.font = '700 34px ' + FONT; g.fillText(themed ? (P.tpl.icon ? P.tpl.icon + ' ' : '') + V('finishTitle', null, '實境解謎') : '實境解謎', W / 2, 90);
     g.fillStyle = '#fff'; g.font = '800 64px ' + FONT; wrap(pj.name || '', W / 2, 190, W - 160, 76, 2);
     g.font = '700 54px ' + FONT; g.fillStyle = '#ffe9a8';
     g.fillText((se.avatar ? se.avatar + ' ' : '') + se.team_name, W / 2, 360);
     if (s.title) { g.font = '600 38px ' + FONT; g.fillStyle = '#cfe8d5'; g.fillText('稱號：' + s.title, W / 2, 425); }
+    if (themed && P.tpl.hud === 'rpg') {   // RPG：職業頭像與 Lv.N
+      try {
+        var cls = (P.tpl.avatarNames || {})[se.avatar] || '', li = levelOf(s);
+        g.font = '700 34px ' + FONT; g.fillStyle = '#ffd84a';
+        g.fillText((se.avatar ? se.avatar + ' ' : '') + (cls ? cls + '・' : '') + 'Lv.' + li.lv, W / 2, s.title ? 466 : 430);
+      } catch (e) { /* */ }
+    }
     // 三個數字
     var stats = [[String(se.score), '總分'], [s.summary.solved + '/' + s.summary.total, '完成關卡'], [se.finished_at ? Q.fmtDuration((new Date(se.finished_at) - new Date(se.started_at)) / 1000) : '—', '花費時間']];
     stats.forEach(function (it, i) {

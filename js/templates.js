@@ -23,7 +23,9 @@
     submitBtn: '送出答案',
     hintBtn: '💡 需要提示？',
     hintTitle: '要看提示嗎？',
-    hpLabel: '體力'
+    hpLabel: '體力',
+    hintOk: '看提示',
+    boardTitle: '即時排行榜'
   };
 
   var TEMPLATES = {
@@ -39,6 +41,7 @@
       avatarNames: { '⚔️': '戰士', '🧙': '法師', '🏹': '弓手', '🗡️': '盜賊', '🛡️': '騎士', '🩺': '牧師', '🎻': '吟遊詩人', '🐉': '龍騎士' },
       dialogue: true, fx: 'fireflies', hud: 'rpg',
       npc: { name: '酒館老闆', avatar: '🧙' },
+      hpIcon: '❤️', hpLost: '💔',
       vocab: {
         nextLabel: '下一個任務',
         stageListTitle: '冒險任務表',
@@ -55,7 +58,9 @@
         submitBtn: '發動解答',
         hintBtn: '💡 求助神諭？',
         hintTitle: '要求助神諭嗎？',
-        hpLabel: '體力'
+        hpLabel: '體力',
+        hintOk: '求助神諭',
+        boardTitle: '冒險者排行榜'
       },
       lines: {arrive:'冒險者，這就是你們的下一個任務。仔細看看線索吧！',wrong:['差一點，勇者！再想想看。','別氣餒，冒險者總是屢敗屢戰。','神諭說：答案就藏在線索裡。'],hint:'嗯……老夫給你們一點提示吧。'}
     },
@@ -65,6 +70,7 @@
       avatars: ['🕵️', '🔍', '🧐', '📜', '🗝️', '🎩', '🔦', '🧤'],
       dialogue: true, fx: 'ink', hud: '',
       npc: { name: '局長', avatar: '🕵️' },
+      hpIcon: '🔍', hpLost: '▫️',
       vocab: {
         nextLabel: '下一條線索',
         stageListTitle: '案件卷宗',
@@ -81,7 +87,9 @@
         submitBtn: '提出推理',
         hintBtn: '💡 調閱檔案？',
         hintTitle: '要調閱檔案嗎？',
-        hpLabel: '專注力'
+        hpLabel: '專注力',
+        hintOk: '調閱檔案',
+        boardTitle: '破案排行榜'
       },
       lines: {arrive:'探員，這是新的案發地點。仔細觀察，別漏掉任何細節。',wrong:['這個推理有破綻，再檢查一次。','別急，真相往往藏在細節裡。','換個角度想想看，探員。'],hint:'我調出了一份檔案，看看有沒有幫助。'}
     },
@@ -91,6 +99,7 @@
       avatars: ['🛰️', '🤖', '👾', '🦾', '🔒', '💾', '📡', '🕶️'],
       dialogue: true, fx: 'stream', hud: '',
       npc: { name: '指揮官', avatar: '🛰️' },
+      hpIcon: '🔋', hpLost: '🪫',
       vocab: {
         nextLabel: '下一個目標',
         stageListTitle: '任務檔案',
@@ -107,7 +116,9 @@
         submitBtn: '提交密碼',
         hintBtn: '💡 請求支援？',
         hintTitle: '要請求支援嗎？',
-        hpLabel: '電量'
+        hpLabel: '電量',
+        hintOk: '接收支援',
+        boardTitle: '行動排行榜'
       },
       lines: {arrive:'目標已鎖定。研讀情報，執行任務。',wrong:['密碼錯誤。重新解碼。','驗證失敗，請再試一次，特務。','總部提醒：仔細檢查情報。'],hint:'總部傳來支援情報，請查收。'}
     },
@@ -117,6 +128,7 @@
       avatars: ['⚓', '🏴‍☠️', '🦜', '🗺️', '🧭', '💰', '🦑', '🚢'],
       dialogue: true, fx: 'bubbles', hud: '',
       npc: { name: '船長', avatar: '🏴‍☠️' },
+      hpIcon: '❤️', hpLost: '💔',
       vocab: {
         nextLabel: '下一個航段',
         stageListTitle: '航海日誌',
@@ -133,7 +145,9 @@
         submitBtn: '開啟寶箱',
         hintBtn: '💡 請教老水手？',
         hintTitle: '要請教老水手嗎？',
-        hpLabel: '士氣'
+        hpLabel: '士氣',
+        hintOk: '請教老水手',
+        boardTitle: '海盜懸賞榜'
       },
       lines: {arrive:'船員們，前方有新的寶藏！看看藏寶線索吧！',wrong:['哈，打不開！再想一想。','別洩氣，水手！','老水手說：答案就在線索裡。'],hint:'好吧，老水手偷偷告訴你們一點訣竅。'}
     },
@@ -143,6 +157,7 @@
       avatars: ['🧙‍♀️', '📚', '🪄', '🦉', '🔮', '⭐', '🧪', '🎓'],
       dialogue: true, fx: 'stars', hud: '',
       npc: { name: '院長', avatar: '🧙‍♀️' },
+      hpIcon: '❤️', hpLost: '💔',
       vocab: {
         nextLabel: '下一堂課',
         stageListTitle: '課程表',
@@ -159,7 +174,9 @@
         submitBtn: '交卷',
         hintBtn: '💡 請教助教？',
         hintTitle: '要請教助教嗎？',
-        hpLabel: '專注'
+        hpLabel: '專注',
+        hintOk: '請教助教',
+        boardTitle: '學院榮譽榜'
       },
       lines: {arrive:'同學們，新的一堂課開始了！先看看課堂說明。',wrong:['再仔細想想，你們可以的！','錯了也沒關係，學習就是不斷嘗試。','翻翻課堂說明，答案就在裡面。'],hint:'助教悄悄給你們一點提示。'}
     }

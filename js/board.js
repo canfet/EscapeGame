@@ -22,8 +22,10 @@
       var th = THEMES.indexOf(r.project.theme) >= 0 ? r.project.theme : 'retro';
       var tid = (Q.Tpl && Q.Tpl.norm) ? Q.Tpl.norm(r.project.template) : 'classic';
       document.body.className = 'quest theme-' + th + ' tpl-' + tid;
-      $('#b-title').textContent = '🏆 ' + r.project.name + (B.run ? '（' + B.run + '）' : '');
-      document.title = r.project.name + '・即時排行榜';
+      var bt = '即時排行榜';
+      try { if (tid !== 'classic') bt = Q.Tpl.vocab(tid, 'boardTitle') || bt; } catch (e) { /* */ }
+      $('#b-title').textContent = '🏆 ' + (tid !== 'classic' ? bt + '・' : '') + r.project.name + (B.run ? '（' + B.run + '）' : '');
+      document.title = r.project.name + '・' + bt;
     } catch (e) { /* 取不到專案資訊就用預設風格 */ }
     await load();
     setInterval(load, 15000);

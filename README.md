@@ -45,4 +45,9 @@ python -m http.server 8000       # 開 http://localhost:8000/
 
 後台編輯專案時可選「體驗套版」：經典、RPG 角色冒險（職業、Lv／EXP、升級動畫）、偵探案件（SOLVED 印章）、特務任務（終端機風）、海盜寶藏、魔法學院。套版會改變用語、隊伍造型、NPC 對話、特效，並可搭配原本 8 種色彩主題。NPC 名稱與頭像可自訂；玩家可用右上 ✨ 關閉特效。升級後請重新部署 `Code.gs`（版本 1.2.0）。
 
+- 活動前請重新部署 `Code.gs`（1.2.0），否則後台會一直跳版本過舊提示。
+- 每關可填 NPC 台詞：`npc_arrive`＝關卡開場台詞（每次點進關卡都出現）、`npc_wrong`＝答錯台詞、`npc_hint`＝提示台詞。
+- 專案可勾「開放玩家自行切換呈現套版」（`allow_tpl_switch`，預設不開放）：只影響前台用語與特效，不影響計分與資料。
+- 部署（GitHub Actions）會先跑自動測試（`node --test tests/*.test.js`），失敗就不部署；`docs`、`tests`、`tools`、`.github` 不會發佈到網站。
+
 自動測試：`node --test tests/*.test.js`

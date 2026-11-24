@@ -7,7 +7,7 @@
   var KEY_STORE = 'escapegame-admin-key';
   var REMEMBER_STORE = 'escapegame-admin-remember';   // 「記住這台裝置」：存在本機，30 天內免重新輸入
   var REMEMBER_DAYS = 30;
-  var PROJECT_FIELDS = ['project_id', 'name', 'status', 'unlock_mode', 'description', 'intro', 'finish_message', 'cover_url', 'theme', 'template', 'npc_name', 'npc_avatar',
+  var PROJECT_FIELDS = ['project_id', 'name', 'status', 'unlock_mode', 'description', 'intro', 'finish_message', 'cover_url', 'theme', 'template', 'npc_name', 'npc_avatar', 'allow_tpl_switch',
     'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy', 'wrong_lock_after', 'wrong_lock_sec', 'is_default', 'show_leaderboard', 'leaderboard_live', 'require_run_code', 'collect_message', 'deck_id'];
   var STAGE_FIELDS = ['stage_id', 'enabled', 'clue', 'image_url', 'require_gps', 'show_location', 'bypass_code', 'question', 'show_question_early', 'require_photo', 'reward_code', 'reward_order', 'final_from_fragments', 'coop_final', 'item_name', 'item_icon', 'item_rarity', 'item_story', 'card_id', 'card_random',
     'answer_type', 'points', 'choices', 'answer', 'max_attempts', 'form_url', 'form_verify_sheet', 'success_message', 'npc_arrive', 'npc_wrong', 'npc_hint',

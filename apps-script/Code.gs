@@ -35,7 +35,7 @@ var THEMES = ['retro', 'history', 'sport', 'mist', 'forest', 'neon', 'campus', '
 /* 各工作表欄位（可以在試算表後面自行加欄位，不影響程式） */
 var SCHEMA = {
   Projects: ['project_id', 'name', 'status', 'is_default', 'unlock_mode', 'description', 'intro',
-    'finish_message', 'cover_url', 'theme', 'template', 'npc_name', 'npc_avatar', 'routes', 'teams', 'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy',
+    'finish_message', 'cover_url', 'theme', 'template', 'npc_name', 'npc_avatar', 'allow_tpl_switch', 'routes', 'teams', 'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy',
     'show_leaderboard', 'leaderboard_live', 'require_run_code', 'wrong_lock_after', 'wrong_lock_sec', 'collect_message', 'deck_id', 'updated_at'],
   Stages: ['project_id', 'stage_id', 'order', 'enabled', 'title', 'clue', 'image_url', 'lat', 'lng',
     'radius_m', 'show_location', 'require_gps', 'bypass_code', 'question', 'show_question_early', 'require_photo', 'reward_code', 'reward_order', 'final_from_fragments', 'coop_final', 'item_name', 'item_icon', 'item_rarity', 'item_story', 'card_id', 'card_random', 'routes', 'answer_type', 'choices',
@@ -51,7 +51,7 @@ var SCHEMA = {
 
 /* 要強制為「純文字」格式的欄位（避免 007 變成 7） */
 var TEXT_COLUMNS = {
-  Projects: ['project_id', 'name', 'description', 'intro', 'finish_message', 'cover_url', 'collect_message', 'deck_id', 'routes', 'teams', 'npc_name', 'npc_avatar'],
+  Projects: ['project_id', 'name', 'description', 'intro', 'finish_message', 'cover_url', 'collect_message', 'deck_id', 'routes', 'teams', 'npc_name', 'npc_avatar', 'allow_tpl_switch'],
   Decks: ['deck_id', 'title', 'cards'],
   Stages: ['project_id', 'stage_id', 'title', 'clue', 'image_url', 'bypass_code', 'question', 'answer', 'choices', 'hint1', 'hint2', 'hint3',
     'success_message', 'npc_arrive', 'npc_wrong', 'npc_hint', 'form_url', 'form_verify_sheet', 'reward_code', 'item_name', 'item_icon', 'item_story', 'card_id', 'routes'],
@@ -64,7 +64,7 @@ var NUMBER_COLUMNS = {
   Stages: ['order', 'lat', 'lng', 'radius_m', 'points', 'max_attempts', 'hint_penalty', 'reward_order', 'card_random']
 };
 var BOOL_COLUMNS = {
-  Projects: ['is_default', 'show_leaderboard', 'leaderboard_live', 'require_run_code'],
+  Projects: ['is_default', 'allow_tpl_switch', 'show_leaderboard', 'leaderboard_live', 'require_run_code'],
   Stages: ['enabled', 'show_location', 'require_gps', 'show_question_early', 'require_photo', 'final_from_fragments', 'coop_final']
 };
 
@@ -1116,7 +1116,7 @@ function ownProject_(c) {
 function publicProject_(p, stages) {
   return {
     project_id: p.project_id, name: p.name, description: p.description, intro: p.intro, cover_url: p.cover_url, theme: p.theme,
-    template: p.template || 'classic', npc_name: p.npc_name || '', npc_avatar: p.npc_avatar || '',
+    template: p.template || 'classic', npc_name: p.npc_name || '', npc_avatar: p.npc_avatar || '', allow_tpl_switch: !!p.allow_tpl_switch,
     restrict_teams: !!(p.teams && p.teams.length),
     teams: (p.teams || []).map(function (t) { var rt = routeById_(p, t.route); return { name: t.name, route_name: rt ? rt.name : '', color: rt ? rt.color : '', avatar: t.avatar || '' }; }),
     avatars: avatarsFor_(p.template), collect_message: p.collect_message || '', deck_title: p.deck_title || '', deck_size: (p.cards || []).length, deck_kind: p.deck_kind || 'nature', deck_style: p.deck_style || 'foil',
@@ -1689,7 +1689,7 @@ function cleanProject_(r) {
     description: str_(r.description), intro: str_(r.intro), finish_message: str_(r.finish_message),
     routes: routes0, teams: parseTeams_(r.teams, routes0),
     cover_url: str_(r.cover_url), theme: THEMES.indexOf(str_(r.theme).toLowerCase()) >= 0 ? str_(r.theme).toLowerCase() : 'retro',
-    template: normTemplate_(r.template), npc_name: str_(r.npc_name).slice(0, 20), npc_avatar: str_(r.npc_avatar).slice(0, 8),
+    template: normTemplate_(r.template), npc_name: str_(r.npc_name).slice(0, 20), npc_avatar: str_(r.npc_avatar).slice(0, 8), allow_tpl_switch: bool_(r.allow_tpl_switch),
     start_at: sd ? sd.toISOString() : '', end_at: ed ? ed.toISOString() : '',
     time_limit_min: num_(r.time_limit_min, 0), gps_max_accuracy: num_(r.gps_max_accuracy, DEFAULT_GPS_MAX_ACCURACY),
     show_leaderboard: bool_(r.show_leaderboard), leaderboard_live: bool_(r.leaderboard_live), require_run_code: bool_(r.require_run_code),
