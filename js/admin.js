@@ -1602,7 +1602,7 @@
         '<small>' + bits.join('・') + '</small></div><span class="tp-st">' + txt + '</span></div>';
     }).join('');
     var s = ses.filter(function (x) { return x.team_name === team; })[0];
-    var head = s ? '<div class="tp-head"><b>' + esc(team) + '</b><span>完成 ' + s.solved + ' / ' + s.total + ' 關・' + s.score + ' 分' + (s.last_active_at ? '・' + subRel(s.last_active_at) + '有動作' : '') + '</span></div>' : '<div class="tp-head"><b>' + esc(team) + '</b></div>';
+    var head = s ? '<div class="tp-head"><b>' + esc(team) + '</b><span>完成 ' + s.solved + ' / ' + s.total + ' 關・' + s.score + ' 分' + (s.last_active_at ? '・' + subRel(s.last_active_at) + '有動作' : '') + (s.rating ? '・評價 ' + s.rating + '★' : '') + '</span></div>' + (s.feedback ? '<div class="small muted" style="margin:2px 0 6px">💬 ' + esc(s.feedback) + '</div>' : '') : '<div class="tp-head"><b>' + esc(team) + '</b></div>';
     return head + rows;
   }
 
@@ -1663,6 +1663,8 @@
     $('#mon-playing').textContent = ss.filter(function (s) { return s.status === 'playing'; }).length;
     $('#mon-finished').textContent = ss.filter(function (s) { return s.status === 'finished'; }).length;
     $('#mon-subs').textContent = sub.submissions.length;
+    var rated = ss.filter(function (x) { return !x.test && x.rating > 0; });   // 完賽後玩家留的 1～5 顆星
+    $('#mon-rating').textContent = rated.length ? (rated.reduce(function (a, x) { return a + x.rating; }, 0) / rated.length).toFixed(1) + '★（' + rated.length + '）' : '—';
     $('#mon-updated').textContent = '更新於 ' + Q.fmtTime(new Date());
     var stTxt = { playing: ['進行中', 'amber'], finished: ['完成', 'green'], timeup: ['超時', 'red'] };
     $('#mon-sessions').innerHTML = ss.length ? ss.map(function (s) {

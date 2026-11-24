@@ -20,6 +20,10 @@
     });
     $('#app-head').classList.toggle('hidden', id === 'v-game');   // 闖關畫面有自己的頂端列
     window.scrollTo(0, 0);
+    try {   // 換畫面：焦點移到該畫面的標題，螢幕閱讀器會念出新畫面
+      var hd = id === 'v-game' ? $('#g-title') : $('#' + id).querySelector('h1, h2');
+      if (hd) { hd.setAttribute('tabindex', '-1'); hd.focus({ preventScroll: true }); }
+    } catch (e) { /* */ }
     if (id === 'v-game' && P.map) setTimeout(function () { P.map.invalidateSize(); }, 50);
     if (id === 'v-game') fxEnter(); else fxLeave();
   }
@@ -52,7 +56,7 @@
     var syncOnline = function () { queueChip(); };
     window.addEventListener('offline', syncOnline); window.addEventListener('online', syncOnline); syncOnline();
     // 大字模式（長輩友善）：整體字放大，設定會記住
-    try { if (localStorage.getItem('escapegame:bigtext') === '1') document.documentElement.classList.add('big-text'); } catch (e) { /* */ }
+    try { if (localStorage.getItem('escapegame:bigtext') === '1') document.documentElement.classList.add('big-text'); $('#btn-font').setAttribute('aria-pressed', 'true'); } catch (e) { /* */ }
     $('#btn-font').onclick = function () {
       var on = document.documentElement.classList.toggle('big-text');
       this.setAttribute('aria-pressed', String(on));
@@ -64,10 +68,16 @@
       var id = e.target.id;
       if (P.sid && P.openId && ['s-ans', 's-caption', 's-code'].indexOf(id) >= 0) { try { localStorage.setItem(draftKey(P.openId, id), e.target.value); } catch (x) { /* */ } }
     });
+    registerSw();
+    $('#ap-go').onclick = arrivePromptGo; $('#ap-x').onclick = hideArrivePrompt;
     $('#tut-next').onclick = tutNext; $('#tut-skip').onclick = tutEnd;
+    $('#tut-font').onclick = function () { $('#btn-font').click(); renderTut(); };   // 與設定裡的大字鈕同一個開關
     try {
       $('#btn-fx').onclick = toggleFx;
-      $('#btn-tpl').onclick = function (e) { e.stopPropagation(); toggleTplMenu(); };
+      $('#btn-tpl').onclick = function (e) { e.stopPropagation(); closeSettings(); toggleTplMenu(); };
+      $('#btn-settings').onclick = function (e) { e.stopPropagation(); toggleSettings(); };
+      document.addEventListener('click', function (e) { var m = $('#settings-menu'); if (m && !m.classList.contains('hidden') && !m.contains(e.target)) closeSettings(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#settings-menu').classList.contains('hidden')) { closeSettings(); try { $('#btn-settings').focus(); } catch (x) { /* */ } } });
       document.addEventListener('click', function (e) { var m = $('#tpl-menu'); if (m && !m.classList.contains('hidden') && !m.contains(e.target)) closeTplMenu(); });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeTplMenu(); });
       $('#levelup').onclick = hideLevelUp;
@@ -192,6 +202,11 @@
         P.prevTeam = ss.team_name;   // 舊進度仍保留在手機上，直到新隊伍開始才會被取代
       } catch (e) {
         if (e.code === 'SESSION_NOT_FOUND') { try { localStorage.removeItem(LS(pid)); } catch (x) { /* */ } }
+        else if (e.code === 'NETWORK' && loadSnapshot(sid)) {   // 訊號很差：先用手機上次存的進度進遊戲，恢復連線後自動更新
+          P.sid = sid;
+          Q.toast('目前沒有網路：先顯示上次的內容，恢復連線後會自動更新', 'warn', 5000);
+          return startGame(loadSnapshot(sid));
+        }
         else return showError(e.message);
       }
     }
@@ -311,7 +326,7 @@
   function resetTeam(e) {
     e.preventDefault();
     if (!confirm('確定要換隊伍／重新開始嗎？\n目前這支隊伍的紀錄會保留在系統裡，但這台手機將不再接續它。')) return;
-    try { localStorage.removeItem(LS(P.projectId)); } catch (x) { /* */ }
+    try { if (P.sid) localStorage.removeItem(snapKey(P.sid)); localStorage.removeItem(LS(P.projectId)); } catch (x) { /* */ }
     fxLeave();
     location.reload();
   }
@@ -351,6 +366,8 @@
     });
     var prevFinished = P.state && P.state.session.status === 'finished';
     P.state = state;
+    saveSnapshot(state);
+    prefetchStages(state);
     renderGame();
     if (P.openId) renderStage();
     if (state.just_finished || (!prevFinished && state.session.status === 'finished' && P.stateLoadedOnce)) {
@@ -493,11 +510,14 @@
       { icon: '📍', title: '跟著指示找地點', text: '地圖上的「下一站」會告訴你方向和距離。\n走到地點附近，按「我到了，定位打卡」。' },
       { icon: '✏️', title: '答題過關', text: '打卡後就能作答。需要幫忙時可以按「需要提示」，\n但看提示會讓這一關可得的分數變少。' }
     ];
-    if (hasColl) TUT.push({ icon: '🃏', title: '收集卡牌與收藏品', text: '每過一關都能收進圖鑑。點右上角的 🎒 看收集進度，\n集滿整本會有驚喜。你的小夥伴也會越來越多！' });
-    if (hasFrag) TUT.push({ icon: '🧩', title: '收集密碼碎片', text: '過關會得到密碼碎片，全部收集起來，\n就能在最後一關解開最終密碼。' });
-    if (pj.leaderboard_live) TUT.push({ icon: '🏆', title: '看看其他隊伍', text: '點上方的「🏆 排行榜」，隨時看各隊的進度。' });
+    // 其他說明合併成一頁「小提醒」，教學最多 4 頁
+    var extra = [];
+    if (hasColl) extra.push('🎒 右上角的背包：看收集進度，集滿有驚喜');
+    if (hasFrag) extra.push('🧩 過關會得到密碼碎片，集齊就能解最後一關');
+    if (pj.leaderboard_live) extra.push('🏆 上方「排行榜」：隨時看各隊進度');
     var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
-    if (TOUCH && !standalone) TUT.push({ icon: '📲', title: '小技巧：加到主畫面', text: 'iPhone：點 Safari 下方的分享鈕 →「加入主畫面」。\nAndroid：點瀏覽器選單 →「加到主畫面」。\n之後從主畫面開啟，沒有網址列，畫面更大。' });
+    if (TOUCH && !standalone) extra.push('📲 瀏覽器選單「加到主畫面」，畫面更大');
+    if (extra.length) TUT.push({ icon: '💡', title: '小提醒', text: extra.join('\n') });
     P.tutI = 0;
     renderTut();
     $('#tutorial').classList.remove('hidden');
@@ -508,19 +528,14 @@
     $('#tut-dots').innerHTML = TUT.map(function (x, i) { return '<i class="' + (i === P.tutI ? 'on' : '') + '"></i>'; }).join('');
     $('#tut-next').textContent = P.tutI === TUT.length - 1 ? '開始闖關！' : '下一步';
     $('#tut-skip').classList.toggle('hidden', P.tutI === TUT.length - 1);
+    var tf = $('#tut-font'), bigOn = document.documentElement.classList.contains('big-text');
+    tf.classList.toggle('hidden', P.tutI !== TUT.length - 1);   // 大字模式只在最後一頁提供，不再另外跳出詢問視窗
+    tf.setAttribute('aria-pressed', String(bigOn)); tf.textContent = bigOn ? '🔠 已開啟大字模式（點一下關閉）' : '🔠 字太小？開啟大字模式';
   }
   function tutNext() { if (P.tutI >= TUT.length - 1) return tutEnd(); P.tutI++; renderTut(); }
   function tutEnd() {
     $('#tutorial').classList.add('hidden');
-    var first = true;
-    try { first = localStorage.getItem('escapegame:tut') !== '1'; localStorage.setItem('escapegame:tut', '1'); } catch (e) { /* */ }
-    if (first && !document.documentElement.classList.contains('big-text')) {
-      askConfirm('文字大小', '在戶外太陽下看字吃力嗎？可以改成大字模式（之後也能在上方 Aa 隨時切換）。', '改成大字').then(function (yes) {
-        if (!yes) return;
-        document.documentElement.classList.add('big-text');
-        try { localStorage.setItem('escapegame:bigtext', '1'); } catch (e) { /* */ }
-      });
-    }
+    try { localStorage.setItem('escapegame:tut', '1'); } catch (e) { /* */ }
   }
 
   /* ---------- 抵達成功的明顯回饋 ---------- */
@@ -668,21 +683,23 @@
     if (state === 'ok') {
       var acc = Math.round(P.pos.acc);
       cls = acc > 50 ? 'warn' : 'ok';
-      text = P.gpsMode === 'low' ? '省電定位中 ±' + acc + ' 公尺' : (acc > 50 ? '定位不準 ±' : '定位中 ±') + acc + ' 公尺';
+      text = P.gpsMode === 'low' ? '省電定位' : (acc > 50 ? '定位不準' : '定位正常');
+      try { pill.title = '誤差約 ' + acc + ' 公尺'; } catch (e) { /* */ }
       if (P.gpsMode === 'low') cls = 'ok';
-      if (acc > 100 && P.gpsMode !== 'low') tip = '⚠️ 誤差很大（電腦定位常見），地圖距離僅供參考，建議用手機到現場。';
+      if (acc > 100 && P.gpsMode !== 'low') tip = '誤差很大，距離僅供參考，建議用手機到現場。';
     } else if (state === 'denied') {
       cls = 'bad'; text = '未允許定位';
       tip = (/iPhone|iPad|iPod/i.test(navigator.userAgent)
-        ? '📍 iPhone：設定 → 隱私權與安全性 → 定位服務 → 開啟，並把 Safari（或你用的瀏覽器）設為「使用 App 期間」；再回來按「重新定位」。'
-        : '📍 Android：點網址列左邊的 🔒 → 權限 → 位置 → 允許；再回來按「重新定位」。');
+        ? '請到「設定 → 隱私權與安全性 → 定位服務」開啟，再按「重新定位」。'
+        : '請點網址列的 🔒 → 權限 → 位置 → 允許，再按「重新定位」。');
     } else if (state === 'stopped') {
       cls = ''; text = '定位已停止（任務已結束）';
     } else if (state === 'none') {
       cls = 'bad'; text = '不支援定位'; tip = '這台裝置不支援定位。';
     } else if (state === 'error') {
-      cls = 'bad'; text = '無法定位'; tip = '📡 暫時抓不到定位，請走到空曠處、確認手機的定位已開啟，再按「重新定位」。';
+      cls = 'bad'; text = '無法定位'; tip = '抓不到定位，請走到空曠處並確認定位已開啟。';
     }
+    try { $('#g-gps').classList.toggle('hidden', cls !== 'bad'); } catch (e) { /* 定位正常時只看地圖上的狀態膠囊；異常才在頂端列提醒 */ }
     dot.className = 'gps-dot ' + (cls === 'ok' || cls === 'warn' ? 'ok' : cls === 'bad' ? 'bad' : '');
     pill.className = 'gps-pill ' + cls;
     pt.textContent = text;
@@ -701,7 +718,7 @@
   }
 
   function toastGps() {
-    if (P.gpsState === 'denied') Q.toast('定位權限被拒絕：請到手機設定 → 瀏覽器 → 位置，改成「允許」，再重新整理頁面。', 'err', 7000);
+    if (P.gpsState === 'denied') Q.toast('定位被拒絕：請到手機設定開啟瀏覽器的定位，再重新整理。', 'err', 7000);
     else Q.toast('還沒取得定位，請稍候或移到空曠處', 'warn');
   }
 
@@ -737,6 +754,8 @@
 
   /* ---------- 方向與指南針 ---------- */
   var DIRS = ['北', '東北', '東', '東南', '南', '西南', '西', '西北'];
+  var ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+  function arrowOf(b) { return ARROWS[Math.round(((b % 360) + 360) % 360 / 45) % 8]; }
   var RELS = ['正前方', '右前方', '右邊', '右後方', '正後方', '左後方', '左邊', '左前方'];
   function dirName(b) { return DIRS[Math.round(((b % 360) + 360) % 360 / 45) % 8]; }
   function relName(r) { return RELS[Math.round(((r % 360) + 360) % 360 / 45) % 8]; }
@@ -850,7 +869,8 @@
     var el = document.getElementById('sheet-map'), st = findStage(P.openId);
     if (!el || !window.L || !st || st.lat == null) return;
     var m = P.sMap = L.map(el, { zoomControl: true, attributionControl: false, dragging: !TOUCH, tap: false }).setView([st.lat, st.lng], 17);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(m);
+    var stl = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(m);
+    mapSkeleton(stl, document.getElementById('sheet-map'));
     var color = themeVar('--forest', '#265f46');
     L.circle([st.lat, st.lng], { radius: st.radius_m, color: color, weight: 2, fillOpacity: .16 }).addTo(m);
     var no = P.state.stages.indexOf(st) + 1;
@@ -908,13 +928,79 @@
     mode.textContent = tips.join('；');
   }
 
+  /* ---------- 離線：進度快照、關卡內容預載 ---------- */
+  function snapKey(sid) { return 'escapegame:snap:' + sid; }
+  /** 每次拿到最新進度就存一份在手機上（含已解鎖關卡的線索與題目）；容量不足就放棄，不影響遊戲 */
+  function saveSnapshot(state) {
+    try {
+      if (!P.sid || !state || !state.session) return;
+      localStorage.setItem(snapKey(P.sid), JSON.stringify({ t: Date.now(), state: state }));
+    } catch (e) { /* 無痕模式或容量不足 */ }
+  }
+  function loadSnapshot(sid) {
+    try {
+      var o = JSON.parse(localStorage.getItem(snapKey(sid)) || 'null');
+      return o && o.state && o.state.session && o.state.session.session_id === sid ? o.state : null;
+    } catch (e) { return null; }
+  }
+  function tileXY(lat, lng, z) {
+    var n = Math.pow(2, z), x = Math.floor((lng + 180) / 360 * n), s = Math.sin(lat * Math.PI / 180);
+    var y = Math.floor((0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n);
+    return { x: x, y: y };
+  }
+  /** 進行中的關卡：預先抓關卡圖片與周邊地圖圖磚（由 sw.js 存起來），到了現場訊號差也看得到；省流量模式或慢速網路不預載 */
+  function prefetchStages(state) {
+    try {
+      var conn = navigator.connection || {};
+      if (!navigator.onLine || conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '')) return;
+      P.pre = P.pre || {};
+      var cur = (state.stages || []).filter(function (s) { return s.status === 'open' || s.status === 'arrived'; }).slice(0, 2);
+      var queue = [];
+      cur.forEach(function (st) {
+        if (st.image_url && !P.pre[st.image_url]) { P.pre[st.image_url] = 1; var im = new Image(); im.src = st.image_url; }
+        if (st.lat == null || st.lng == null) return;
+        [16, 17].forEach(function (z) {
+          var c = tileXY(st.lat, st.lng, z);
+          for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) {
+            var url = 'https://a.tile.openstreetmap.org/' + z + '/' + (c.x + dx) + '/' + (c.y + dy) + '.png';
+            if (!P.pre[url]) { P.pre[url] = 1; queue.push(url); }
+          }
+        });
+      });
+      // 分批慢慢抓（每 250 毫秒 3 張），不跟玩家的操作搶頻寬
+      (function next() {
+        var batch = queue.splice(0, 3);
+        batch.forEach(function (u) { try { fetch(u, { mode: 'no-cors' }).catch(function () { /* */ }); } catch (e) { /* */ } });
+        if (queue.length) setTimeout(next, 250);
+      })();
+    } catch (e) { /* */ }
+  }
+  function registerSw() {
+    try {
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        navigator.serviceWorker.register('sw.js').catch(function () { /* 註冊失敗只是少了離線快取 */ });
+      }
+    } catch (e) { /* */ }
+  }
+
   /* ---------- 地圖 ---------- */
+  /** 圖磚還沒載入前顯示流動的骨架底色；載入完成（或 10 秒後仍沒有，例如離線）就拿掉 */
+  function mapSkeleton(layer, el) {
+    try {
+      if (!el) return;
+      el.classList.add('map-skel');
+      var off = function () { el.classList.remove('map-skel'); };
+      layer.once('load', off);
+      setTimeout(off, 10000);
+    } catch (e) { /* */ }
+  }
   function initMap() {
     if (P.map || !window.L) { if (!window.L) $('#map-card').classList.add('hidden'); return; }
     P.map = L.map('g-map', { zoomControl: true, attributionControl: true, dragging: !TOUCH }).setView([23.7, 121], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    var tl = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, attribution: '&copy; OpenStreetMap'
     }).addTo(P.map);
+    mapSkeleton(tl, $('#g-map'));
     P.layers = L.layerGroup().addTo(P.map);
     P.map.on('zoomend', updateLink);
     if (TOUCH) P.map.on('click', function () { if (!$('#map-card').classList.contains('full')) setFullscreen(true); });
@@ -990,6 +1076,16 @@
       b.classList.toggle('hidden', !ok);
       if (!ok) closeTplMenu();
     } catch (e) { /* */ }
+  }
+  /** 設定選單：套版、特效、大字、音效收在同一個按鈕裡，頂端列只留背包與設定 */
+  function closeSettings() { try { $('#settings-menu').classList.add('hidden'); $('#btn-settings').setAttribute('aria-expanded', 'false'); } catch (e) { /* */ } }
+  function toggleSettings() {
+    var m = $('#settings-menu');
+    if (!m.classList.contains('hidden')) return closeSettings();
+    closeTplMenu();
+    m.classList.remove('hidden');
+    $('#btn-settings').setAttribute('aria-expanded', 'true');
+    try { var f = m.querySelector('button:not(.hidden)'); if (f) f.focus(); } catch (e) { /* */ }
   }
   function closeTplMenu() { try { $('#tpl-menu').classList.add('hidden'); $('#btn-tpl').setAttribute('aria-expanded', 'false'); } catch (e) { /* */ } }
   function toggleTplMenu() {
@@ -1183,6 +1279,7 @@
   function dlgLine() {
     var el = $('#dialog'), tx = el.querySelector('.dlg-text');
     el.classList.add('typing');
+    try { var dn = el.querySelector('.dlg-name'); say(DLG.lines[DLG.i], dn && dn.textContent); } catch (e) { /* */ }
     DLG.h = typeText(tx, DLG.lines[DLG.i], function () { el.classList.remove('typing'); });
   }
   function dlgAdvance() {
@@ -1331,8 +1428,12 @@
     P.inside = P.inside || {};
     if (inside && P.pos.acc <= 100 && !P.inside[st.stage_id]) {   // 定位誤差太大（例如剛開始的概略位置）時先不要通知
       P.inside[st.stage_id] = true;
-      if (P.state && P.state.session.status === 'playing') { sfx('near'); Q.toast('已進入「' + st.title + '」範圍' + (st.require_gps ? '，可以打卡了' : ''), 'ok'); }
-    } else if (!inside && d > st.radius_m * 1.3) P.inside[st.stage_id] = false;
+      if (P.state && P.state.session.status === 'playing') {
+        sfx('near');
+        if (st.require_gps && st.status === 'open' && showArrivePrompt(st)) { /* 一鍵打卡提示已顯示 */ }
+        else Q.toast('已進入「' + st.title + '」範圍' + (st.require_gps ? '，可以打卡了' : ''), 'ok');
+      }
+    } else if (!inside && d > st.radius_m * 1.3) { P.inside[st.stage_id] = false; if (P.apSid === st.stage_id) hideArrivePrompt(); }
     var ll = [[P.pos.lat, P.pos.lng], [st.lat, st.lng]];
     var label = '距離「' + st.title + '」' + Q.fmtDist(d) + (P.pos.acc > 100 ? ' ⚠️誤差大' : '');
     var style = { color: inside ? themeVar('--link-near', '#2d6a4f') : themeVar('--link-far', '#c1440e') };
@@ -1365,6 +1466,7 @@
     if (P.openId !== id) { P.choice = null; P.photo = null; P.bubble = null; }
     var wasOpen = P.openId === id && !$('#sheet').classList.contains('hidden');
     P.openId = id;
+    hideArrivePrompt();
     updateLink();
     if (!wasOpen) npcOnOpen(id);
     renderStage();
@@ -1410,16 +1512,25 @@
       : used * pen > 0 ? '<span class="chip amber">本關可得 ' + avail + ' 分（原 ' + st.points + ' 分）</span>'
       : '<span class="chip">本關 ' + st.points + ' 分</span>';
     h.push('<div class="row wrap" style="margin-bottom:12px"><span class="chip ' + lab[1] + '">' + lab[0] + '</span>' +
-      '<span class="chip">' + Q.TYPE_LABEL[st.answer_type] + '</span>' + ptsChip +
-      '<span class="chip blue">⭐ 目前總分 ' + se.score + '</span></div>');
+      ptsChip + '</div>');   // 題型與總分不再重複顯示（總分在上方 HUD、題型看題目就知道）
     h.push('<div class="sheet-content stack">');
 
     // 1) 線索 → 2) 題目 → 3) 提示（可收合）
     var contentStart = h.length;
-    if (st.clue) h.push((themed ? secHeadHtml('clue') : '') + '<div class="clue">' + Q.linkify(st.clue) + '</div>');
+    // 作答中（已抵達）：題目與答案欄放最前面，線索收合成「再看一次」，玩家不用捲動就能作答
+    var answering = st.status === 'arrived' && playing && !!st.question;
+    var ansUi = (st.status === 'arrived' && playing) ? answerUI(st) : null;
+    var clueHtml = st.clue ? '<div class="clue">' + Q.linkify(st.clue) + '</div>' : '';
     // 題目：抵達後一定顯示；前往中則看關卡是否設定「抵達前就顯示題目」
-    if (st.question) {
-      h.push((themed ? secHeadHtml('question') : '') + '<div class="question">' + (st.status === 'open' ? '<div class="q-label">📝 ' + V('questionHeading') + '（抵達地點後才能作答）</div>' : '') + Q.linkify(st.question) + '</div>');
+    var qHtml = st.question ? (themed ? secHeadHtml('question') : '') + '<div class="question">' + (st.status === 'open' ? '<div class="q-label">📝 ' + V('questionHeading') + '（抵達地點後才能作答）</div>' : '') + Q.linkify(st.question) + '</div>' : '';
+    if (answering) {
+      h.push(qHtml);
+      if (ansUi && ansUi.body) h.push(ansUi.body);
+      if (clueHtml) P.clueOpen = P.clueOpen || {};
+      h.push('<details class="stage-more" data-ck="' + esc(st.stage_id) + '"' + (P.clueOpen[st.stage_id] ? ' open' : '') + '><summary>📜 再看一次線索</summary><div style="margin-top:10px">' + clueHtml + '</div></details>');
+    } else {
+      if (clueHtml) h.push((themed ? secHeadHtml('clue') : '') + clueHtml);
+      if (qHtml) h.push(qHtml);
     }
     // 已完成／未通過的關卡：線索與題目收合起來，面板只留結果，比較精簡
     if (st.status === 'solved' || st.status === 'failed') {
@@ -1459,10 +1570,9 @@
 
     // 5) 作答區；送出按鈕固定在底部
     if (st.status === 'arrived' && !st.require_gps && st.lat != null) pushLoc();   // 不用打卡：位置還是要讓玩家看到
-    if (st.status === 'arrived' && playing) {
-      var ui = answerUI(st);
-      if (ui.body) h.push(ui.body);
-      if (ui.btn) acts.push(ui.btn);
+    if (ansUi) {
+      if (ansUi.body && !answering) h.push(ansUi.body);   // 沒有題目文字時，答案欄仍照原位置顯示
+      if (ansUi.btn) acts.push(ansUi.btn);
     }
 
     if (st.status === 'solved') {
@@ -1493,6 +1603,7 @@
     });
     if (same && saved[focusId] !== undefined) { var fe = document.getElementById(focusId); if (fe) { try { fe.focus({ preventScroll: true }); } catch (e) { /* */ } } }
     bindStage(st);
+    Q.$$('#sheet-body details[data-ck]').forEach(function (d) { d.addEventListener('toggle', function () { P.clueOpen[d.getAttribute('data-ck')] = d.open; }); });   // 輪詢重繪後維持展開狀態
     mountSheetMap();
     if (themed) afterThemedRender(st);
   }
@@ -1525,10 +1636,12 @@
       return '<div class="sx-bar"><div class="sx-hp">' + out + '</div>' + exp + '</div>';
     } catch (e) { return ''; }
   }
+  /** 螢幕閱讀器通報（逐字輸出的文字不放 live 區域，改成整句一次念） */
+  function say(text, name) { try { if (Q.announce && text) Q.announce((name ? name + "說：" : "") + text); } catch (e) { /* */ } }
   /** 內嵌 NPC 氣泡（頭像＋文字）；文字先完整放進 DOM，之後由 Fx.typewriter 逐字重播 */
   function npcBubbleHtml(npc, text) {
     if (!npc || !text) return '';
-    return '<div class="npc-bubble" role="status" aria-live="polite" aria-label="' + esc(npc.name || '') + '說">' +
+    return '<div class="npc-bubble" data-npc="' + esc(npc.name || '') + '">' +   // 不放 aria-live：逐字輸出會被反覆朗讀，改由 announce() 一次通報
       '<span class="nb-av" aria-hidden="true">' + esc(npc.avatar || '') + '</span>' +
       '<span class="nb-body"><b class="nb-name">' + esc(npc.name || '') + '</b><span class="nb-text">' + esc(text) + '</span></span></div>';
   }
@@ -1546,6 +1659,7 @@
       var b = P.bubble;
       if (b && b.fresh && b.sid === st.stage_id) {
         b.fresh = false;
+        try { var nn = Q.Tpl.npcOf(P.tplId, P.project || (P.state && P.state.project)); say(b.text, nn && nn.name); } catch (e) { /* */ }
         var el = document.querySelector('#sheet-body .npc-bubble .nb-text'), f = FX();
         if (el && f && f.typewriter && !reduced()) f.typewriter(el, b.text, { speed: 28, onTick: blipTick });
       }
@@ -1720,8 +1834,8 @@
       var pen = st.hint_penalty || 0, u = st.hints.length;
       var a0 = Math.max(0, st.points - u * pen), a1 = Math.max(0, st.points - (u + 1) * pen);
       var msg = pen
-        ? '⚠️ 看提示會扣分！\n\n這一關答對可得的分數：' + a0 + ' 分 → ' + a1 + ' 分（每則提示少 ' + pen + ' 分）。\n\n你們目前總分 ' + P.state.session.score + ' 分，不會馬上被扣，會在這一關過關時少算。'
-        : '這則提示不會扣分，可以放心使用。\n\n（你們目前總分 ' + P.state.session.score + ' 分）';
+        ? '這一關可得分數：' + a0 + ' → ' + a1 + ' 分（過關時才少算）。'
+        : '這則提示不扣分，放心看。';
       var ok = await askConfirm(V('hintTitle'), msg, pen ? V('hintOk', null, '看提示') + '（少 ' + pen + ' 分）' : V('hintOk', null, '看提示'));
       if (ok) act('getHint', { stageId: st.stage_id });
     });
@@ -2008,9 +2122,32 @@
     return best;
   }
 
+  /** 走進關卡範圍時主動跳出「打卡看題目」：一次點擊完成定位打卡並打開關卡（沒有其他視窗擋住時才跳出） */
+  function showArrivePrompt(st) {
+    try {
+      var busy = LAYERS.length || ['#tutorial', '#dialog', '#solved', '#confirm'].some(function (s) { var e = $(s); return e && !e.classList.contains('hidden'); });
+      if (busy) return false;
+      P.apSid = st.stage_id;
+      $('#ap-title').textContent = '📍 到了「' + st.title + '」';
+      $('#arrive-prompt').classList.remove('hidden');
+      return true;
+    } catch (e) { return false; }
+  }
+  function hideArrivePrompt() { P.apSid = null; try { $('#arrive-prompt').classList.add('hidden'); } catch (e) { /* */ } }
+  function arrivePromptGo() {
+    var id = P.apSid, st = id && findStage(id);
+    hideArrivePrompt();
+    if (!st) return;
+    doArrive(st, '').then(function () {
+      var s2 = findStage(id);
+      if (s2 && (s2.status === 'arrived' || s2.status === 'open')) openStage(id);
+    });
+  }
+
   function updateNextStep() {
     var btn = $('#next-step');
     if (!btn) return;
+    if (P.apSid) { var ap = findStage(P.apSid); if (!ap || ap.status !== 'open') hideArrivePrompt(); }
     var st = P.state && P.state.session.status === 'playing' ? nextStage() : null;
     btn.classList.toggle('hidden', !st);
     if (!st) return;
@@ -2020,7 +2157,7 @@
     if (st.status === 'arrived' && !(st.lat != null && !st.require_gps)) sub = '已抵達，點這裡作答';
     else if (st.lat != null && P.pos) {   // 前往中；不用打卡的關卡也顯示方向與距離
       var d = Q.distM(P.pos.lat, P.pos.lng, st.lat, st.lng);
-      sub = d <= st.radius_m ? (st.require_gps ? '✅ 已在範圍內，點這裡打卡' : '✅ 已在這一關的位置，點這裡作答') : dirName(bearing(P.pos.lat, P.pos.lng, st.lat, st.lng)) + '方 ' + Q.fmtDist(d);
+      sub = d <= st.radius_m ? (st.require_gps ? '✅ 已在範圍內，點這裡打卡' : '✅ 已在這一關的位置，點這裡作答') : (function (bb) { return arrowOf(bb) + ' ' + dirName(bb); })(bearing(P.pos.lat, P.pos.lng, st.lat, st.lng)) + '方 ' + Q.fmtDist(d);
     }
     else if (st.lat != null) sub = '定位中…';
     else sub = '點這裡看線索';
@@ -2441,6 +2578,28 @@
   }
   function closeShare() { $('#share-view').classList.add('hidden'); layerClose('share'); }
 
+  /** 完賽後的一題回饋：點星星就送出，再補一句話（選填）；後端太舊或斷線時不影響完賽畫面 */
+  function setupFeedback(se) {
+    try {
+      var box = $('#fin-feedback'), stars = Q.$$('#fb-stars button'), st = $('#fb-status'), more = $('#fb-more'), txt = $('#fb-text');
+      var cur = se.rating || 0;
+      var paint = function (n) { stars.forEach(function (b) { var on = +b.dataset.n <= n; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(+b.dataset.n === n)); }); };
+      var send = async function (n, silent) {
+        st.textContent = '送出中…';
+        try {
+          await Q.api('submitFeedback', { sessionId: P.sid, rating: n, comment: txt.value.trim() }, { noToast: true });
+          cur = n; se.rating = n; paint(n); more.classList.remove('hidden');
+          st.textContent = silent ? '已補充，謝謝你！' : '謝謝你的回饋！可以再補一句話';
+        } catch (e) { st.textContent = '目前無法送出，稍後再點一次星星'; }
+      };
+      paint(cur); more.classList.toggle('hidden', !cur);
+      st.textContent = cur ? '謝謝你的回饋！' : '點星星就會送出';
+      stars.forEach(function (b) { b.onclick = function () { if (!P.busy) send(+b.dataset.n, false); }; });
+      $('#fb-send').onclick = function () { if (cur) send(cur, true); };
+      box.classList.remove('hidden');
+    } catch (e) { try { $('#fin-feedback').classList.add('hidden'); } catch (x) { /* */ } }
+  }
+
   async function showFinish() {
     var s = P.state, se = s.session;
     $('#fin-team').textContent = se.team_name + (se.run_code ? '・' + se.run_code : '');
@@ -2468,6 +2627,7 @@
         askConfirm((it.icon && !/^(https?:|data:)/i.test(it.icon) ? it.icon + ' ' : '') + it.name + '（' + RARITY_TXT[it.rarity] + '）', it.story || '收藏成功！', '關閉', true);
       };
     });
+    setupFeedback(se);
     show('v-finish');
     fxCelebrate('finish');
     if (!s.project.show_leaderboard) return;

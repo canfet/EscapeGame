@@ -73,7 +73,7 @@ function state(s, extra) {
   if (solved === list.length && s.status === 'playing') { s.status = 'finished'; s.finished_at = new Date().toISOString(); s.just = true; }
   const score = list.reduce((a, x) => a + x.earned, 0);
   const st = {
-    session: { session_id: s.id, code: s.code, project_id: 'demo', team_name: s.team, run_code: '', route: '', avatar: s.avatar, test: false, status: s.status, score,
+    session: { session_id: s.id, code: s.code, project_id: 'demo', team_name: s.team, run_code: '', route: '', avatar: s.avatar, test: false, status: s.status, rating: s.rating || 0, score,
       started_at: s.started_at, finished_at: s.finished_at || null, deadline: null, server_time: new Date().toISOString() },
     project: project(), stages: list, fragments: [], collection: [], badges: [], title: '',
     summary: { total: list.length, solved, done: solved },
@@ -103,6 +103,9 @@ function handle(b) {
     }
     case 'arrive': {
       need(); const d = def(); const g = s.prog[d.stage_id] = s.prog[d.stage_id] || {};
+      // 帶了定位座標：離關卡 80 公尺內就算抵達（模擬後端的 GPS 打卡）
+      const near = b.lat != null && Math.hypot((b.lat - d.lat) * 111000, (b.lng - d.lng) * 100000) < 80;
+      if (!g.arrived && d.gps && near) g.arrived = true;
       if (!g.arrived && d.gps) {
         if (!b.code || b.code !== d.bypass) { const e = new Error('通關碼不正確'); e.code = 'WRONG_CODE'; throw e; }
         g.arrived = true;
@@ -121,6 +124,13 @@ function handle(b) {
       if ((g.hints || 0) >= d.hints.length) { const e = new Error('沒有更多提示了'); e.code = 'NO_HINT'; throw e; }
       const h = d.hints[g.hints || 0]; g.hints = (g.hints || 0) + 1;
       return state(s, { hint: h, message: '已使用提示：每則提示少 10 分' });
+    }
+    case 'submitFeedback': {
+      need();
+      const n = Math.round(Number(b.rating));
+      if (!(n >= 1 && n <= 5)) { const e = new Error('請選 1 到 5 顆星'); e.code = 'BAD_INPUT'; throw e; }
+      s.rating = n; s.feedback = String(b.comment || '').slice(0, 200);
+      return { saved: true, rating: n };
     }
     case 'leaderboard': {
       const rows = Object.values(sessions).map(x => ({ team_name: x.team, avatar: x.avatar, route_name: '', score: 290, solved: 3, total: 3, duration_sec: 25, badges: [] }));

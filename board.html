@@ -7,20 +7,22 @@
   <link rel="stylesheet" href="css/style.css?v=20261124a">
 </head>
 <body class="quest">
+  <a class="skip-link" href="#main">跳到排行榜</a>
   <header class="topbar app-head" id="app-head"><div class="title">🧭 實境解謎</div></header>
-  <div class="board-page">
+  <main class="board-page" id="main" tabindex="-1">
     <div class="board-head">
       <h1 id="b-title">🏆 即時排行榜</h1>
       <span class="small muted" id="b-updated"></span>
       <button class="ghost sm" id="b-full" type="button">⛶ 全螢幕</button>
     </div>
-    <div class="board-tabs hidden" id="b-tabs"></div>
-    <div id="b-rows" class="lb"></div>
+    <div class="board-tabs hidden" id="b-tabs" role="group" aria-label="路線篩選"></div>
+    <div id="b-rows" class="lb" role="list" aria-label="隊伍排名"></div>
     <p class="help center" id="b-note" style="margin-top:14px"></p>
-  </div>
+  </main>
   <script src="config.js?v=20261124a"></script>
   <script src="js/common.js?v=20261124a"></script>
   <script src="js/templates.js?v=20261124a"></script>
+  <script src="js/a11y.js?v=20261124a"></script>
   <script src="js/board.js?v=20261124a"></script>
 </body>
 </html>

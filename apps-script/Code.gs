@@ -42,7 +42,7 @@ var SCHEMA = {
     'answer', 'points', 'max_attempts', 'hint1', 'hint2', 'hint3', 'hint_penalty', 'success_message', 'npc_arrive', 'npc_wrong', 'npc_hint',
     'form_url', 'form_verify_sheet', 'updated_at'],
   Sessions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'avatar', 'route', 'test', 'status', 'score',
-    'started_at', 'last_active_at', 'finished_at', 'last_lat', 'last_lng', 'progress_json', 'user_agent'],
+    'started_at', 'last_active_at', 'finished_at', 'last_lat', 'last_lng', 'progress_json', 'user_agent', 'rating', 'feedback'],
   Decks: ['deck_id', 'title', 'kind', 'style', 'cards', 'updated_at'],
   Submissions: ['timestamp', 'session_id', 'code', 'project_id', 'run_code', 'team_name', 'route', 'stage_id',
     'stage_title', 'action', 'input', 'result', 'points', 'lat', 'lng', 'accuracy_m', 'distance_m',
@@ -55,7 +55,7 @@ var TEXT_COLUMNS = {
   Decks: ['deck_id', 'title', 'cards'],
   Stages: ['project_id', 'stage_id', 'title', 'clue', 'image_url', 'bypass_code', 'question', 'answer', 'choices', 'hint1', 'hint2', 'hint3',
     'success_message', 'npc_arrive', 'npc_wrong', 'npc_hint', 'form_url', 'form_verify_sheet', 'reward_code', 'item_name', 'item_icon', 'item_story', 'card_id', 'routes'],
-  Sessions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'avatar', 'route', 'user_agent'],
+  Sessions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'avatar', 'route', 'user_agent', 'feedback'],
   Submissions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'stage_id', 'stage_title', 'input', 'result', 'note']
 };
 /* 要強制成「數字」格式的欄位（避免試算表把 1、2 當成日期或時間） */
@@ -82,6 +82,7 @@ var ROUTES = {
   getHint: getHint_,
   uploadPhoto: uploadPhoto_,
   checkForm: checkForm_,
+  submitFeedback: submitFeedback_,
   leaderboard: leaderboard_,
   // 後台（需管理密碼）
   adminLogin: admin_(adminLogin_),
@@ -898,7 +899,8 @@ function adminSessions_(b) {
       session_id: str_(r.session_id), code: str_(r.code), team_name: str_(r.team_name), avatar: str_(r.avatar), route: str_(r.route), test: bool_(r.test),
       run_code: str_(r.run_code), status: str_(r.status), score: num_(r.score, 0), solved: solved, failed: failedN, total: stages.length,
       current_stage: current, started_at: r.started_at, last_active_at: r.last_active_at, finished_at: r.finished_at,
-      last_lat: num_(r.last_lat, null), last_lng: num_(r.last_lng, null)
+      last_lat: num_(r.last_lat, null), last_lng: num_(r.last_lng, null),
+      rating: num_(r.rating, 0) || 0, feedback: str_(r.feedback)
     };
   });
   list.sort(function (a, c2) { return (date_(c2.last_active_at) || 0) - (date_(a.last_active_at) || 0); });
@@ -1042,6 +1044,7 @@ function buildState_(c, extra) {
       session: {
         session_id: c.s.session_id, code: c.s.code, project_id: c.p.project_id, team_name: c.s.team_name,
         run_code: c.s.run_code, route: c.s.route || '', avatar: c.s.avatar || '', test: !!c.s.test, status: c.s.status, score: score_(c),
+        rating: num_(c.s.rating, 0) || 0,
         started_at: date_(c.s.started_at), finished_at: date_(c.s.finished_at) || null, deadline: dl,
         server_time: new Date()
       },
@@ -1718,6 +1721,19 @@ function cleanStage_(r) {
     success_message: str_(r.success_message), form_url: str_(r.form_url), form_verify_sheet: str_(r.form_verify_sheet),
     npc_arrive: str_(r.npc_arrive).slice(0, 200), npc_wrong: str_(r.npc_wrong).slice(0, 200), npc_hint: str_(r.npc_hint).slice(0, 200)
   };
+}
+
+/** 完賽後的一題回饋：1～5 顆星＋選填一句話（寫在 Sessions 的 rating／feedback 欄；重送會覆蓋同一隊的上一筆） */
+function submitFeedback_(b) {
+  var rating = Math.round(num_(b.rating, 0));
+  if (!(rating >= 1 && rating <= 5)) throw appError_('請選 1 到 5 顆星', 'BAD_INPUT');
+  var comment = noFormula_(b.comment).slice(0, 200);
+  return lockedAction_(function () {
+    var s = loadSession_(b.sessionId);
+    if (rateHit_('fb_' + s.session_id, 5, 60)) throw appError_('操作太頻繁了，請稍等幾秒再試', 'RATE');
+    writeRow_('Sessions', s._row, { rating: rating, feedback: comment });
+    return { saved: true, rating: rating };
+  });
 }
 
 function loadSession_(id) {

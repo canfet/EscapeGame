@@ -37,7 +37,7 @@
   <section id="v-app" class="hidden">
     <div class="topbar">
       <div class="title">🧩 實境解謎後台</div>
-      <nav class="tabs">
+      <nav class="tabs" aria-label="後台功能">
         <button data-tab="live" class="on">現場</button>
         <button data-tab="projects">專案</button>
         <button data-tab="stages">關卡</button>
@@ -125,6 +125,7 @@
         <div class="stat"><b id="mon-playing">0</b><span>進行中</span></div>
         <div class="stat"><b id="mon-finished">0</b><span>已完成</span></div>
         <div class="stat"><b id="mon-subs">0</b><span>最近紀錄</span></div>
+        <div class="stat"><b id="mon-rating">—</b><span>平均評價</span></div>
       </div>
       <div class="editor-grid">
         <div>
@@ -546,6 +547,7 @@
   <script src="vendor/qrcode.min.js"></script>
   <script src="config.js?v=20261124a"></script>
   <script src="js/common.js?v=20261124a"></script>
+  <script src="js/a11y.js?v=20261124a"></script>
   <script src="js/admin.js?v=20261124a"></script>
 </body>
 </html>

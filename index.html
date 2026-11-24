@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="css/templates.css?v=20261124a">
 </head>
 <body class="quest">
+  <a class="skip-link" href="#main">跳到主要內容</a>
   <canvas id="fx-canvas" class="hidden" aria-hidden="true"></canvas>
   <div id="test-banner" class="inapp test hidden" role="status">🧪 <b>試玩模式</b>：這支隊伍不會計入排行榜與正式紀錄。</div>
   <div id="inapp-banner" class="inapp hidden" role="alert">
@@ -26,6 +27,7 @@
   <!-- 非闖關畫面共用的頂端列（跟後台一樣：深色底，自動避開手機狀態列的時間與電量） -->
   <header class="topbar app-head hidden" id="app-head"><div class="title" id="app-head-title">🧭 實境解謎</div></header>
 
+  <main id="main" tabindex="-1">
   <!-- 選擇專案 -->
   <section id="v-projects" class="page hidden">
     <h1 id="site-name" class="sr-only">實境解謎</h1>
@@ -73,28 +75,25 @@
   <!-- 遊戲主畫面 -->
   <section id="v-game" class="hidden">
     <div class="topbar">
-      <div class="title" id="g-title"></div>
-      <span class="chip" id="g-gps"><span class="gps-dot"></span> 定位</span>
+      <h1 class="title" id="g-title"></h1>
+      <span class="chip hidden" id="g-gps" role="status"><span class="gps-dot"></span> 定位異常</span>
       <span class="chip hidden" id="offline-chip" role="status">📴 離線中</span>
       <span class="chip hidden" id="g-timer">⏱ --:--</span>
       <button class="icon-btn hidden" id="btn-pack" aria-label="線索背包" title="線索背包（密碼碎片）">🎒</button>
-      <button class="icon-btn hidden" id="btn-tpl" aria-label="切換呈現套版" aria-haspopup="menu" aria-expanded="false" title="切換呈現套版">🎭</button>
-      <button class="icon-btn hidden" id="btn-fx" aria-label="特效開關" aria-pressed="true" title="特效開關">✨</button>
-      <button class="icon-btn" id="btn-font"aria-label="大字模式" title="大字模式">Aa</button>
-      <button class="icon-btn" id="btn-sound" aria-label="音效開關" title="音效開關">🔊</button>
+      <button class="icon-btn" id="btn-settings" type="button" aria-label="設定" aria-haspopup="true" aria-expanded="false" aria-controls="settings-menu" title="設定">⚙️</button>
     </div>
     <div class="page">
       <div class="card hud">
         <div class="row">
-          <div class="grow hud-team"><span id="g-avatar" class="hud-avatar"></span><b id="g-team"></b> <span class="chip gray" id="g-code" title="隊伍代碼"></span> <span class="chip hidden" id="g-route"></span></div>
+          <div class="grow hud-team"><span id="g-avatar" class="hud-avatar"></span><b id="g-team"></b> <span class="chip gray hidden" id="g-code" title="隊伍代碼"></span> <span class="chip hidden" id="g-route"></span></div>
           <div class="hud-score">⭐ <b id="g-score">0</b></div>
           <div class="hud-prog" id="g-progress-text"></div>
           <button class="sm ghost hidden" id="btn-board" type="button">🏆 排行榜</button>
         </div>
         <div class="hud-exp hidden" id="hud-exp"><span class="hud-lv" id="hud-lv">Lv.1</span><div class="hud-exp-bar" id="hud-exp-bar"><i></i></div><span class="hud-exp-text" id="hud-exp-text"></span></div>
         <div class="hud-title hidden" id="g-hud-title"></div>
-        <div class="code-line" id="g-code-line"><span>🔑 隊伍代碼 <b id="g-code-big"></b>・換手機或誤關頁面時，用它接續</span><button class="sm ghost" id="btn-copy-code" type="button">複製</button></div>
-        <div class="progress thin"><i id="g-progress" style="width:0"></i></div>
+        <div class="code-line" id="g-code-line"><span title="換手機或誤關頁面時，用隊伍代碼接續">🔑 隊伍代碼 <b id="g-code-big"></b></span><button class="sm ghost" id="btn-copy-code" type="button">複製</button></div>
+        <div class="progress thin hidden"><i id="g-progress" style="width:0"></i></div>
       </div>
 
       <button class="next-step hidden" id="next-step" type="button">
@@ -117,10 +116,10 @@
 
       <div class="card" id="map-card">
         <div class="map-wrap">
-          <div id="g-map" class="map"></div>
+          <div id="g-map" class="map" role="region" aria-label="關卡地圖（各關卡的距離與狀態請看下方的關卡列表）"></div>
           <div class="gps-pill" id="gps-pill" role="status" aria-live="polite"><span class="gps-dot"></span><span id="gps-pill-text">定位中…</span></div>
           <button class="map-fs" id="btn-fs" type="button" aria-label="全螢幕地圖">⛶</button>
-          <div class="map-hint hidden" id="map-hint">單指捲動頁面・雙指縮放地圖・點一下地圖進入全螢幕後可拖曳</div>
+          <div class="map-hint hidden" id="map-hint">點一下地圖可全螢幕</div>
           <svg class="compass-rose" viewBox="0 0 100 100" aria-hidden="true">
             <circle cx="50" cy="50" r="46" fill="rgba(245,236,214,.85)" stroke="#6b5636" stroke-width="2"/>
             <path d="M50 8 L58 50 L50 92 L42 50 Z" fill="#8a6d3b" opacity=".55"/>
@@ -163,6 +162,18 @@
     <div class="card pre" id="fin-message" style="margin-top:12px"></div>
     <button class="big" id="btn-share" type="button" style="margin-top:12px">📸 存成圖片／分享</button>
     <button class="big ghost" id="btn-back-game" style="margin-top:12px">回到關卡列表</button>
+    <div class="card center" id="fin-feedback">
+      <h2 id="fb-title">這次好玩嗎？</h2>
+      <div class="fb-stars" id="fb-stars" role="radiogroup" aria-labelledby="fb-title">
+        <button type="button" role="radio" aria-checked="false" data-n="1" aria-label="1 顆星，不太好">★</button><button type="button" role="radio" aria-checked="false" data-n="2" aria-label="2 顆星">★</button><button type="button" role="radio" aria-checked="false" data-n="3" aria-label="3 顆星，普通">★</button><button type="button" role="radio" aria-checked="false" data-n="4" aria-label="4 顆星">★</button><button type="button" role="radio" aria-checked="false" data-n="5" aria-label="5 顆星，非常好玩">★</button>
+      </div>
+      <div class="small muted" id="fb-status" role="status">點星星就會送出</div>
+      <div class="hidden stack" id="fb-more" style="margin-top:8px">
+        <label class="sr-only" for="fb-text">想說的話</label>
+        <input id="fb-text" maxlength="200" autocomplete="off" placeholder="想說的話（選填，例如哪一關最有趣）">
+        <button type="button" class="sm" id="fb-send">補充送出</button>
+      </div>
+    </div>
     <div class="card hidden" id="fin-board-card">
       <h2>排行榜</h2>
       <div class="row hidden" id="fin-board-tabs" style="margin-bottom:8px"><button class="sm" id="tab-board-route">本路線</button><button class="sm ghost" id="tab-board-all">全部隊伍</button></div>
@@ -186,6 +197,7 @@
       <a href="./" class="small">回到任務列表</a>
     </div>
   </section>
+  </main>
 
   <!-- 看卡（大卡片） -->
   <div id="card-view" class="solved-overlay hidden" role="dialog" aria-modal="true" aria-label="卡片">
@@ -221,7 +233,7 @@
     <div class="board-card">
       <div class="sheet-head"><h2 class="grow" id="board-title" style="margin:0">🏆 即時排行榜</h2><button class="close-x" id="board-close" aria-label="關閉">✕</button></div>
       <div class="help" id="board-note" style="margin:4px 0 8px"></div>
-      <div id="board-rows" class="lb"></div>
+      <div id="board-rows" class="lb" role="list"></div>
     </div>
   </div>
 
@@ -232,15 +244,29 @@
       <div class="solved-title" id="tut-title"></div>
       <div class="tut-text pre" id="tut-text"></div>
       <div class="tut-dots" id="tut-dots"></div>
+      <button class="big ghost hidden" id="tut-font" type="button" aria-pressed="false">🔠 字太小？開啟大字模式</button>
       <button class="big" id="tut-next">下一步</button>
       <button class="big ghost" id="tut-skip">跳過教學</button>
     </div>
+  </div>
+
+  <!-- 進入關卡範圍：一鍵打卡 -->
+  <div id="arrive-prompt" class="arrive-prompt hidden" role="alert">
+    <div class="ap-text"><b id="ap-title"></b><span>你已經到了，按一下就打卡</span></div>
+    <button class="big" id="ap-go" type="button">📍 打卡看題目</button>
+    <button class="sm ghost" id="ap-x" type="button">稍後</button>
   </div>
 
   <!-- 抵達打卡成功 -->
   <div id="arrive-flash" class="arrive-flash hidden" role="status" aria-live="assertive"><div><span>📍</span><b>抵達！</b></div></div>
 
   <!-- 套版：NPC 對話框、LEVEL UP、SOLVED 印章 -->
+  <div id="settings-menu" class="settings-menu hidden" role="group" aria-label="設定">
+    <button class="icon-btn hidden" id="btn-tpl" aria-label="切換呈現套版" aria-haspopup="menu" aria-expanded="false" title="切換呈現套版">🎭</button>
+    <button class="icon-btn hidden" id="btn-fx" aria-label="特效開關" aria-pressed="true" title="特效開關">✨</button>
+    <button class="icon-btn" id="btn-font" aria-pressed="false" aria-label="大字模式" title="大字模式">Aa</button>
+    <button class="icon-btn" id="btn-sound" aria-label="音效開關" title="音效開關">🔊</button>
+  </div>
   <div id="tpl-menu" class="tpl-menu hidden" role="menu" aria-label="呈現套版"></div>
   <div id="dialog" class="dialog hidden" role="dialog" aria-label="對話" tabindex="0"><span class="dlg-avatar" aria-hidden="true"></span><div class="dlg-body"><b class="dlg-name"></b><div class="dlg-text"></div></div><span class="dlg-next" aria-hidden="true">▼</span></div>
   <div id="levelup" class="levelup hidden" role="status" aria-live="polite"><div class="lu-box"><span class="lu-title">LEVEL UP!</span><span class="lu-lv" id="levelup-lv"></span><span class="lu-sub">點一下繼續</span></div></div>
@@ -285,6 +311,7 @@
   <script src="js/common.js?v=20261124a"></script>
   <script src="js/templates.js?v=20261124a"></script>
   <script src="js/fx.js?v=20261124a"></script>
+  <script src="js/a11y.js?v=20261124a"></script>
   <script src="js/player.js?v=20261124a"></script>
 </body>
 </html>

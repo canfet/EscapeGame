@@ -474,8 +474,8 @@ body.theme-history {
 /* ===== 3) 運動活力：明亮、高對比、粗斜體 ===== */
 body.theme-sport {
   --paper: #f4f7fb; --card: #ffffff; --ink: #0f172a; --muted: #475569; --line: #dbe3ee;
-  --forest: #16a34a; --forest-dark: #15803d; --amber: #f59e0b; --blue: #1d4ed8; --red: #dc2626;
-  --bg: #f4f7fb; --accent: #ff4d1a; --accent-soft: #fff1ea; --edge: #0f172a; --frame: #dbeafe;
+  --forest: #15803d; --forest-dark: #166534; --amber: #f59e0b; --blue: #1d4ed8; --red: #dc2626;
+  --bg: #f4f7fb; --accent: #c2410c; --accent-soft: #fff1ea; --edge: #0f172a; --frame: #dbeafe;
   --topbar: #0f172a; --hero: linear-gradient(135deg, #0f172a, #1e3a8a);
   --font-h: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --map-filter: saturate(1.15) contrast(1.05);
@@ -495,12 +495,12 @@ body.theme-sport {
 .theme-sport .ns-label { border-radius: 4px; font-style: italic; }
 .theme-sport .pin { border-radius: 8px; transform: skewX(-6deg); }
 .theme-sport .solved-badge { background: #ff4d1a; box-shadow: 0 0 0 8px rgba(255, 77, 26, .18); }
-.theme-sport .solved-points { color: #ff4d1a; }
+.theme-sport .solved-points { color: #c2410c; }
 
 /* ===== 4) 迷霧：深色、冷色調、薄霧 ===== */
 body.theme-mist {
   --paper: #0f1720; --card: #16212c; --ink: #e6edf3; --muted: #9fb0bf; --line: #2a3a49;
-  --forest: #1f8a8f; --forest-dark: #17696d; --amber: #e0b24a; --blue: #7dd3fc; --red: #e0644a;
+  --forest: #17747a; --forest-dark: #12595e; --amber: #e0b24a; --blue: #7dd3fc; --red: #e0644a;
   --bg: #0f1720; --accent: #7dd3fc; --accent-soft: #13222e; --edge: #3b556b; --frame: #1c2936;
   --topbar: #0a1118; --hero: linear-gradient(135deg, #0a1118, #1f3347);
   --font-h: "Noto Serif TC", "PMingLiU", Georgia, serif;
@@ -539,7 +539,7 @@ body.theme-mist {
 body.theme-forest {
   --paper: #eef3e6; --card: #fbfdf7; --ink: #1e2a1e; --muted: #53634f; --line: #d3dec3;
   --forest: #2f6f3e; --forest-dark: #1f5230; --amber: #d89b2b; --blue: #2c6a8a; --red: #b4402a;
-  --bg: #eef3e6; --accent: #b4531a; --accent-soft: #fbf1e6; --edge: #4b6b3a; --frame: #dfe8cf;
+  --bg: #eef3e6; --accent: #a64a14; --accent-soft: #fbf1e6; --edge: #4b6b3a; --frame: #dfe8cf;
   --topbar: #1f3a26; --hero: linear-gradient(135deg, #1f3a26, #3b6b43);
   --font-h: "Noto Serif TC", "PMingLiU", Georgia, serif;
   --map-filter: saturate(.9) sepia(.15) hue-rotate(-8deg) brightness(1.02);
@@ -592,9 +592,9 @@ body.theme-neon {
 
 /* ===== 7) 校園清新：馬卡龍色系、圓潤可愛 ===== */
 body.theme-campus {
-  --paper: #fff8f3; --card: #ffffff; --ink: #3b3355; --muted: #7a7196; --line: #f0dfe6;
-  --forest: #17977a; --forest-dark: #107a62; --amber: #ffb84d; --blue: #5b7cff; --red: #e0577f;
-  --bg: #fff8f3; --accent: #e0577f; --accent-soft: #fff0f4; --edge: #c9b8ff; --frame: #efe7ff;
+  --paper: #fff8f3; --card: #ffffff; --ink: #3b3355; --muted: #6a6186; --line: #f0dfe6;
+  --forest: #0f7a62; --forest-dark: #0b6350; --amber: #ffb84d; --blue: #5b7cff; --red: #e0577f;
+  --bg: #fff8f3; --accent: #c2385f; --accent-soft: #fff0f4; --edge: #c9b8ff; --frame: #efe7ff;
   --topbar: #7c6cd9; --hero: linear-gradient(135deg, #8f7ff0, #f59ac0);
   --font-h: "jf-openhuninn", "Yuanti TC", "Hiragino Maru Gothic ProN", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --map-filter: saturate(.85) brightness(1.06) contrast(.92) hue-rotate(-6deg);
@@ -668,7 +668,7 @@ body.theme-ocean {
 .route-row input[type=color] { width: 40px; height: 38px; padding: 2px; flex: none; }
 .route-row input[data-f] { flex: 1; min-width: 0; }
 .route-row select { width: auto; max-width: 180px; flex: none; }
-.route-token { font-size: .72rem; background: #efe8da; border-radius: 6px; padding: 3px 6px; color: var(--muted); flex: none; }
+.route-token { font-size: .75rem; background: #efe8da; border-radius: 6px; padding: 3px 6px; color: var(--muted); flex: none; }
 .route-pick { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .route-pick label { flex: 1; margin: 0; }
 .route-pick input[type=number] { width: 84px; flex: none; }
@@ -732,7 +732,7 @@ body.theme-ocean {
 .frag-chip { min-width: 64px; padding: 6px 10px; border-radius: 12px; border: 2px dashed var(--line); background: var(--surface2, #fff); color: var(--ink); text-align: center; display: grid; gap: 0; line-height: 1.2; font-weight: 400; }
 .frag-chip small { font-size: .7rem; color: var(--muted); }
 .frag-chip b { font-size: 1.3rem; }
-.frag-chip em { font-size: .68rem; color: var(--muted); font-style: normal; }
+.frag-chip em { font-size: .75rem; color: var(--muted); font-style: normal; }
 .frag-chip.got { border: 2px solid var(--forest); background: var(--sel, #eaf4ee); cursor: pointer; }
 .frag-chip.got:hover { filter: brightness(.97); }
 .pack-rows { display: grid; gap: 8px; }
@@ -768,7 +768,7 @@ body.theme-ocean {
 .comp { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,.92); border: 2px solid var(--amber); display: grid; place-items: center; font-size: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,.3); transition: transform .8s ease-out; overflow: hidden; }
 .comp img { width: 100%; height: 100%; object-fit: cover; }
 .lb-avatar { font-size: 1.3rem; }
-.lb-title { font-size: .72rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
+.lb-title { font-size: .75rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
 .lb-badges { letter-spacing: 2px; font-size: 1rem; }
 
 /* ----- 收藏冊 ----- */
@@ -779,7 +779,7 @@ body.theme-ocean {
 .item-icon { font-size: 2rem; line-height: 1.1; width: 48px; height: 48px; display: grid; place-items: center; }
 .item-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
 .item-name { font-weight: 700; font-size: .8rem; text-align: center; line-height: 1.2; }
-.item-cell small { color: var(--muted); font-size: .68rem; }
+.item-cell small { color: var(--muted); font-size: .75rem; }
 .item-cell.locked { background: var(--chip, #ece4d3); border-style: dashed; }
 .item-cell.locked .item-icon { filter: brightness(0) opacity(.3); }
 .item-cell.rar-rare.got { border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
@@ -906,7 +906,7 @@ body.theme-ocean {
 .solved-overlay > * { margin: auto; }
 .solved-card { max-width: 420px; }
 /* 進度表小卡：狀態文字不換行 */
-.sc-top { flex-wrap: nowrap; white-space: nowrap; font-size: .72rem; }
+.sc-top { flex-wrap: nowrap; white-space: nowrap; font-size: .75rem; }
 .sc-state { overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 480px) {
   .stage-card { flex-basis: 154px; padding: 10px 12px; }
@@ -936,7 +936,7 @@ body.theme-ocean {
 #btn-pack.has-new::after { content: ""; position: absolute; top: 3px; right: 3px; width: 12px; height: 12px; border-radius: 50%; background: #ef4444; border: 2px solid #fff; animation: dot-pulse 1.4s ease-in-out infinite; }
 @keyframes dot-pulse { 50% { transform: scale(1.25); } }
 .deck-cell.is-new { position: relative; }
-.deck-cell.is-new::before { content: "NEW"; position: absolute; top: -6px; left: -2px; z-index: 5; background: #ef4444; color: #fff; font-size: .62rem; font-weight: 800; padding: 1px 6px; border-radius: 99px; box-shadow: 0 1px 4px rgba(0,0,0,.4); animation: dot-pulse 1.4s ease-in-out infinite; }
+.deck-cell.is-new::before { content: "NEW"; position: absolute; top: -6px; left: -2px; z-index: 5; background: #ef4444; color: #fff; font-size: .75rem; font-weight: 800; padding: 1px 6px; border-radius: 99px; box-shadow: 0 1px 4px rgba(0,0,0,.4); animation: dot-pulse 1.4s ease-in-out infinite; }
 .deck-cell.is-new .tcg { outline: 3px solid #ef4444; outline-offset: 2px; }
 details.stage-more { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 0 14px; }
 details.stage-more > summary { cursor: pointer; padding: 12px 0; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
@@ -963,9 +963,9 @@ body { font-size: 1rem; }
 .is-item { display: grid; gap: 2px; padding: 6px; background: #fff; color: var(--ink); border: 2px solid var(--line); border-radius: 12px; text-align: left; font-weight: 400; min-height: 0; }
 .is-item:hover { border-color: var(--forest); }
 .is-item img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; }
-.is-item small { font-size: .72rem; color: var(--muted); }
+.is-item small { font-size: .75rem; color: var(--muted); }
 .is-by { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-credit { color: #fff; font-size: .72rem; text-align: center; opacity: .85; margin-top: 4px; max-width: 320px; }
+.card-credit { color: #fff; font-size: .75rem; text-align: center; opacity: .85; margin-top: 4px; max-width: 320px; }
 
 /* 卡面圖片：預設完整顯示（不被截掉），空白處用同一張圖模糊填滿 */
 .tcg-art { position: relative; }
@@ -1245,3 +1245,42 @@ input, select, textarea { min-width: 0; max-width: 100%; }
 /* 從主畫面圖示開啟時，內容會延伸到狀態列（時間、電量）下方，所以頁面頂端一律要有避開它的頂端列 */
 /* 前台：非闖關畫面用共用的深色頂端列（#app-head，已含狀態列的安全區域）；排行榜頁面自己讓開 */
 .app-head { min-height: 52px; }
+
+/* ===== 無障礙 ===== */
+.skip-link { position: absolute; left: 8px; top: -60px; z-index: 5000; background: #fff; color: #1d2a2f; padding: 10px 14px; border-radius: 8px; border: 2px solid #1d5fa8; font-weight: 700; text-decoration: none; }
+.skip-link:focus { top: 8px; }
+main:focus, h1:focus, h2:focus { outline: none; }
+.topbar h1.title { margin: 0; font-family: inherit; font-weight: 700; font-size: 1rem; line-height: inherit; letter-spacing: normal; text-shadow: none; }
+#toast .toast { max-width: calc(100vw - 24px); }
+@media (forced-colors: active) { .stage-card, .card, .lb-row, .npc-bubble { border: 1px solid CanvasText; } }
+
+/* ===== 設定選單（套版／特效／大字／音效收在 ⚙️ 裡） ===== */
+.settings-menu { position: fixed; right: 8px; top: calc(56px + env(safe-area-inset-top)); z-index: 2440; display: flex; flex-direction: column; gap: 2px; min-width: 200px; max-width: calc(100vw - 16px); padding: 6px; border-radius: 12px; background: var(--card); color: var(--ink); border: 1.5px solid var(--edge, var(--line)); box-shadow: 0 8px 28px rgba(0, 0, 0, .35); }
+.quest .settings-menu .icon-btn { width: auto; height: auto; min-height: 44px; border-radius: 8px; padding: 10px 12px; background: transparent; color: var(--ink); font-size: 1rem; font-weight: 600; text-align: left; display: flex; align-items: center; gap: 8px; justify-content: flex-start; }
+.quest .settings-menu .icon-btn:hover, .quest .settings-menu .icon-btn:focus-visible { background: var(--chip, #ece4d3); }
+.settings-menu .icon-btn[aria-pressed="false"] { opacity: .6; }
+#btn-sound::after { content: "音效與震動"; } #btn-font::after { content: "大字模式"; } #btn-fx::after { content: "畫面特效"; } #btn-tpl::after { content: "切換呈現套版"; }
+#btn-font { font-size: 1rem; }
+
+/* ===== 完賽回饋（星星評分） ===== */
+.fb-stars { display: flex; justify-content: center; gap: 4px; margin: 4px 0 6px; }
+.quest .fb-stars button { min-width: 52px; min-height: 52px; padding: 0; background: transparent; border: 0; box-shadow: none; font-size: 2.2rem; line-height: 1; color: #bfb08c; }
+.quest .fb-stars button.on { color: #e0a400; }
+.quest .fb-stars button:focus-visible { outline: 3px solid #1d5fa8; border-radius: 10px; }
+
+/* ===== 進入範圍：一鍵打卡提示 ===== */
+.arrive-prompt { position: fixed; left: 8px; right: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 950; max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--card); color: var(--ink); border: 2px solid var(--forest); box-shadow: 0 8px 28px rgba(0, 0, 0, .35); animation: up .22s ease-out; }
+.arrive-prompt .ap-text { grid-column: 1 / -1; display: grid; }
+.arrive-prompt .ap-text b { font-size: 1.05rem; }
+.arrive-prompt .ap-text span { font-size: .85rem; color: var(--muted); }
+.arrive-prompt #ap-go { min-height: 52px; }
+@media (prefers-reduced-motion: reduce) { .arrive-prompt { animation: none; } }
+
+/* 關卡面板：大圖不要占掉大半個畫面，題目才是重點 */
+.sheet-hero .hero-img { max-height: 34vh; max-height: 34dvh; }
+
+/* ===== 地圖圖磚載入前的骨架底色 ===== */
+.map.map-skel { background: linear-gradient(100deg, #e4dcc8 30%, #f1ead9 50%, #e4dcc8 70%); background-size: 200% 100%; animation: skel 1.3s linear infinite; }
+@keyframes skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .map.map-skel { animation: none; } }
+#fin-feedback { margin-top: 12px; }

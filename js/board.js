@@ -47,8 +47,8 @@
     var tabs = $('#b-tabs');
     tabs.classList.toggle('hidden', B.routes.length < 2);
     if (B.routes.length > 1) {
-      tabs.innerHTML = '<button class="' + (B.route ? '' : 'on') + '" data-r="">全部</button>' + B.routes.map(function (x) {
-        return '<button class="' + (B.route === x.name ? 'on' : '') + '" data-r="' + esc(x.name) + '">' + esc(x.name) + '</button>';
+      tabs.innerHTML = '<button class="' + (B.route ? '' : 'on') + '" aria-pressed="' + (B.route ? 'false' : 'true') + '" data-r="">全部</button>' + B.routes.map(function (x) {
+        return '<button class="' + (B.route === x.name ? 'on' : '') + '" aria-pressed="' + (B.route === x.name ? 'true' : 'false') + '" data-r="' + esc(x.name) + '">' + esc(x.name) + '</button>';
       }).join('');
       Q.$$('#b-tabs [data-r]').forEach(function (b) { b.onclick = function () { B.route = b.dataset.r; render(); }; });
     }

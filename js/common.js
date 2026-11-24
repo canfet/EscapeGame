@@ -285,8 +285,8 @@
         ago = m < 1 ? '剛剛有動作' : m + ' 分鐘前有動作';
       }
       var route = x.route_name ? '<span class="chip" style="background:' + esc(x.route_color || '#e6e3dc') + ';color:' + (x.route_color ? '#fff' : 'inherit') + '">' + esc(x.route_name) + '</span>' : '';
-      return '<div class="lb-row' + (i < 3 ? ' top' : '') + (o.me && x.team_name === o.me ? ' me' : '') + (x.status === 'finished' ? ' fin' : '') + '">' +
-        '<div class="lb-rank">' + medal + '</div>' +
+      return '<div role="listitem" class="lb-row' + (i < 3 ? ' top' : '') + (o.me && x.team_name === o.me ? ' me' : '') + (x.status === 'finished' ? ' fin' : '') + '">' +
+        '<div class="lb-rank"><span aria-hidden="true">' + medal + '</span><span class="sr-only">第 ' + (i + 1) + ' 名</span></div>' +
         '<div class="lb-main"><div class="lb-name">' + (x.avatar ? '<span class="lb-avatar">' + esc(x.avatar) + '</span>' : '') + '<b>' + esc(x.team_name) + '</b> ' + route +
         (x.title ? ' <span class="lb-title">' + esc(x.title) + '</span>' : '') +
         ((x.badges || []).length ? ' <span class="lb-badges">' + x.badges.map(function (b) { return '<span title="' + esc(b.name) + '">' + esc(b.icon) + '</span>'; }).join('') + '</span>' : '') + '</div>' +
