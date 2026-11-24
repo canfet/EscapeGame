@@ -9,7 +9,7 @@ const root = path.join(__dirname, '..');
 const stub = new Proxy(function () {}, { get: () => stub, apply: () => stub, construct: () => stub });
 const ctx = vm.createContext({ SpreadsheetApp: stub, CacheService: stub, LockService: stub, PropertiesService: stub, Utilities: stub, ContentService: stub, Logger: stub, Session: stub, console });
 const src = fs.readFileSync(path.join(root, 'apps-script/Code.gs'), 'utf8');
-vm.runInContext(src + '\n;this.__x={TEMPLATES:TEMPLATES,AV:AVATARS,ABT:AVATARS_BY_TEMPLATE,normTemplate_:normTemplate_,avatarsFor_:avatarsFor_,allAvatars_:allAvatars_,cleanProject_:cleanProject_,publicProject_:publicProject_};', ctx);
+vm.runInContext(src + '\n;this.__x={TEMPLATES:TEMPLATES,AV:AVATARS,ABT:AVATARS_BY_TEMPLATE,normTemplate_:normTemplate_,avatarsFor_:avatarsFor_,allAvatars_:allAvatars_,cleanProject_:cleanProject_,publicProject_:publicProject_,cleanStage_:cleanStage_,publicStage_:publicStage_};', ctx);
 const B = ctx.__x;
 const T = require('../js/templates.js');
 
@@ -48,4 +48,26 @@ test('avatars match frontend', () => {
 
 test('rejects invalid template (adminSaveProject_ guard exists)', () => {
   assert.match(src, /p\.template && TEMPLATES\.indexOf\(str_\(p\.template\)\.toLowerCase\(\)\) < 0\) throw appError_\('[^']+', 'BAD_INPUT'\)/);
+});
+
+test('cleanStage_ truncates npc lines to 200 chars', () => {
+  const s = B.cleanStage_({ project_id: 'a', stage_id: 's1', npc_arrive: ' ' + 'a'.repeat(300), npc_wrong: 'b'.repeat(250), npc_hint: 'c'.repeat(201) });
+  assert.strictEqual(s.npc_arrive.length, 200);
+  assert.strictEqual(s.npc_wrong.length, 200);
+  assert.strictEqual(s.npc_hint.length, 200);
+  const e = B.cleanStage_({ project_id: 'a', stage_id: 's1' });
+  assert.strictEqual(e.npc_arrive, '');
+});
+
+test('publicStage_ npc lines: hidden when locked, shown when set, omitted when empty', () => {
+  const c = { now: new Date(), p: {} };
+  const st = B.cleanStage_({ project_id: 'a', stage_id: 's1', npc_arrive: 'hi', npc_wrong: 'no', npc_hint: 'psst' });
+  const locked = B.publicStage_(st, 'locked', {}, c);
+  ['npc_arrive', 'npc_wrong', 'npc_hint'].forEach(k => assert.ok(!(k in locked)));
+  const open = B.publicStage_(st, 'open', {}, c);
+  assert.strictEqual(open.npc_arrive, 'hi');
+  assert.strictEqual(open.npc_wrong, 'no');
+  assert.strictEqual(open.npc_hint, 'psst');
+  const empty = B.publicStage_(B.cleanStage_({ project_id: 'a', stage_id: 's2' }), 'open', {}, c);
+  ['npc_arrive', 'npc_wrong', 'npc_hint'].forEach(k => assert.ok(!(k in empty)));
 });

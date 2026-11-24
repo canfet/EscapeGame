@@ -124,3 +124,101 @@ body.tpl-academy .avatar-opt { border-radius: 16px; }
   .stamp > span { transform: rotate(-14deg); }
   #fx-canvas { display: none; }
 }
+
+/* =====================================================================
+   關卡面板（#sheet）套版化：只在 body.tpl-* 下生效，classic 不受影響
+   ===================================================================== */
+/* ---- 共用：體力列、迷你 EXP、小標題、內嵌 NPC 氣泡 ---- */
+body[class*="tpl-"] .sx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 10px; }
+body[class*="tpl-"] .sx-hp { display: flex; align-items: center; gap: 6px; font-size: .82rem; font-weight: 700; color: var(--muted); }
+body[class*="tpl-"] .sx-hearts { letter-spacing: 1px; font-size: .95rem; line-height: 1; white-space: nowrap; }
+body[class*="tpl-"] .sx-hp-t { font-variant-numeric: tabular-nums; }
+body[class*="tpl-"] .sx-exp { flex: 1 1 140px; min-width: 0; display: flex; align-items: center; gap: 6px; }
+body[class*="tpl-"] .sx-exp .hud-exp-bar { height: 8px; }
+body[class*="tpl-"] .sx-exp .hud-exp-text { font-size: .72rem; }
+body[class*="tpl-"] .sx-h {
+  font-size: .8rem; font-weight: 800; letter-spacing: .14em; color: var(--accent, var(--muted)); margin: 2px 0 -4px;
+}
+body[class*="tpl-"] .npc-bubble {
+  display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 14px; position: relative;
+  background: var(--accent-soft, var(--card)); color: var(--ink); border: 1.5px solid var(--accent, var(--edge, var(--line)));
+  animation: nb-in .25s ease-out both;
+}
+body[class*="tpl-"] .npc-bubble .nb-av {
+  flex: none; width: 34px; height: 34px; display: grid; place-items: center; font-size: 1.3rem; line-height: 1;
+  border-radius: 50%; background: var(--card); border: 1.5px solid var(--accent, var(--edge));
+}
+body[class*="tpl-"] .npc-bubble .nb-body { flex: 1; min-width: 0; display: block; }
+body[class*="tpl-"] .npc-bubble .nb-name { display: block; font-size: .74rem; color: var(--accent, var(--ink)); letter-spacing: .06em; }
+body[class*="tpl-"] .npc-bubble .nb-text { display: block; font-size: .92rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+@keyframes nb-in { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---- 戰鬥感：答對命中閃光、答錯搖晃 ---- */
+#sheet.hit .sheet-body { animation: sx-hit .7s ease-out; }
+#sheet.shake .sheet-body { animation: sx-shake .5s ease-in-out; }
+@keyframes sx-hit { 0% { box-shadow: inset 0 0 0 0 rgba(255, 230, 120, 0); } 25% { box-shadow: inset 0 0 36px 6px rgba(255, 230, 120, .75); } 100% { box-shadow: inset 0 0 0 0 rgba(255, 230, 120, 0); } }
+@keyframes sx-shake { 0%, 100% { transform: none; } 15% { transform: translateX(-7px); } 35% { transform: translateX(6px); } 55% { transform: translateX(-4px); } 75% { transform: translateX(3px); } }
+
+/* ---- RPG：羊皮紙卷軸（頂底裝飾邊、章節徽章）---- */
+body.tpl-rpg .sheet-body .sheet-head {
+  position: relative; padding: 14px 10px 10px; margin-bottom: 12px; border-top: 4px double var(--edge, var(--line)); border-bottom: 4px double var(--edge, var(--line));
+  background: linear-gradient(var(--accent-soft, transparent), transparent);
+}
+body.tpl-rpg .sheet-body .sheet-sub {
+  display: inline-block; padding: 1px 10px; border-radius: 999px; font-weight: 800; letter-spacing: .12em; color: #3b2a00;
+  background: linear-gradient(135deg, #f6d365, #e0a400); box-shadow: 0 0 0 1px rgba(120, 80, 0, .35);
+}
+body.tpl-rpg .sheet-body .clue, body.tpl-rpg .sheet-body .question { border-radius: 6px; border: 2px solid var(--edge, var(--line)); box-shadow: inset 0 0 14px rgba(120, 80, 0, .12); }
+body.tpl-rpg .sx-h::before { content: "⚜ "; }
+body.tpl-rpg .sx-h::after { content: " ⚜"; }
+
+/* ---- 偵探：卷宗夾、迴紋針、手寫字 ---- */
+body.tpl-detective .sheet-body .sheet-head { position: relative; padding: 12px 10px 8px 14px; border-left: 6px solid var(--accent, var(--edge)); border-bottom: 2px dashed var(--edge, var(--line)); border-radius: 4px 4px 0 0; }
+body.tpl-detective .sheet-body .sheet-head::after { content: "📎"; position: absolute; top: -12px; right: 38px; font-size: 1.5rem; transform: rotate(12deg); }
+body.tpl-detective .sheet-body .sheet-sub { font-family: "DFKai-SB", "BiauKai", "Kaiti TC", "STKaiti", serif; letter-spacing: .14em; }
+body.tpl-detective .sheet-body .sheet-sub::before { content: "CASE FILE · "; font-size: .7rem; }
+body.tpl-detective .sheet-body .clue, body.tpl-detective .sheet-body .question { border-radius: 2px; font-family: "DFKai-SB", "BiauKai", "Kaiti TC", "STKaiti", "Noto Serif TC", serif; }
+body.tpl-detective .sheet-body .clue { border-left: 4px solid var(--accent, var(--edge)); }
+body.tpl-detective .sx-h { font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif; border-bottom: 1px solid var(--edge, var(--line)); padding-bottom: 2px; }
+body.tpl-detective .npc-bubble { border-style: dashed; border-radius: 4px; font-family: "DFKai-SB", "BiauKai", "Kaiti TC", serif; }
+
+/* ---- 特務：終端機視窗標題列 ---- */
+body.tpl-agent .sheet-body .sheet-head {
+  padding: 6px 10px; margin-bottom: 12px; border: 1px solid var(--accent, var(--edge)); border-radius: 2px;
+  background: var(--accent-soft, var(--card)); font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
+}
+body.tpl-agent .sheet-body .sheet-sub::before { content: "> "; color: var(--accent); }
+body.tpl-agent .sheet-body .sheet-sub::after { content: " ●○○"; color: var(--accent); letter-spacing: 2px; }
+body.tpl-agent .sheet-body .sheet-title::before { content: "$ "; color: var(--accent); }
+body.tpl-agent .sheet-body .clue, body.tpl-agent .sheet-body .question { border-radius: 2px; font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace; border: 1px solid var(--accent, var(--edge)); }
+body.tpl-agent .sx-h, body.tpl-agent .sx-hp, body.tpl-agent .sx-hp-t, body.tpl-agent .npc-bubble { font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace; }
+body.tpl-agent .sx-h::before { content: "> "; }
+body.tpl-agent .npc-bubble { border-radius: 2px; }
+
+/* ---- 海盜：捲邊航海圖 ---- */
+body.tpl-pirate .sheet-body .sheet-head { padding: 10px 12px; margin-bottom: 12px; border: 2px solid var(--edge, var(--line)); border-radius: 14px 4px 14px 4px; background: var(--accent-soft, var(--card)); }
+body.tpl-pirate .sheet-body .sheet-sub { font-style: italic; letter-spacing: .1em; }
+body.tpl-pirate .sheet-body .sheet-sub::before { content: "🧭 "; }
+body.tpl-pirate .sheet-body .clue, body.tpl-pirate .sheet-body .question { border-radius: 14px 4px 14px 4px; border: 2px dashed var(--edge, var(--line)); }
+body.tpl-pirate .sx-h { font-family: Georgia, "Noto Serif TC", serif; font-style: italic; }
+body.tpl-pirate .sx-h::before { content: "⚓ "; }
+body.tpl-pirate .npc-bubble { border-radius: 14px 4px 14px 4px; }
+
+/* ---- 學院：課表便條 ---- */
+body.tpl-academy .sheet-body .sheet-head { padding: 10px 12px; margin-bottom: 12px; border-radius: 16px; border: 2px solid var(--accent, var(--edge)); background: var(--accent-soft, var(--card)); }
+body.tpl-academy .sheet-body .sheet-sub { font-weight: 800; letter-spacing: .08em; color: var(--accent, var(--muted)); }
+body.tpl-academy .sheet-body .sheet-sub::before { content: "📖 "; }
+body.tpl-academy .sheet-body .clue, body.tpl-academy .sheet-body .question { border-radius: 16px; border: 2px solid var(--line); border-top: 8px solid var(--accent, var(--edge)); }
+body.tpl-academy .sx-h::before { content: "✎ "; }
+body.tpl-academy .npc-bubble { border-radius: 18px; }
+
+/* ---- 小螢幕（320px）：不橫向溢出 ---- */
+@media (max-width: 360px) {
+  body[class*="tpl-"] .sx-bar { gap: 4px 8px; }
+  body[class*="tpl-"] .sx-hearts { font-size: .85rem; letter-spacing: 0; }
+  body[class*="tpl-"] .sx-exp { flex-basis: 100%; }
+  body.tpl-detective .sheet-body .sheet-head::after { right: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .npc-bubble, #sheet.hit .sheet-body, #sheet.shake .sheet-body { animation: none !important; }
+}

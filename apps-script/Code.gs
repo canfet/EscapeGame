@@ -39,7 +39,7 @@ var SCHEMA = {
     'show_leaderboard', 'leaderboard_live', 'require_run_code', 'wrong_lock_after', 'wrong_lock_sec', 'collect_message', 'deck_id', 'updated_at'],
   Stages: ['project_id', 'stage_id', 'order', 'enabled', 'title', 'clue', 'image_url', 'lat', 'lng',
     'radius_m', 'show_location', 'require_gps', 'bypass_code', 'question', 'show_question_early', 'require_photo', 'reward_code', 'reward_order', 'final_from_fragments', 'coop_final', 'item_name', 'item_icon', 'item_rarity', 'item_story', 'card_id', 'card_random', 'routes', 'answer_type', 'choices',
-    'answer', 'points', 'max_attempts', 'hint1', 'hint2', 'hint3', 'hint_penalty', 'success_message',
+    'answer', 'points', 'max_attempts', 'hint1', 'hint2', 'hint3', 'hint_penalty', 'success_message', 'npc_arrive', 'npc_wrong', 'npc_hint',
     'form_url', 'form_verify_sheet', 'updated_at'],
   Sessions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'avatar', 'route', 'test', 'status', 'score',
     'started_at', 'last_active_at', 'finished_at', 'last_lat', 'last_lng', 'progress_json', 'user_agent'],
@@ -54,7 +54,7 @@ var TEXT_COLUMNS = {
   Projects: ['project_id', 'name', 'description', 'intro', 'finish_message', 'cover_url', 'collect_message', 'deck_id', 'routes', 'teams', 'npc_name', 'npc_avatar'],
   Decks: ['deck_id', 'title', 'cards'],
   Stages: ['project_id', 'stage_id', 'title', 'clue', 'image_url', 'bypass_code', 'question', 'answer', 'choices', 'hint1', 'hint2', 'hint3',
-    'success_message', 'form_url', 'form_verify_sheet', 'reward_code', 'item_name', 'item_icon', 'item_story', 'card_id', 'routes'],
+    'success_message', 'npc_arrive', 'npc_wrong', 'npc_hint', 'form_url', 'form_verify_sheet', 'reward_code', 'item_name', 'item_icon', 'item_story', 'card_id', 'routes'],
   Sessions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'avatar', 'route', 'user_agent'],
   Submissions: ['session_id', 'code', 'project_id', 'run_code', 'team_name', 'stage_id', 'stage_title', 'input', 'result', 'note']
 };
@@ -825,6 +825,7 @@ function adminSaveStage_(b) {
     if (b.isNew && ex) throw appError_('關卡代碼重複', 'DUPLICATE');
     var data = pick_(s, SCHEMA.Stages);
     data.project_id = pid; data.stage_id = id; data.answer_type = type;
+    ['npc_arrive', 'npc_wrong', 'npc_hint'].forEach(function (k) { if (k in data) data[k] = str_(data[k]).slice(0, 200); });
     if ('routes' in data) data.routes = str_(data.routes).split('|').map(function (t) { return t.trim(); }).filter(function (t) { return /^[A-Za-z0-9_-]{1,20}(:\d+(\.\d+)?)?$/.test(t); }).join('|');
     if (!ex && !num_(data.order, 0)) {
       data.order = mine.reduce(function (m, r) { return Math.max(m, num_(r.order, 0)); }, 0) + 1;
@@ -1075,6 +1076,7 @@ function publicStage_(st, status, g, c) {
   if (status === 'locked') return o;
   o.wait_sec = lockLeft_(c, g, 'ans');
   o.clue = st.clue; o.image_url = st.image_url;
+  ['npc_arrive', 'npc_wrong', 'npc_hint'].forEach(function (k) { var v = str_(st[k]); if (v) o[k] = v; });
   if (st.show_location && isNum_(st.lat) && isNum_(st.lng)) {
     o.lat = st.lat; o.lng = st.lng; o.radius_m = st.radius_m;
   }
@@ -1713,7 +1715,8 @@ function cleanStage_(r) {
     answer_type: ANSWER_TYPES.indexOf(type) >= 0 ? type : 'text', choices: str_(r.choices), answer: str_(r.answer),
     points: num_(r.points, 10), max_attempts: num_(r.max_attempts, 0),
     hint1: str_(r.hint1), hint2: str_(r.hint2), hint3: str_(r.hint3), hint_penalty: num_(r.hint_penalty, 0),
-    success_message: str_(r.success_message), form_url: str_(r.form_url), form_verify_sheet: str_(r.form_verify_sheet)
+    success_message: str_(r.success_message), form_url: str_(r.form_url), form_verify_sheet: str_(r.form_verify_sheet),
+    npc_arrive: str_(r.npc_arrive).slice(0, 200), npc_wrong: str_(r.npc_wrong).slice(0, 200), npc_hint: str_(r.npc_hint).slice(0, 200)
   };
 }
 

@@ -1295,7 +1295,7 @@
   /* ---------- 關卡面板 ---------- */
   function openStage(id) {
     startCompass(true); // 點擊關卡是使用者手勢，iOS 可在這時詢問方向權限
-    if (P.openId !== id) { P.choice = null; P.photo = null; }
+    if (P.openId !== id) { P.choice = null; P.photo = null; P.bubble = null; }
     P.openId = id;
     updateLink();
     renderStage();
@@ -1309,7 +1309,7 @@
   }
 
   function closeStage() {
-    P.openId = null;
+    P.openId = null; P.bubble = null;
     destroySheetMap();
     updateLink();
     $('#sheet').classList.add('hidden');
@@ -1329,7 +1329,9 @@
     // 關卡有上傳圖片才顯示頂部大圖；沒設定就不顯示
     if (st.image_url) h.push('<div class="sheet-hero"><img class="hero-img" src="' + esc(st.image_url) + '" alt="" onerror="this.parentNode.remove()"></div>');
     var no = P.state.stages.indexOf(st) + 1;
-    h.push('<div class="sheet-head"><div class="grow"><div class="sheet-sub">第 ' + no + ' 關</div><h2 class="sheet-title">' + esc(st.title) + '</h2></div><button class="close-x" id="s-close" aria-label="關閉">✕</button></div>');
+    h.push('<div class="sheet-head"><div class="grow"><div class="sheet-sub">' + V('stageTitle', { n: no, title: st.title }) + '</div><h2 class="sheet-title">' + esc(st.title) + '</h2></div><button class="close-x" id="s-close" aria-label="關閉">✕</button></div>');
+    var themed = isThemed();
+    if (themed) h.push(sheetStatusHtml(st));   // 套版：體力列／RPG 迷你 EXP 條（classic 不加）
     var pen = st.hint_penalty || 0, used = (st.hints || []).length;
     var avail = Math.max(0, st.points - used * pen);   // 目前這一關答對可得的分數
     var ptsChip = st.status === 'solved' ? '<span class="chip green">本關得 ' + st.earned + ' 分</span>'
@@ -1340,13 +1342,14 @@
       '<span class="chip">' + Q.TYPE_LABEL[st.answer_type] + '</span>' + ptsChip +
       '<span class="chip blue">⭐ 目前總分 ' + se.score + '</span></div>');
     h.push('<div class="sheet-content stack">');
+    if (themed) h.push(bubbleForStage(st));   // 套版：答錯／提示後的內嵌 NPC 氣泡
 
     // 1) 線索 → 2) 題目 → 3) 提示（可收合）
     var contentStart = h.length;
-    if (st.clue) h.push('<div class="clue">' + Q.linkify(st.clue) + '</div>');
+    if (st.clue) h.push((themed ? secHeadHtml('clue') : '') + '<div class="clue">' + Q.linkify(st.clue) + '</div>');
     // 題目：抵達後一定顯示；前往中則看關卡是否設定「抵達前就顯示題目」
     if (st.question) {
-      h.push('<div class="question">' + (st.status === 'open' ? '<div class="q-label">📝 題目（抵達地點後才能作答）</div>' : '') + Q.linkify(st.question) + '</div>');
+      h.push((themed ? secHeadHtml('question') : '') + '<div class="question">' + (st.status === 'open' ? '<div class="q-label">📝 ' + V('questionHeading') + '（抵達地點後才能作答）</div>' : '') + Q.linkify(st.question) + '</div>');
     }
     // 已完成／未通過的關卡：線索與題目收合起來，面板只留結果，比較精簡
     if (st.status === 'solved' || st.status === 'failed') {
@@ -1376,7 +1379,7 @@
         // 需要 GPS 打卡、又要輸入文字／數字答案：到了現場可以直接填答案，一次完成「定位＋送答案」
         var combo = st.require_gps && st.question && !st.require_photo && !st.uses_fragments && (st.answer_type === 'text' || st.answer_type === 'number');
         if (combo) h.push(answerUI(st).body);
-        if (st.require_gps) acts.push('<button class="big" id="s-arrive">' + (combo ? '📍 我到了，定位打卡' : '📍 我到了，定位打卡') + '</button>');
+        if (st.require_gps) acts.push('<button class="big" id="s-arrive">' + V('arriveBtn') + '</button>');
         if (st.has_bypass) {
           h.push('<div class="card"><label for="s-code">' + (st.require_gps ? '定位不準？輸入現場通關碼' : '輸入現場的通關碼') + '</label>' +
             '<div class="row"><input id="s-code" class="grow" autocomplete="off" placeholder="通關碼"><button id="s-code-btn">確認</button></div></div>');
@@ -1401,7 +1404,7 @@
     // 提示按鈕（次要）
     if (playing && (st.status === 'open' || st.status === 'arrived') && st.hints.length < st.hints_total) {
       var nextAvail = Math.max(0, st.points - (used + 1) * pen);
-      h.push('<button class="ghost big" id="s-hint">💡 需要提示？（' + (used + 1) + '/' + st.hints_total + '）' +
+      h.push('<button class="ghost big" id="s-hint">' + V('hintBtn') + '（' + (used + 1) + '/' + st.hints_total + '）' +
         (pen ? '<span class="hint-cost">本關可得 ' + avail + ' → ' + nextAvail + ' 分</span>' : '<span class="hint-cost">不扣分</span>') + '</button>');
     }
     if (!playing && st.status !== 'solved') h.push('<p class="muted center">' + (se.status === 'timeup' ? '闖關時間已到' : '闖關已結束') + '</p>');
@@ -1421,6 +1424,118 @@
     if (same && saved[focusId] !== undefined) { var fe = document.getElementById(focusId); if (fe) { try { fe.focus({ preventScroll: true }); } catch (e) { /* */ } } }
     bindStage(st);
     mountSheetMap();
+    if (themed) afterThemedRender(st);
+  }
+
+  /* ---------- 套版：關卡面板（任務卷軸、NPC 氣泡、戰鬥回饋）；classic 一律不執行 ---------- */
+  function isThemed() { return !!(P.tpl && P.tplId && P.tplId !== 'classic'); }
+  function reduced() {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
+  }
+  function secHeadHtml(which) {
+    try { return '<div class="sx-h" data-sx="' + which + '">' + esc(V(which === 'clue' ? 'clueHeading' : 'questionHeading')) + '</div>'; } catch (e) { return ''; }
+  }
+  var HEART_TPL = ['rpg', 'pirate', 'academy'];
+  /** 面板頂端：體力（純視覺，不影響計分）＋ RPG 迷你 EXP 條 */
+  function sheetStatusHtml(st) {
+    try {
+      var hp = Q.Tpl.hearts(st), left = hp.total - hp.lost, label = V('hpLabel'), out = '';
+      if (HEART_TPL.indexOf(P.tplId) >= 0) {
+        var hs = '', i;
+        for (i = 0; i < hp.total; i++) hs += i < left ? '❤️' : '💔';
+        out = '<span class="sx-hp-l">' + esc(label) + '</span><span class="sx-hearts" role="img" aria-label="' + esc(label) + '：剩 ' + left + '，共 ' + hp.total + '">' + hs + '</span>';
+      } else {
+        out = '<span class="sx-hp-l">' + esc(label) + '</span><span class="sx-hp-t" aria-label="' + esc(label) + '：剩 ' + left + '，共 ' + hp.total + '">' + left + ' / ' + hp.total + '</span>';
+      }
+      var exp = '';
+      if (P.tpl && P.tpl.hud === 'rpg') {
+        var li = levelOf(P.state), w = P.miniPct != null ? P.miniPct : li.pct;
+        exp = '<div class="sx-exp" role="img" aria-label="Lv.' + li.lv + '，經驗值 ' + li.exp + ' / ' + li.expMax + '"><span class="hud-lv">Lv.' + li.lv + '</span>' +
+          '<span class="hud-exp-bar"><i style="width:' + w + '%"></i></span><span class="hud-exp-text">' + li.exp + ' / ' + li.expMax + ' EXP</span></div>';
+      }
+      return '<div class="sx-bar"><div class="sx-hp">' + out + '</div>' + exp + '</div>';
+    } catch (e) { return ''; }
+  }
+  /** 內嵌 NPC 氣泡（頭像＋文字）；文字先完整放進 DOM，之後由 Fx.typewriter 逐字重播 */
+  function npcBubbleHtml(npc, text) {
+    if (!npc || !text) return '';
+    return '<div class="npc-bubble" role="status" aria-live="polite" aria-label="' + esc(npc.name || '') + '說">' +
+      '<span class="nb-av" aria-hidden="true">' + esc(npc.avatar || '') + '</span>' +
+      '<span class="nb-body"><b class="nb-name">' + esc(npc.name || '') + '</b><span class="nb-text">' + esc(text) + '</span></span></div>';
+  }
+  function bubbleForStage(st) {
+    try {
+      var b = P.bubble;
+      if (!b || b.sid !== st.stage_id || (st.status !== 'open' && st.status !== 'arrived')) return '';
+      var npc = Q.Tpl.npcOf(P.tplId, P.project || (P.state && P.state.project));
+      return npcBubbleHtml(npc, b.text);
+    } catch (e) { return ''; }
+  }
+  /** 重繪後：新的氣泡才逐字播放一次（輪詢重繪不會重播）；迷你 EXP 條增長動畫 */
+  function afterThemedRender(st) {
+    try {
+      var b = P.bubble;
+      if (b && b.fresh && b.sid === st.stage_id) {
+        b.fresh = false;
+        var el = document.querySelector('#sheet-body .npc-bubble .nb-text'), f = FX();
+        if (el && f && f.typewriter && !reduced()) f.typewriter(el, b.text, { speed: 28 });
+      }
+      if (P.tpl && P.tpl.hud === 'rpg') {
+        var li = levelOf(P.state), bar = document.querySelector('#sheet-body .sx-exp .hud-exp-bar > i');
+        if (bar && P.miniPct != null && P.miniPct !== li.pct) setTimeout(function () { bar.style.width = li.pct + '%'; }, 60);
+        P.miniPct = li.pct;
+      }
+    } catch (e) { /* */ }
+  }
+  /** act() 在 applyState 之前呼叫：決定氣泡內容（讓這次重繪就帶出氣泡）、記下送出鈕位置供命中特效 */
+  function battlePre(action, payload, r, before) {
+    if (!isThemed() || !payload || !payload.stageId) return null;
+    var sid = payload.stageId, ns = (r.state.stages || []).filter(function (x) { return x.stage_id === sid; })[0];
+    if (!ns) return null;
+    var ctx = { sid: sid, wrong: action === 'submitAnswer' && r.correct === false, ok: action === 'submitAnswer' && r.correct === true, x: 0, y: 0 };
+    if (ctx.wrong) P.bubble = { sid: sid, text: Q.Tpl.npcLine(P.tplId, 'wrong', ns, Math.max(0, (ns.attempts || 1) - 1)), fresh: true };
+    else if (action === 'getHint' && (ns.hints || []).length > ((P.state.stages.filter(function (x) { return x.stage_id === sid; })[0] || {}).hints || []).length) {
+      P.bubble = { sid: sid, text: Q.Tpl.npcLine(P.tplId, 'hint', ns), fresh: true };
+    } else if (ns.status === 'solved' || ns.status === 'failed') P.bubble = null;
+    if (P.bubble && !P.bubble.text) P.bubble = null;
+    var btn = document.getElementById('s-submit') || document.getElementById('s-arrive');
+    var rc = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : null;
+    ctx.x = rc ? rc.left + rc.width / 2 : (window.innerWidth || 360) / 2;
+    ctx.y = rc ? rc.top + rc.height / 2 : (window.innerHeight || 640) * 0.8;
+    return ctx;
+  }
+  /** applyState 之後：答對命中特效／面板閃光、答錯面板搖晃 */
+  function battlePost(ctx, r) {
+    var sheet = $('#sheet'), f = FX();
+    var flash = function (cls, ms) {
+      if (!sheet || reduced()) return;
+      sheet.classList.remove(cls); void sheet.offsetWidth; sheet.classList.add(cls);
+      setTimeout(function () { sheet.classList.remove(cls); }, ms);
+    };
+    if (ctx.ok) {
+      flash('hit', 700);
+      if (f && f.burst) f.burst(ctx.x, ctx.y, P.tplId === 'pirate' ? 'coin' : 'star');
+    } else if (ctx.wrong) flash('shake', 500);
+  }
+  /** 打卡成功後 NPC 講一句（每關一次；點一下關閉、數秒後自動關閉，不擋作答） */
+  function npcArrive(sid, before, state) {
+    if (!isThemed()) return;
+    var ns = (state.stages || []).filter(function (x) { return x.stage_id === sid; })[0];
+    if (!ns || ns.status !== 'arrived' || before[sid] === 'arrived') return;
+    var key = 'escapegame:npcseen:' + P.sid + ':' + sid + ':arrive';
+    try { if (localStorage.getItem(key) === '1') return; } catch (e) { /* 讀不到就當沒看過 */ }
+    var text = Q.Tpl.npcLine(P.tplId, 'arrive', ns);
+    if (!text) return;
+    setTimeout(function () {
+      try {
+        if (P.openId !== sid) return;
+        try { localStorage.setItem(key, '1'); } catch (e) { /* */ }
+        if (showDialog([text], null)) {
+          var d = DLG;
+          setTimeout(function () { if (DLG === d && d.open) closeDialog(true); }, 8000);
+        }
+      } catch (e) { /* */ }
+    }, 1100);
   }
 
   /** 照片挑選區：可以直接拍照，也可以從相簿選（相簿不會強制開相機） */
@@ -1445,7 +1560,7 @@
     var miss = st.uses_fragments ? (st.fragments_missing || 0) : 0, w = waitLeft(st);
     if (miss > 0) return '<button class="big" id="s-submit" disabled>還差 ' + miss + ' 個碎片</button>';
     if (w > 0) return '<button class="big" id="s-submit" disabled>答錯太多次，請等 <span id="wait-n">' + w + '</span> 秒</button>';
-    return '<button class="big" id="s-submit">送出答案</button>';
+    return '<button class="big" id="s-submit">' + V('submitBtn') + '</button>';
   }
 
   /** 每秒更新冷卻倒數，時間到就重畫讓按鈕恢復 */
@@ -1519,7 +1634,7 @@
     on('s-frag-clear', function () { var el = document.getElementById('s-ans'); if (el) { el.value = ''; el.focus(); } });
     updateCompass();
     var arriveBtn = document.getElementById('s-arrive'), ansEl = document.getElementById('s-ans');
-    var arriveLabel = function () { return ansEl && st.status === 'open' && ansEl.value.trim() ? '📍 定位打卡並送出答案' : '📍 我到了，定位打卡'; };
+    var arriveLabel = function () { return ansEl && st.status === 'open' && ansEl.value.trim() ? '📍 定位打卡並送出答案' : V('arriveBtn'); };
     if (arriveBtn && ansEl && st.status === 'open') {
       arriveBtn.textContent = arriveLabel();
       ansEl.addEventListener('input', function () { arriveBtn.textContent = arriveLabel(); });
@@ -1537,7 +1652,7 @@
       var msg = pen
         ? '⚠️ 看提示會扣分！\n\n這一關答對可得的分數：' + a0 + ' 分 → ' + a1 + ' 分（每則提示少 ' + pen + ' 分）。\n\n你們目前總分 ' + P.state.session.score + ' 分，不會馬上被扣，會在這一關過關時少算。'
         : '這則提示不會扣分，可以放心使用。\n\n（你們目前總分 ' + P.state.session.score + ' 分）';
-      var ok = await askConfirm('要看提示嗎？', msg, pen ? '看提示（少 ' + pen + ' 分）' : '看提示');
+      var ok = await askConfirm(V('hintTitle'), msg, pen ? '看提示（少 ' + pen + ' 分）' : '看提示');
       if (ok) act('getHint', { stageId: st.stage_id });
     });
     on('s-submit', function () {
@@ -1550,7 +1665,7 @@
         if (!okGo) return;
         var sb = $('#s-submit'); if (sb) { sb.disabled = true; sb.textContent = '送出中…'; }
         return act('submitAnswer', st.require_photo ? { stageId: st.stage_id, answer: ans, dataUrl: P.photo } : { stageId: st.stage_id, answer: ans })
-          .then(function (r) { if (r && r.correct) P.photo = null; else { sb = $('#s-submit'); if (sb) { sb.disabled = false; sb.textContent = '送出答案'; } } });
+          .then(function (r) { if (r && r.correct) P.photo = null; else { sb = $('#s-submit'); if (sb) { sb.disabled = false; sb.textContent = V('submitBtn'); } } });
       });
     });
     Q.$$('[data-choice]').forEach(function (b) {
@@ -1593,7 +1708,7 @@
       Q.toast(e.message, 'err', 6000);
     } finally {
       btn = $('#s-arrive');
-      if (btn) { btn.disabled = false; var a2 = $('#s-ans'); btn.textContent = (a2 && a2.value.trim() && findStage(st.stage_id) && findStage(st.stage_id).status === 'open') ? '📍 定位打卡並送出答案' : '📍 我到了，定位打卡'; }
+      if (btn) { btn.disabled = false; var a2 = $('#s-ans'); btn.textContent = (a2 && a2.value.trim() && findStage(st.stage_id) && findStage(st.stage_id).status === 'open') ? '📍 定位打卡並送出答案' : V('arriveBtn'); }
     }
   }
 
@@ -1612,13 +1727,16 @@
       }
       var beforeBadges = ((P.state && P.state.badges) || []).map(function (x) { return x.id; });
       var liBefore = levelOf(P.state);
+      var fxCtx = null;
+      try { fxCtx = battlePre(action, payload, r, before); } catch (e) { fxCtx = null; }   // 套版：先決定 NPC 氣泡內容、記下送出鈕位置
       applyState(r.state);
+      try { if (fxCtx) battlePost(fxCtx, r); } catch (e) { /* 戰鬥回饋失敗不影響作答 */ }
       (r.state.badges || []).filter(function (x) { return beforeBadges.indexOf(x.id) < 0; }).forEach(function (bd, i) {
         setTimeout(function () { Q.toast('🏅 獲得徽章：' + bd.icon + ' ' + bd.name + '（' + bd.desc + '）', 'ok', 5500); }, 900 + i * 1400);
       });
       var solved = r.state.stages.filter(function (x) { return x.status === 'solved' && before[x.stage_id] && before[x.stage_id] !== 'solved'; })[0];
       var type = (r.correct === false || r.arrived === false) ? 'warn' : 'ok';
-      if (action === 'arrive' && r.arrived !== false && type !== 'warn') arriveFlash();
+      if (action === 'arrive' && r.arrived !== false && type !== 'warn') { arriveFlash(); try { npcArrive(payload.stageId, before, r.state); } catch (e) { /* */ } }
       if (r.correct && payload && payload.stageId) clearDrafts(payload.stageId);
       if (solved) { sfx('win'); if (r.state.session.status === 'playing') celebrateSolved(liBefore, levelOf(r.state)); }
       else if (type === 'warn') sfx('bad');

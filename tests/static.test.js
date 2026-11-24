@@ -40,3 +40,30 @@ test('versions', () => {
   assert.match(read('js/common.js'), /FRONT_VERSION = '1\.2\.0'/);
   assert.match(read('apps-script/Code.gs'), /APP_VERSION = '1\.2\.0'/);
 });
+
+test('player.js no longer hard-codes strings replaced by vocab; classic vocab keeps them', () => {
+  const T = require('../js/templates.js');
+  const old = {
+    stageTitle: ["'<div class=\"sheet-sub\">第 '", "' 關</div>"],
+    questionHeading: ['📝 題目（'],
+    arriveBtn: ["'📍 我到了，定位打卡'"],
+    submitBtn: ["'送出答案'"],
+    hintBtn: ['💡 需要提示？'],
+    hintTitle: ["'要看提示嗎？'"]
+  };
+  Object.keys(old).forEach((k) => old[k].forEach((s) => assert.ok(player.indexOf(s) < 0, 'player.js still hard-codes ' + s)));
+  assert.strictEqual(T.vocab('classic', 'arriveBtn'), '📍 我到了，定位打卡');
+  assert.strictEqual(T.vocab('classic', 'submitBtn'), '送出答案');
+  assert.strictEqual(T.vocab('classic', 'hintTitle'), '要看提示嗎？');
+  assert.strictEqual(T.vocab('classic', 'hintBtn'), '💡 需要提示？');
+  assert.strictEqual(T.vocab('classic', 'questionHeading'), '題目');
+  assert.strictEqual(T.vocab('classic', 'stageTitle', { n: 2 }), '第 2 關');
+  ['stageTitle', 'questionHeading', 'arriveBtn', 'submitBtn', 'hintBtn', 'hintTitle'].forEach((k) => assert.ok(player.indexOf("V('" + k + "'") > 0, 'uses V(' + k + ')'));
+});
+
+test('stage-panel NPC/battle code is guarded and gated to non-classic', () => {
+  assert.ok(/function npcBubbleHtml\(npc, text\)/.test(player));
+  assert.ok(/escapegame:npcseen:/.test(player));
+  assert.ok(/function isThemed\(\)/.test(player) && /if \(themed\) h\.push\(sheetStatusHtml/.test(player));
+  assert.ok(read('css/templates.css').indexOf('prefers-reduced-motion') > 0 && /#sheet\.shake/.test(read('css/templates.css')));
+});

@@ -150,3 +150,6 @@ sequenceDiagram
 - 2026-11-24：加入 pirate、academy 兩套版（共 6 種）；用語鍵與 fx 同表。
 - 2026-11-24：實作偏離：後台 NPC 欄位 id 為 `mp-npc_name`、`mp-npc_avatar`（底線，配合 PROJECT_FIELDS 通用迴圈）；`allAvatars_()` 為聯集去重（🦉 同時在 classic 與 academy）。
 - 2026-11-24（E2）：`TemplateDef` 新增選填 `avatarNames`（rpg 職業小標籤，`{emoji:名稱}`）；`#hud-exp` 內含 `#hud-lv`、`#hud-exp-bar > i`、`#hud-exp-text`；`#levelup` 內含 `#levelup-lv`；另新增 `#solved-npc`（過關畫面 NPC 訊息）與 `#intro-heading`、`#avatar-label`、`#stage-list-title`、`#g-finished-title`、`#fin-h1`（用語替換目標）。`Fx` 在瀏覽器同時掛 `window.Fx` 與 `Q.Fx`；`typeSteps` 另外把 ZWJ／異體選擇符黏回前一字元。
+
+- R8 每關自訂 NPC 台詞：Stages 新增選填欄位 `npc_arrive`、`npc_wrong`、`npc_hint`（各 ≤200 字，存檔與清洗皆截斷）；`publicStage_` 僅在非 locked 且有值時回傳；過關仍用 `success_message`。後台關卡表單新增三欄。APP_VERSION 維持 1.2.0（相容擴充）。
+- 2026-11-24（E2）：套版進入關卡面板。vocab 新增 stageTitle／clueHeading／questionHeading／arriveBtn／submitBtn／hintBtn／hintTitle／hpLabel（classic 值＝原寫死字串；stageTitle 只作面板副標「第 {n} 關」，標題仍是關卡名）；TemplateDef 新增 lines{arrive,wrong[3],hint}，純函式 npcLine(id,kind,stage,idx)（stage.npc_arrive／npc_wrong／npc_hint 優先）與 hearts(stage)。player.js：非 classic 才有體力列、RPG 迷你 EXP、小標題、內嵌 NPC 氣泡 npcBubbleHtml、命中閃光 hit／搖晃 shake；打卡後 NPC 一句話以 localStorage escapegame:npcseen:<sid>:<stageId>:arrive 去重。
