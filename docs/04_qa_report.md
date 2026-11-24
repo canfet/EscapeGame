@@ -32,3 +32,15 @@
 - 未在瀏覽器實測：卷軸版面、內嵌 NPC 氣泡、命中閃光／震動、320px 排版。
 - 打卡台詞用底部對話框，可能蓋住送出鈕，已設 8 秒自動關閉、點擊可關。
 - 台詞覆寫需重新部署 Code.gs 後才生效；沒有值時用套版預設台詞。
+
+## 瀏覽器驗證（headless Chrome）
+- 工具：`node tools/mockserver.js [port]`（靜態檔＋模擬後端，`/__set?tpl=rpg&theme=forest&switch=1` 切換套版／主題）；`node tools/shots.js [套版[:主題] …] [--size 320x568]`（自動啟動模擬後端與 Chrome，走完介紹→開始→主畫面→關卡→打卡→答錯→提示→答對→完賽，截圖存 `shots/`，已加入 .gitignore，並在各步驟檢查橫向溢出與小按鈕、收集 console 錯誤）。
+- 範圍：6 個套版＋建議主題、rpg+neon、academy+mist（390x844，各約 19 張，共 153 張），另以 320x568 抽查 rpg／detective／academy+mist；`tools/mobilecheck.js` 對模擬後端的介紹頁（320–412px）無橫向捲動、無過小按鈕。
+- 發現並修正：
+  1. 過關畫面 NPC 氣泡與卡片左右並排（`.solved-overlay` 在 style.css 後段被改成橫向 flex，`:has` 規則只設 grid 屬性無效）→ css/templates.css 改成 `#solved` 直向排列。
+  2. 環境粒子畫布 z-index 1800 蓋在關卡面板文字上（agent 的 0/1 雨、RPG 螢火蟲壓在題目上）→ 降到 900（面板之下）；過關特效層 `.fx-top` 不變。
+  3. 學院（campus 主題）介紹頁英雄區白字壓淡粉漸層，對比不足 → templates.css 加深漸層並讓副標變白。
+  4. 完賽頁排行榜／徽章卡片與上方按鈕貼在一起 → 非經典套版加 12px 間距（經典不變）。
+  5. 開始闖關時 `scrollIntoView` 會連整頁一起捲（320 寬時主畫面開場被捲下 400px，看不到 HUD 與地圖；此為舊行為，經典也會）→ 改成只橫向捲動關卡列。
+- 驗證結果：6 套版＋2 組非建議組合所有步驟畫面正常（職業選擇、HUD Lv/EXP、內嵌開場氣泡、卷軸／案件卷宗版面、體力列、答錯震動與 NPC 回應、LEVEL UP、SOLVED 印章、完賽）；暗色主題（neon、mist）搭 RPG／學院對比足夠；經典畫面沒有任何新元素；console 無錯誤（`navigator.vibrate` 的「未經使用者操作」提示來自自動點擊，已排除）。
+- 仍需人眼／真機確認：觸控手勢與震動、GPS 定位與指南針、Leaflet 真實圖磚（本次離線封鎖）、音效、`prefers-reduced-motion`、iOS Safari 的 `:has()` 與 dvh 行為、字型實際載入（模擬環境擋掉 Google Fonts）。

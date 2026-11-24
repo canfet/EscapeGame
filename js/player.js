@@ -27,8 +27,6 @@
 
   /* ---------- 啟動 ---------- */
   async function init() {
-    // 浮層開關會用 history.pushState／back；瀏覽器預設會在 back 時還原舊捲動位置（介紹頁往下捲過再開始闖關，主畫面就被推下去一截）
-    try { history.scrollRestoration = 'manual'; } catch (e) { /* */ }
     var name = '實境解謎';
     $('#site-name').textContent = name;
     $('#app-head-title').textContent = '🧭 ' + name;
@@ -417,7 +415,7 @@
     // 重畫後保留橫向捲動位置；第一次才把進行中的那一關捲到可見位置
     stageList.scrollLeft = keepLeft;
     var cur = document.querySelector('#g-stages .stage-card.open, #g-stages .stage-card.arrived');
-    if (cur && cur.scrollIntoView && !P.scrolledCur) { P.scrolledCur = true; cur.scrollIntoView({ block: 'nearest', inline: 'center' }); }
+    if (cur && !P.scrolledCur) { P.scrolledCur = true; stageList.scrollLeft = Math.max(0, cur.getBoundingClientRect().left - stageList.getBoundingClientRect().left + stageList.scrollLeft - (stageList.clientWidth - cur.offsetWidth) / 2); }   // 只橫向捲動關卡列（scrollIntoView 會連整頁一起捲，小螢幕開場就看不到 HUD 與地圖）
     Q.$$('#g-stages [data-id]').forEach(function (b) {
       b.onclick = function () {
         var st = findStage(b.dataset.id);

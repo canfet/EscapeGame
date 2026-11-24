@@ -242,3 +242,5 @@ body.tpl-academy .npc-bubble { border-radius: 18px; }
 /* 校園主題的英雄區原本是淡紫→淡粉漸層，白字對比不足（學院套版預設就是這個主題）：加深漸層，並讓副標用較亮的白 */
 body.theme-campus { --hero: linear-gradient(135deg, #6a5acd, #c94f86); }
 body.theme-campus .hero #intro-desc { color: #fff !important; opacity: .92; }
+/* 完賽畫面：排行榜卡片與上方按鈕貼在一起（只在非經典套版加間距，經典維持原樣） */
+body[class*="tpl-"]:not(.tpl-classic) #fin-board-card, body[class*="tpl-"]:not(.tpl-classic) #fin-badges-card { margin-top: 12px; }

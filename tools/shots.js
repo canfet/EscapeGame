@@ -43,7 +43,7 @@ async function main() {
   const outDir = path.join(__dirname, '..', 'shots');
   fs.mkdirSync(outDir, { recursive: true });
   let ws, count = 0;
-  const errors = [];
+  const errors = [], warns = [];
   let cur = '';
   try {
     let list;
@@ -72,7 +72,21 @@ async function main() {
     const waitFor = async (sel, ms) => { for (let t = 0; t < (ms || 6000); t += 100) { if (await vis(sel)) return true; await sleep(100); } return false; };
     const click = async sel => { const ok = await ev(`(function(){var e=document.querySelector(${JSON.stringify(sel)});if(!e)return false;e.click();return true})()`); if (!ok) errors.push(cur + ' 找不到可點元素 ' + sel); return ok; };
     const fill = sel => async v => ev(`(function(){var e=document.querySelector(${JSON.stringify(sel)});if(!e)return false;e.focus();e.value=${JSON.stringify(v)};e.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
+    // 版面檢查：橫向捲動、超出右側的元素、過小的按鈕（跟 mobilecheck 同標準，但在遊戲各步驟執行）
+    const layoutCheck = async name => {
+      const v = await ev(`(function(){var W=document.documentElement.clientWidth,o=[],sm=[];
+        if(document.documentElement.scrollWidth>W+1)o.push('頁面橫向捲動');
+        document.querySelectorAll('body *').forEach(function(e){var cs=getComputedStyle(e);if(cs.display==='none'||cs.visibility==='hidden'||e.closest('.hidden,.table-wrap,.stage-list,.leaflet-container,#fx-canvas,.leaflet-control-container'))return;
+          var r=e.getBoundingClientRect();if(!r.width||!r.height)return;
+          var n=(e.id?'#'+e.id:'')+(typeof e.className==='string'&&e.className?'.'+e.className.trim().split(/\\s+/)[0]:'')||e.tagName;
+          if(r.right>W+2&&cs.position!=='fixed'&&!e.closest('#sheet-body'))o.push(n+' 右緣 '+Math.round(r.right));
+          if(/^(BUTTON|A)$/.test(e.tagName)&&cs.position!=='absolute'&&Math.min(r.width,r.height)<36&&(e.textContent.trim()||e.getAttribute('aria-label')))sm.push(n+' '+Math.round(r.width)+'x'+Math.round(r.height))});
+        return {o:Array.from(new Set(o)).slice(0,6),sm:Array.from(new Set(sm)).slice(0,6)}})()`);
+      if (v && v.o.length) errors.push(cur + ' [' + name + '] 版面：' + v.o.join('、'));
+      if (v && v.sm.length) warns.push(cur + ' [' + name + '] 按鈕偏小：' + v.sm.join('、'));
+    };
     const shot = async name => {
+      if (/^(3-game|4-stage-open|5-arrived|7b-solved|10-finish)$/.test(name)) await layoutCheck(name);
       const s = await send('Page.captureScreenshot', { format: 'png' });
       fs.writeFileSync(path.join(outDir, cur + '-' + name + '.png'), Buffer.from(s.result.data, 'base64')); count++;
     };
@@ -153,6 +167,8 @@ async function main() {
   }
   console.log('截圖 ' + count + ' 張 → shots/');
   const uniq = Array.from(new Set(errors));
+  const uw = Array.from(new Set(warns));
+  if (uw.length) console.log('提醒 ' + uw.length + ' 筆：\n  ' + uw.join('\n  '));
   console.log(uniq.length ? 'Console／流程問題 ' + uniq.length + ' 筆：\n  ' + uniq.join('\n  ') : 'Console 沒有錯誤');
   process.exit(0);
 }
