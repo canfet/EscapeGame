@@ -11,7 +11,7 @@
    * ‧ 後端回「BUSY」（很多人同時操作、排隊太久）代表這個動作還沒執行，自動等一下再試，最多 3 次。
    */
   // 前台版本：後端會檢查它（太舊會叫玩家重新整理）；後端版本太舊時，後台會提示重新部署 Code.gs
-  var FRONT_VERSION = '1.1.0', MIN_BACKEND = '1.1.0';
+  var FRONT_VERSION = '1.2.0', MIN_BACKEND = '1.2.0';
 
   function cmpVer(a, b) {
     var x = String(a || '0').split('.'), y = String(b || '0').split('.');

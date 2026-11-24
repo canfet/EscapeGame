@@ -40,3 +40,9 @@
 cp config.example.js config.js   # 填入步驟 1 的網址
 python -m http.server 8000       # 開 http://localhost:8000/
 ```
+
+## 體驗套版（畫面與玩法氛圍）
+
+後台編輯專案時可選「體驗套版」：經典、RPG 角色冒險（職業、Lv／EXP、升級動畫）、偵探案件（SOLVED 印章）、特務任務（終端機風）、海盜寶藏、魔法學院。套版會改變用語、隊伍造型、NPC 對話、特效，並可搭配原本 8 種色彩主題。NPC 名稱與頭像可自訂；玩家可用右上 ✨ 關閉特效。升級後請重新部署 `Code.gs`（版本 1.2.0）。
+
+自動測試：`node --test tests/*.test.js`

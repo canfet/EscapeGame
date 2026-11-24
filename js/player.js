@@ -21,6 +21,7 @@
     $('#app-head').classList.toggle('hidden', id === 'v-game');   // 闖關畫面有自己的頂端列
     window.scrollTo(0, 0);
     if (id === 'v-game' && P.map) setTimeout(function () { P.map.invalidateSize(); }, 50);
+    if (id === 'v-game') fxEnter(); else fxLeave();
   }
   function showError(msg) { $('#err-text').textContent = msg; show('v-error'); }
 
@@ -64,6 +65,13 @@
       if (P.sid && P.openId && ['s-ans', 's-caption', 's-code'].indexOf(id) >= 0) { try { localStorage.setItem(draftKey(P.openId, id), e.target.value); } catch (x) { /* */ } }
     });
     $('#tut-next').onclick = tutNext; $('#tut-skip').onclick = tutEnd;
+    try {
+      $('#btn-fx').onclick = toggleFx;
+      $('#levelup').onclick = hideLevelUp;
+      var dl = $('#dialog');
+      dl.onclick = dlgAdvance;
+      dl.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dlgAdvance(); } };
+    } catch (e) { /* 套版 UI 缺少不影響闖關 */ }
     $('#link-resume').onclick = async function (e) {
       e.preventDefault();
       var code = prompt('請輸入你們的隊伍代碼\n（闖關畫面頂部、隊伍名稱旁邊的英數字，例如 AB12CD）：');
@@ -128,6 +136,7 @@
       var r = await Q.run(function () { return api('listProjects'); }, { noToast: true });
       var list = r.projects || [];
       if (!list.length) return showError('目前沒有開放中的任務');
+      P.list = list;
       if (list.length === 1) return goProject(list[0].project_id);
       $('#project-list').innerHTML = list.map(function (p) {
         var tag = p.ended ? '<span class="chip red">已結束</span>' : p.not_started ? '<span class="chip amber">尚未開始</span>' : '<span class="chip green">開放中</span>';
@@ -147,6 +156,11 @@
     q.set('p', id);
     history.replaceState(null, '', location.pathname + '?' + q.toString());
     P.projectId = id;
+    // 先用專案列表裡的資料預覽套版與色彩主題（取得完整專案資料後 showIntro 會再套用一次）
+    try {
+      var it = (P.list || []).filter(function (x) { return x.project_id === id; })[0];
+      if (it && it.template != null) applyTemplate(it);
+    } catch (e) { /* */ }
     enterProject(id, fromList);
   }
 
@@ -185,7 +199,7 @@
     try {
       var r = await Q.run(function () { return api('getProject', { projectId: pid, route: P.urlRoute, team: P.urlTeam }); }, { noToast: true });
       var p = P.project = r.project;
-      applyTheme(p.theme);
+      applyTemplate(p);
       document.title = p.name;
       $('#intro-name').textContent = p.name;
       $('#intro-desc').textContent = p.description || '';
@@ -237,14 +251,15 @@
 
   /** 隊伍造型挑選；名單指定了造型的隊伍就固定，不能改 */
   function renderAvatarPicker(proj, team) {
-    var list = proj.avatars || [], box = $('#avatar-picker'), field = $('#avatar-field');
+    var list = proj.avatars || [], box = $('#avatar-picker'), field = $('#avatar-field'), names = {};
+    try { list = Q.Tpl.avatars(P.tplId, proj.avatars) || []; names = Q.Tpl.get(P.tplId).avatarNames || {}; } catch (e) { list = proj.avatars || []; }
     field.classList.toggle('hidden', !list.length);
     if (!list.length) return;
     var fixed = team && team.avatar;
     if (fixed) P.avatar = fixed;
     else if (!P.avatar || list.indexOf(P.avatar) < 0) P.avatar = list[Math.floor(Math.random() * list.length)];
     box.innerHTML = list.map(function (a) {
-      return '<button type="button" class="avatar-opt' + (a === P.avatar ? ' sel' : '') + '" data-av="' + esc(a) + '"' + (fixed ? ' disabled' : '') + '>' + esc(a) + '</button>';
+      return '<button type="button" class="avatar-opt' + (a === P.avatar ? ' sel' : '') + '" data-av="' + esc(a) + '"' + (names[a] ? ' data-name="' + esc(names[a]) + '"' : '') + (fixed ? ' disabled' : '') + '>' + esc(a) + '</button>';
     }).join('');
     Q.$$('#avatar-picker [data-av]').forEach(function (b) {
       b.onclick = function () { P.avatar = b.dataset.av; renderAvatarPicker(proj, team); };
@@ -294,6 +309,7 @@
     e.preventDefault();
     if (!confirm('確定要換隊伍／重新開始嗎？\n目前這支隊伍的紀錄會保留在系統裡，但這台手機將不再接續它。')) return;
     try { localStorage.removeItem(LS(P.projectId)); } catch (x) { /* */ }
+    fxLeave();
     location.reload();
   }
 
@@ -310,8 +326,9 @@
     }
     show('v-game');
     applyState(state);
+    fxEnter();
     if (state.session.test) $('#test-banner').classList.remove('hidden');
-    setTimeout(function () { maybeTutorial(state); }, 400);
+    setTimeout(function () { introThenTutorial(state); }, 400);
     if (stateNoGps(state)) noGpsMode(); else {
       initMap();
       startWatch();
@@ -344,7 +361,7 @@
 
   function renderGame() {
     var s = P.state, se = s.session;
-    applyTheme(s.project.theme);
+    applyTemplate(s.project);
     document.title = s.project.name;
     $('#g-title').textContent = s.project.name;
     $('#g-team').textContent = se.team_name;
@@ -371,6 +388,7 @@
       rtEl.style.background = myRoute.color || ''; rtEl.style.color = myRoute.color ? '#fff' : '';
     }
     $('#g-score').textContent = se.score;
+    updateHud(s);
     $('#g-progress-text').textContent = s.summary.done + ' / ' + s.summary.total;
     $('#g-progress').style.width = (s.summary.total ? s.summary.done / s.summary.total * 100 : 0) + '%';
     $('#g-unlock-mode').textContent = s.project.unlock_mode === 'free' ? '自由順序' : '依序解鎖';
@@ -509,6 +527,7 @@
     el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
     try { if (Snd.on && navigator.vibrate) navigator.vibrate([90, 50, 90, 50, 160]); } catch (e) { /* */ }
     setTimeout(function () { el.classList.add('hidden'); }, 1500);
+    fxCelebrate('arrive');
   }
 
   /* ---------- 🎒 紅點：有新收集的東西 ---------- */
@@ -910,13 +929,229 @@
     var key = { locked: '--pin-locked', open: '--pin-open', arrived: '--pin-open', solved: '--pin-solved', failed: '--pin-failed' }[status] || '--pin-locked';
     return themeVar(key, '#5b4a32');
   }
-  function applyTheme(t) {
+  /** 色彩主題（theme-x）與體驗套版（tpl-y）合併成同一個 body.className，兩者互不覆寫 */
+  function applyLook(t, tid) {
     t = THEMES.indexOf(t) >= 0 ? t : 'retro';
-    if (P.theme === t) return;
-    P.theme = t;
-    document.body.className = 'quest theme-' + t;
+    if (P.theme === t && P.tplId === tid) return;
+    P.theme = t; P.tplId = tid;
+    document.body.className = 'quest theme-' + t + ' tpl-' + tid;
     var m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', themeVar('--topbar', '#3b2d17'));
+  }
+
+  /* ---------- 體驗套版：用語、HUD、特效、對話框 ---------- */
+  function V(key, vars, dflt) {
+    var v = '';
+    try { v = Q.Tpl.vocab(P.tplId || 'classic', key, vars); } catch (e) { /* */ }
+    return v || dflt || '';
+  }
+
+  /** 依專案的 template／theme 套用外觀；舊後端沒有 template 欄位、或任何錯誤都當 classic */
+  function applyTemplate(project) {
+    var theme = project && project.theme, tid = 'classic';
+    try {
+      tid = Q.Tpl.norm(project && project.template);
+      P.tpl = Q.Tpl.get(tid);
+    } catch (e) { tid = 'classic'; P.tpl = null; }
+    try {
+      if (THEMES.indexOf(theme) < 0 && tid !== 'classic') theme = Q.Tpl.themeHint(tid);
+      applyLook(theme, tid);
+      applyVocab();
+      updateFxBtn();
+    } catch (e) {
+      P.tpl = null;
+      try { applyLook(theme, 'classic'); applyVocab(); } catch (x) { /* */ }
+    }
+  }
+
+  function setText(sel, text) { var el = $(sel); if (el && text) el.textContent = text; }
+  function applyVocab() {
+    setText('#next-step .ns-label', V('nextLabel'));
+    setText('#stage-list-title', V('stageListTitle'));
+    setText('#intro-heading', V('introHeading'));
+    setText('#avatar-label', V('avatarLabel'));
+    setText('#btn-start', V('startBtn'));
+    setText('#g-finished-title', '🎉 ' + V('finishTitle'));
+    setText('#fin-h1', V('finishTitle'));
+    if (!P.solvedNext) setText('#solved-next', V('goNext'));
+  }
+
+  function levelOf(state) {
+    try { return Q.Tpl.levelInfo(state); } catch (e) { return { lv: 1, exp: 0, expMax: 1, pct: 0 }; }
+  }
+  function updateHud(s) {
+    try {
+      var box = $('#hud-exp'), on = !!(P.tpl && P.tpl.hud === 'rpg');
+      box.classList.toggle('hidden', !on);
+      if (!on) return;
+      var li = levelOf(s);
+      $('#hud-lv').textContent = 'Lv.' + li.lv;
+      $('#hud-exp-bar > i').style.width = li.pct + '%';
+      $('#hud-exp-text').textContent = li.exp + ' / ' + li.expMax + ' EXP';
+    } catch (e) { /* */ }
+  }
+
+  /* ---------- 特效 ---------- */
+  function FX() { return window.Fx || Q.Fx || null; }
+  function fxEnter() {
+    try {
+      var f = FX();
+      if (!f) return;
+      if (P.tpl && P.tpl.fx) f.start(P.tpl.fx); else f.stop();
+    } catch (e) { /* */ }
+  }
+  function fxLeave() { try { var f = FX(); if (f) f.stop(); } catch (e) { /* */ } }
+  function updateFxBtn() {
+    try {
+      var f = FX(), b = $('#btn-fx'), vis = !!(f && P.tpl && P.tpl.id !== 'classic');
+      b.classList.toggle('hidden', !vis);
+      if (!vis) return;
+      var on = f.enabled();
+      b.textContent = on ? '✨' : '🚫';
+      b.setAttribute('aria-pressed', String(on));
+      b.title = on ? '特效：開（點一下關閉）' : '特效：關（點一下開啟）';
+    } catch (e) { /* */ }
+  }
+  function toggleFx() {
+    try {
+      var f = FX(), want = !f.enabled();
+      f.setEnabled(want);
+      if (want) fxEnter(); else fxLeave();
+      updateFxBtn();
+      if (want && !f.enabled()) Q.toast('你的裝置開啟了「減少動態效果」，特效會維持關閉', 'warn', 3500);
+      else Q.toast(want ? '已開啟特效' : '已關閉特效', 'ok', 1500);
+    } catch (e) { /* */ }
+  }
+  /** kind：arrive（抵達）、solved（過關）、finish（完賽）；classic 不做任何事 */
+  function fxCelebrate(kind) {
+    try {
+      var f = FX();
+      if (!f || !P.tpl || P.tpl.id === 'classic') return;
+      var cx = (window.innerWidth || 360) / 2, cy = (window.innerHeight || 640) * 0.4;
+      var ch = P.tplId === 'pirate' ? 'coin' : 'star';
+      if (kind === 'finish') { f.confetti(); f.burst(cx, cy, ch); }
+      else if (kind === 'solved') {
+        f.burst(cx, cy, ch);
+        if (P.tplId === 'academy' || P.tplId === 'pirate') setTimeout(function () { f.burst(cx * 0.5, cy * 1.2, ch); f.burst(cx * 1.5, cy * 1.2, ch); }, 250);
+      } else f.burst(cx, cy * 1.5, 'star');
+    } catch (e) { /* */ }
+  }
+
+  /** RPG 升級：全螢幕 LEVEL UP（約 1.6 秒，可點擊關閉） */
+  function showLevelUp(from, to) {
+    try {
+      $('#levelup-lv').textContent = 'Lv.' + from + ' → Lv.' + to;
+      $('#levelup').classList.remove('hidden');
+      layerOpen('levelup');
+      clearTimeout(P.luT);
+      P.luT = setTimeout(hideLevelUp, 1600);
+    } catch (e) { /* */ }
+  }
+  function hideLevelUp() {
+    clearTimeout(P.luT);
+    var el = $('#levelup');
+    if (el) el.classList.add('hidden');
+    layerClose('levelup');
+  }
+  /** 偵探：紅色 SOLVED 印章蓋下 */
+  function showStamp() {
+    try {
+      var el = $('#stamp'), sp = el.firstElementChild;
+      clearTimeout(P.stT);
+      el.classList.remove('hidden');
+      if (sp) { sp.style.animation = 'none'; void sp.offsetWidth; sp.style.animation = ''; }
+      P.stT = setTimeout(function () { el.classList.add('hidden'); }, 1800);
+    } catch (e) { /* */ }
+  }
+  /** 過關：升級／印章／粒子（classic 什麼都不做） */
+  function celebrateSolved(before, after) {
+    try {
+      if (!P.tpl || P.tpl.id === 'classic') return;
+      if (P.tpl.hud === 'rpg' && after.lv > before.lv) showLevelUp(before.lv, after.lv);
+      if (P.tplId === 'detective') setTimeout(showStamp, 350);
+      fxCelebrate('solved');
+    } catch (e) { /* */ }
+  }
+
+  /* ---------- NPC 對話框 ---------- */
+  var DLG = { lines: [], i: 0, h: null, onDone: null, open: false };
+  var GREET = {
+    rpg: '歡迎來到冒險者公會，勇者們！有幾個任務等著你們，準備好就出發吧。',
+    detective: '案件已經交到你們手上，注意每一條線索，別放過任何細節。',
+    agent: '特務，歡迎登入。這次的任務代號已啟動，請隨時回報進度。',
+    pirate: '嘿，新來的船員！揚起船帆，寶藏就在前方等著我們。',
+    academy: '歡迎入學，同學們！今天的課程很精彩，準備好翻開第一頁了嗎？'
+  };
+  function typeText(el, text, onDone) {
+    var f = FX();
+    if (f && f.typewriter) return f.typewriter(el, text, { speed: 32, onDone: onDone });
+    el.textContent = text;
+    if (onDone) onDone();
+    return { done: true, skip: function () { /* */ } };
+  }
+  /** 以 NPC 的口吻逐句顯示；點一下先顯示全文，再點下一句，最後一句點完關閉並呼叫 onDone。classic 直接呼叫 onDone */
+  function showDialog(lines, onDone) {
+    var started = false;
+    try {
+      var pj = P.project || (P.state && P.state.project) || {};
+      var npc = Q.Tpl.npcOf(P.tplId, pj);
+      lines = (lines || []).filter(function (x) { return x && String(x).trim(); });
+      if (!npc || !P.tpl || !P.tpl.dialogue || !lines.length) { if (onDone) onDone(); return false; }
+      if (DLG.open) closeDialog(false);
+      DLG = { lines: lines, i: 0, h: null, onDone: onDone || null, open: true };
+      var el = $('#dialog');
+      el.querySelector('.dlg-avatar').textContent = npc.avatar;
+      el.querySelector('.dlg-name').textContent = npc.name;
+      el.classList.remove('hidden');
+      layerOpen('dialog');
+      started = true;
+      dlgLine();
+      try { el.focus({ preventScroll: true }); } catch (e) { /* */ }
+      return true;
+    } catch (e) {
+      if (started) { try { closeDialog(true); } catch (x) { /* */ } } else if (onDone) onDone();
+      return false;
+    }
+  }
+  function dlgLine() {
+    var el = $('#dialog'), tx = el.querySelector('.dlg-text');
+    el.classList.add('typing');
+    DLG.h = typeText(tx, DLG.lines[DLG.i], function () { el.classList.remove('typing'); });
+  }
+  function dlgAdvance() {
+    if (!DLG.open) return;
+    try {
+      if (DLG.h && !DLG.h.done) { DLG.h.skip(); return; }
+      if (DLG.i < DLG.lines.length - 1) { DLG.i++; dlgLine(); return; }
+    } catch (e) { /* 出錯就直接關閉 */ }
+    closeDialog(true);
+  }
+  function closeDialog(callDone) {
+    if (!DLG.open) return;
+    var cb = DLG.onDone;
+    DLG.open = false; DLG.onDone = null;
+    try { if (DLG.h && !DLG.h.done) DLG.h.skip(); } catch (e) { /* */ }
+    $('#dialog').classList.add('hidden');
+    layerClose('dialog');
+    if (callDone && cb) { try { cb(); } catch (e) { /* */ } }
+  }
+
+  /** 開場：第一次進入闖關畫面（每隊伍一次）先由 NPC 講專案介紹，講完才接新手教學 */
+  function introThenTutorial(state) {
+    var go = function () { maybeTutorial(state); };
+    try {
+      var se = state.session || {}, key = 'escapegame:intro:' + se.session_id;
+      if (!P.tpl || !P.tpl.dialogue || se.status !== 'playing') return go();
+      var seen = false;
+      try { seen = localStorage.getItem(key) === '1'; } catch (e) { /* */ }
+      if (seen) return go();
+      try { localStorage.setItem(key, '1'); } catch (e) { /* */ }
+      var pj = state.project || P.project || {};
+      var lines = String(pj.intro || '').split(/\n+/).map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 3)
+        .map(function (x) { return x.length > 120 ? x.slice(0, 120) + '…' : x; });
+      if (!lines.length) lines = [GREET[P.tplId] || ''];
+      showDialog(lines, go);
+    } catch (e) { go(); }
   }
 
   function drawStagesOnMap() {
@@ -1376,6 +1611,7 @@
         r.state.stages.forEach(function (x) { if (x.stage_id === payload.stageId && x.hints && x.hints.length) P.hintOpen[x.stage_id + ':' + (x.hints.length - 1)] = true; });
       }
       var beforeBadges = ((P.state && P.state.badges) || []).map(function (x) { return x.id; });
+      var liBefore = levelOf(P.state);
       applyState(r.state);
       (r.state.badges || []).filter(function (x) { return beforeBadges.indexOf(x.id) < 0; }).forEach(function (bd, i) {
         setTimeout(function () { Q.toast('🏅 獲得徽章：' + bd.icon + ' ' + bd.name + '（' + bd.desc + '）', 'ok', 5500); }, 900 + i * 1400);
@@ -1384,7 +1620,7 @@
       var type = (r.correct === false || r.arrived === false) ? 'warn' : 'ok';
       if (action === 'arrive' && r.arrived !== false && type !== 'warn') arriveFlash();
       if (r.correct && payload && payload.stageId) clearDrafts(payload.stageId);
-      if (solved) sfx('win');
+      if (solved) { sfx('win'); if (r.state.session.status === 'playing') celebrateSolved(liBefore, levelOf(r.state)); }
       else if (type === 'warn') sfx('bad');
       else if (action === 'arrive') sfx('arrive');
       else if (r.correct) sfx('ok');
@@ -1601,7 +1837,8 @@
     var stages = P.state.stages, no = stages.indexOf(st) + 1;
     var next = stages.filter(function (s) { return s.status === 'open' || s.status === 'arrived'; })[0] || null;
     P.solvedNext = next;
-    $('#solved-title').textContent = '第 ' + no + ' 關完成！';
+    $('#solved-title').textContent = V('solvedTitle', { n: no }, '第 ' + no + ' 關完成！');
+    solvedNpc(st);
     $('#solved-msg').innerHTML = st.success_message ? Q.linkify(st.success_message) : '';
     countUp($('#solved-points'), st.earned || 0);
     var ib = $('#solved-item'), colAll = P.state.collection || [], colGot = colAll.filter(function (x) { return x.got; }).length;
@@ -1630,14 +1867,33 @@
     } else { rw.classList.add('hidden'); rw.innerHTML = ''; }
     var nb = $('#solved-next');
     nb.classList.toggle('hidden', !next);
-    if (next) nb.textContent = '前往第 ' + (stages.indexOf(next) + 1) + ' 關：' + next.title;
+    if (next) nb.textContent = (P.tplId && P.tplId !== 'classic') ? V('goNext', null, '前往下一關') + '：' + next.title : '前往第 ' + (stages.indexOf(next) + 1) + ' 關：' + next.title;
     $('#solved').classList.remove('hidden');
     layerOpen('solved');  // 先開過關畫面，再關面板，避免返回鍵紀錄錯亂
     closeStage();
   }
 
+  /** 過關畫面上方：NPC 用逐字訊息講出過關訊息的第一句（classic 與沒有訊息時不顯示） */
+  function solvedNpc(st) {
+    try {
+      var box = $('#solved-npc');
+      box.classList.add('hidden');
+      if (!st.success_message || !P.tpl || !P.tpl.dialogue) return;
+      var npc = Q.Tpl.npcOf(P.tplId, P.project || (P.state && P.state.project));
+      if (!npc) return;
+      var m = String(st.success_message).trim().split(/\n/)[0].match(/^[^。！？!?]*[。！？!?]?/);
+      var first = m ? m[0].trim() : '';
+      if (!first) return;
+      if (first.length > 80) first = first.slice(0, 80) + '…';
+      $('#solved-npc-av').textContent = npc.avatar;
+      box.classList.remove('hidden');
+      typeText($('#solved-npc-text'), npc.name + '：' + first);
+    } catch (e) { /* */ }
+  }
+
   function hideSolved() {
     $('#solved').classList.add('hidden');
+    try { $('#solved-npc').classList.add('hidden'); } catch (e) { /* */ }
     layerClose('solved');
   }
 
@@ -1701,6 +1957,8 @@
     else if (n === 'board') closeBoard();
     else if (n === 'pack') closePack();
     else if (n === 'cardview') closeCardView();
+    else if (n === 'levelup') hideLevelUp();
+    else if (n === 'dialog') closeDialog(true);
   }
   window.addEventListener('popstate', function () {
     if (P.skipPop) { P.skipPop = false; return; }
@@ -1998,6 +2256,7 @@
       };
     });
     show('v-finish');
+    fxCelebrate('finish');
     if (!s.project.show_leaderboard) return;
     var hasRoutes = !!(se.route && (s.project.routes || []).length > 1);
     $('#fin-board-tabs').classList.toggle('hidden', !hasRoutes);

@@ -20,7 +20,8 @@
     try {
       var r = await Q.api('getProject', { projectId: B.pid });
       var th = THEMES.indexOf(r.project.theme) >= 0 ? r.project.theme : 'retro';
-      document.body.className = 'quest theme-' + th;
+      var tid = (Q.Tpl && Q.Tpl.norm) ? Q.Tpl.norm(r.project.template) : 'classic';
+      document.body.className = 'quest theme-' + th + ' tpl-' + tid;
       $('#b-title').textContent = '🏆 ' + r.project.name + (B.run ? '（' + B.run + '）' : '');
       document.title = r.project.name + '・即時排行榜';
     } catch (e) { /* 取不到專案資訊就用預設風格 */ }

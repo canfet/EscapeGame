@@ -8,7 +8,7 @@
  */
 
 /* ===================== 基本設定 ===================== */
-var APP_VERSION = '1.1.2';
+var APP_VERSION = '1.2.0';
 // 前台至少要是這個版本（前台每次呼叫都會帶自己的版本 fv）；太舊時回傳 front_stale，前台會提示重新整理
 var MIN_FRONT = '1.1.0';
 var CACHE_SEC = 30;                 // 專案／關卡資料快取秒數
@@ -18,6 +18,14 @@ var MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 var ANSWER_TYPES = ['text', 'number', 'choice', 'photo', 'form', 'none'];
 var PROJECT_STATUS = ['active', 'hidden', 'draft', 'closed'];
 var AVATARS = ['🦊', '🐼', '🐯', '🐸', '🦉', '🐙', '🦄', '🐳', '🦖', '🐧', '🐝', '🦋', '🐢', '🐬', '🦁', '🐰'];   // 隊伍造型
+var TEMPLATES = ['classic', 'rpg', 'detective', 'agent', 'pirate', 'academy'];   // 體驗套版
+var AVATARS_BY_TEMPLATE = {
+  rpg: ['⚔️', '🧙', '🏹', '🗡️', '🛡️', '🩺', '🎻', '🐉'],
+  detective: ['🕵️', '🔍', '🧐', '📜', '🗝️', '🎩', '🔦', '🧤'],
+  agent: ['🛰️', '🤖', '👾', '🦾', '🔒', '💾', '📡', '🕶️'],
+  pirate: ['⚓', '🏴‍☠️', '🦜', '🗺️', '🧭', '💰', '🦑', '🚢'],
+  academy: ['🧙‍♀️', '📚', '🪄', '🦉', '🔮', '⭐', '🧪', '🎓']
+};
 var RARITIES = ['normal', 'rare', 'legend'];
 var DECK_KINDS = ['nature', 'place', 'custom'];       // 圖鑑類型：荒野自然名角色／在地景點與代表物／自訂
 var DECK_STYLES = ['foil', 'classic', 'watercolor', 'pixel'];   // 卡面畫風：閃卡／古典標本／水彩／像素
@@ -27,7 +35,7 @@ var THEMES = ['retro', 'history', 'sport', 'mist', 'forest', 'neon', 'campus', '
 /* 各工作表欄位（可以在試算表後面自行加欄位，不影響程式） */
 var SCHEMA = {
   Projects: ['project_id', 'name', 'status', 'is_default', 'unlock_mode', 'description', 'intro',
-    'finish_message', 'cover_url', 'theme', 'routes', 'teams', 'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy',
+    'finish_message', 'cover_url', 'theme', 'template', 'npc_name', 'npc_avatar', 'routes', 'teams', 'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy',
     'show_leaderboard', 'leaderboard_live', 'require_run_code', 'wrong_lock_after', 'wrong_lock_sec', 'collect_message', 'deck_id', 'updated_at'],
   Stages: ['project_id', 'stage_id', 'order', 'enabled', 'title', 'clue', 'image_url', 'lat', 'lng',
     'radius_m', 'show_location', 'require_gps', 'bypass_code', 'question', 'show_question_early', 'require_photo', 'reward_code', 'reward_order', 'final_from_fragments', 'coop_final', 'item_name', 'item_icon', 'item_rarity', 'item_story', 'card_id', 'card_random', 'routes', 'answer_type', 'choices',
@@ -43,7 +51,7 @@ var SCHEMA = {
 
 /* 要強制為「純文字」格式的欄位（避免 007 變成 7） */
 var TEXT_COLUMNS = {
-  Projects: ['project_id', 'name', 'description', 'intro', 'finish_message', 'cover_url', 'collect_message', 'deck_id', 'routes', 'teams'],
+  Projects: ['project_id', 'name', 'description', 'intro', 'finish_message', 'cover_url', 'collect_message', 'deck_id', 'routes', 'teams', 'npc_name', 'npc_avatar'],
   Decks: ['deck_id', 'title', 'cards'],
   Stages: ['project_id', 'stage_id', 'title', 'clue', 'image_url', 'bypass_code', 'question', 'answer', 'choices', 'hint1', 'hint2', 'hint3',
     'success_message', 'form_url', 'form_verify_sheet', 'reward_code', 'item_name', 'item_icon', 'item_story', 'card_id', 'routes'],
@@ -217,7 +225,8 @@ function startSession_(b) {
     }
     ensureHeaders_('Sessions');
     // 隊伍造型：玩家挑的（或名單指定的）；沒挑就依目前隊伍數輪流分配
-    var avatar = AVATARS.indexOf(avatarWant) >= 0 ? avatarWant : AVATARS[readRows_('Sessions').filter(function (r) { return str_(r.project_id) === p.project_id; }).length % AVATARS.length];
+    var avList = avatarsFor_(p.template);
+    var avatar = avList.indexOf(avatarWant) >= 0 ? avatarWant : avList[readRows_('Sessions').filter(function (r) { return str_(r.project_id) === p.project_id; }).length % avList.length];
     var s = {
       session_id: Utilities.getUuid(),
       code: uniqueCode_(p.project_id),
@@ -695,6 +704,7 @@ function adminSaveProject_(b) {
     if (!str_(p.name)) throw appError_('請輸入專案名稱', 'BAD_INPUT');
     if (p.status && PROJECT_STATUS.indexOf(p.status) < 0) throw appError_('狀態不正確', 'BAD_INPUT');
     if (p.theme && THEMES.indexOf(p.theme) < 0) throw appError_('畫面風格不正確', 'BAD_INPUT');
+    if (p.template && TEMPLATES.indexOf(str_(p.template).toLowerCase()) < 0) throw appError_('體驗套版不正確', 'BAD_INPUT');
     ensureHeaders_('Projects');   // 舊試算表若缺新欄位（例如 theme），先補上，設定才會被存下來
     var rows = readRows_('Projects');
     var ex = find_(rows, function (r) { return str_(r.project_id) === id; });
@@ -702,6 +712,9 @@ function adminSaveProject_(b) {
     if (!b.isNew && !ex) throw appError_('找不到專案', 'NOT_FOUND');
     var data = pick_(p, SCHEMA.Projects);
     data.project_id = id;
+    if ('template' in data) data.template = normTemplate_(data.template);
+    if ('npc_name' in data) data.npc_name = str_(data.npc_name).slice(0, 20);
+    if ('npc_avatar' in data) data.npc_avatar = str_(data.npc_avatar).slice(0, 8);
     var routesNow = ex ? parseRoutes_(ex.routes) : [];
     if ('routes' in data) {
       var rts = parseRoutes_(data.routes);
@@ -1101,9 +1114,10 @@ function ownProject_(c) {
 function publicProject_(p, stages) {
   return {
     project_id: p.project_id, name: p.name, description: p.description, intro: p.intro, cover_url: p.cover_url, theme: p.theme,
+    template: p.template || 'classic', npc_name: p.npc_name || '', npc_avatar: p.npc_avatar || '',
     restrict_teams: !!(p.teams && p.teams.length),
     teams: (p.teams || []).map(function (t) { var rt = routeById_(p, t.route); return { name: t.name, route_name: rt ? rt.name : '', color: rt ? rt.color : '', avatar: t.avatar || '' }; }),
-    avatars: AVATARS, collect_message: p.collect_message || '', deck_title: p.deck_title || '', deck_size: (p.cards || []).length, deck_kind: p.deck_kind || 'nature', deck_style: p.deck_style || 'foil',
+    avatars: avatarsFor_(p.template), collect_message: p.collect_message || '', deck_title: p.deck_title || '', deck_size: (p.cards || []).length, deck_kind: p.deck_kind || 'nature', deck_style: p.deck_style || 'foil',
     unlock_mode: p.unlock_mode, time_limit_min: p.time_limit_min, show_leaderboard: p.show_leaderboard, leaderboard_live: !!p.leaderboard_live,
     require_run_code: p.require_run_code, is_default: p.is_default, start_at: p.start_at || null,
     end_at: p.end_at || null, stage_count: stages.length
@@ -1525,6 +1539,25 @@ function parseRoutes_(s) {
 }
 
 /** 預設隊伍名單：[{name, route}]（route 是路線代碼，空白＝自動平均分配）。有名單＝玩家只能從名單選隊伍 */
+/** 套版代碼正規化：非法或空白回傳 classic */
+function normTemplate_(t) {
+  var v = str_(t).toLowerCase();
+  return TEMPLATES.indexOf(v) >= 0 ? v : 'classic';
+}
+/** 該套版可選的隊伍造型 */
+function avatarsFor_(template) {
+  var t = normTemplate_(template);
+  return t === 'classic' ? AVATARS : AVATARS_BY_TEMPLATE[t];
+}
+/** 所有造型（經典＋各套版）聯集 */
+function allAvatars_() {
+  var out = AVATARS.slice();
+  TEMPLATES.forEach(function (t) {
+    (AVATARS_BY_TEMPLATE[t] || []).forEach(function (a) { if (out.indexOf(a) < 0) out.push(a); });
+  });
+  return out;
+}
+
 function parseTeams_(s, routes) {
   var a = Array.isArray(s) ? s : parseJson_(s, []);
   if (!Array.isArray(a)) return [];
@@ -1536,7 +1569,7 @@ function parseTeams_(s, routes) {
     if (!name || seen[name]) return;
     seen[name] = 1;
     var rt = str_(x.route);
-    out.push({ name: name, route: ids[rt] ? rt : '', avatar: AVATARS.indexOf(str_(x.avatar)) >= 0 ? str_(x.avatar) : '' });
+    out.push({ name: name, route: ids[rt] ? rt : '', avatar: allAvatars_().indexOf(str_(x.avatar)) >= 0 ? str_(x.avatar) : '' });
   });
   return out;
 }
@@ -1654,6 +1687,7 @@ function cleanProject_(r) {
     description: str_(r.description), intro: str_(r.intro), finish_message: str_(r.finish_message),
     routes: routes0, teams: parseTeams_(r.teams, routes0),
     cover_url: str_(r.cover_url), theme: THEMES.indexOf(str_(r.theme).toLowerCase()) >= 0 ? str_(r.theme).toLowerCase() : 'retro',
+    template: normTemplate_(r.template), npc_name: str_(r.npc_name).slice(0, 20), npc_avatar: str_(r.npc_avatar).slice(0, 8),
     start_at: sd ? sd.toISOString() : '', end_at: ed ? ed.toISOString() : '',
     time_limit_min: num_(r.time_limit_min, 0), gps_max_accuracy: num_(r.gps_max_accuracy, DEFAULT_GPS_MAX_ACCURACY),
     show_leaderboard: bool_(r.show_leaderboard), leaderboard_live: bool_(r.leaderboard_live), require_run_code: bool_(r.require_run_code),

@@ -13,9 +13,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <title>實境解謎</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261123r">
+  <link rel="stylesheet" href="css/style.css?v=20261124a">
+  <link rel="stylesheet" href="css/templates.css?v=20261124a">
 </head>
 <body class="quest">
+  <canvas id="fx-canvas" class="hidden" aria-hidden="true"></canvas>
   <div id="test-banner" class="inapp test hidden" role="status">🧪 <b>試玩模式</b>：這支隊伍不會計入排行榜與正式紀錄。</div>
   <div id="inapp-banner" class="inapp hidden" role="alert">
     <div class="grow"><b>建議改用 Safari／Chrome 開啟</b><br><span class="small">你正在用 LINE、Facebook 等內建瀏覽器，定位和指南針可能無法使用。請點右上角選單選「用瀏覽器開啟」，或複製連結貼到瀏覽器。</span></div>
@@ -46,14 +48,14 @@
       <div class="row wrap" id="intro-meta"></div>
     </div>
     <div class="card">
-      <h2>建立隊伍</h2>
+      <h2 id="intro-heading">建立隊伍</h2>
       <div class="field">
         <label for="f-team">隊伍名稱 *</label>
         <input id="f-team" maxlength="30" placeholder="例如：第三小隊" autocomplete="off">
         <select id="f-team-select" class="hidden"></select>
       </div>
       <div class="field hidden" id="avatar-field">
-        <label>隊伍造型</label>
+        <label id="avatar-label">隊伍造型</label>
         <div id="avatar-picker" class="avatar-picker"></div>
       </div>
       <div class="field" id="run-field">
@@ -76,7 +78,8 @@
       <span class="chip hidden" id="offline-chip" role="status">📴 離線中</span>
       <span class="chip hidden" id="g-timer">⏱ --:--</span>
       <button class="icon-btn hidden" id="btn-pack" aria-label="線索背包" title="線索背包（密碼碎片）">🎒</button>
-      <button class="icon-btn" id="btn-font" aria-label="大字模式" title="大字模式">Aa</button>
+      <button class="icon-btn hidden" id="btn-fx" aria-label="特效開關" aria-pressed="true" title="特效開關">✨</button>
+      <button class="icon-btn" id="btn-font"aria-label="大字模式" title="大字模式">Aa</button>
       <button class="icon-btn" id="btn-sound" aria-label="音效開關" title="音效開關">🔊</button>
     </div>
     <div class="page">
@@ -87,6 +90,7 @@
           <div class="hud-prog" id="g-progress-text"></div>
           <button class="sm ghost hidden" id="btn-board" type="button">🏆 排行榜</button>
         </div>
+        <div class="hud-exp hidden" id="hud-exp"><span class="hud-lv" id="hud-lv">Lv.1</span><div class="hud-exp-bar" id="hud-exp-bar"><i></i></div><span class="hud-exp-text" id="hud-exp-text"></span></div>
         <div class="hud-title hidden" id="g-hud-title"></div>
         <div class="code-line" id="g-code-line"><span>🔑 隊伍代碼 <b id="g-code-big"></b>・換手機或誤關頁面時，用它接續</span><button class="sm ghost" id="btn-copy-code" type="button">複製</button></div>
         <div class="progress thin"><i id="g-progress" style="width:0"></i></div>
@@ -101,7 +105,7 @@
 
       <div id="g-finished" class="card hidden" style="border-color:var(--forest)">
         <div class="row">
-          <div class="grow"><b>🎉 任務完成！</b><div class="small muted">點這裡看成績與排行</div></div>
+          <div class="grow"><b id="g-finished-title">🎉 任務完成！</b><div class="small muted">點這裡看成績與排行</div></div>
           <button id="btn-show-finish" class="sm">查看</button>
         </div>
       </div>
@@ -134,7 +138,7 @@
         </div>
       </div>
 
-      <div class="row" style="margin:18px 0 10px;align-items:baseline"><h2 class="grow" style="margin:0">探險關卡進度表</h2><span class="small muted" id="g-unlock-mode"></span></div>
+      <div class="row" style="margin:18px 0 10px;align-items:baseline"><h2 class="grow" id="stage-list-title" style="margin:0">探險關卡進度表</h2><span class="small muted" id="g-unlock-mode"></span></div>
       <div class="stage-wrap" id="stage-wrap"><div id="g-stages" class="stage-list"></div></div>
 
       <p class="center small" style="margin-top:24px">
@@ -147,7 +151,7 @@
   <section id="v-finish" class="page hidden">
     <div class="hero"><div class="inner center">
       <div style="font-size:3rem">🏆</div>
-      <h1>任務完成！</h1>
+      <h1 id="fin-h1">任務完成！</h1>
       <div id="fin-team" style="color:#cfd8d4"></div>
     </div></div>
     <div class="stat-row">
@@ -235,8 +239,14 @@
   <!-- 抵達打卡成功 -->
   <div id="arrive-flash" class="arrive-flash hidden" role="status" aria-live="assertive"><div><span>📍</span><b>抵達！</b></div></div>
 
+  <!-- 套版：NPC 對話框、LEVEL UP、SOLVED 印章 -->
+  <div id="dialog" class="dialog hidden" role="dialog" aria-label="對話" tabindex="0"><span class="dlg-avatar" aria-hidden="true"></span><div class="dlg-body"><b class="dlg-name"></b><div class="dlg-text"></div></div><span class="dlg-next" aria-hidden="true">▼</span></div>
+  <div id="levelup" class="levelup hidden" role="status" aria-live="polite"><div class="lu-box"><span class="lu-title">LEVEL UP!</span><span class="lu-lv" id="levelup-lv"></span><span class="lu-sub">點一下繼續</span></div></div>
+  <div id="stamp" class="stamp hidden" aria-hidden="true"><span>SOLVED</span></div>
+
   <!-- 過關畫面 -->
   <div id="solved" class="solved-overlay hidden" role="dialog" aria-modal="true">
+    <div class="solved-npc hidden" id="solved-npc"><span class="dlg-avatar" id="solved-npc-av"></span><div class="dlg-text" id="solved-npc-text"></div></div>
     <div class="solved-card">
       <div class="solved-badge">✓</div>
       <div class="solved-title" id="solved-title">過關！</div>
@@ -269,8 +279,10 @@
   <div id="retry-bar" class="retry-bar hidden" role="alert"><span class="grow">連線失敗，請確認訊號後再試</span><button class="sm" id="retry-btn">重試</button><button class="sm ghost" id="retry-x" aria-label="關閉">✕</button></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="config.js?v=20261123r"></script>
-  <script src="js/common.js?v=20261123r"></script>
-  <script src="js/player.js?v=20261123r"></script>
+  <script src="config.js?v=20261124a"></script>
+  <script src="js/common.js?v=20261124a"></script>
+  <script src="js/templates.js?v=20261124a"></script>
+  <script src="js/fx.js?v=20261124a"></script>
+  <script src="js/player.js?v=20261124a"></script>
 </body>
 </html>

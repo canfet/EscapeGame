@@ -13,7 +13,12 @@
   <meta name="robots" content="noindex">
   <title>實境解謎 · 管理後台</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261123r">
+  <link rel="stylesheet" href="css/style.css?v=20261124a">
+  <style>
+    .tpl-prev { margin-top: 6px; padding: 8px 10px; border: 1px dashed rgba(0,0,0,.25); border-radius: 8px; font-size: .84rem; line-height: 1.6; }
+    .tpl-prev b { font-size: .95rem; }
+    .tpl-prev div { color: var(--muted); }
+  </style>
 </head>
 <body>
   <!-- 登入 -->
@@ -179,6 +184,24 @@
             <option value="free">自由順序（全部關卡同時開放）</option>
           </select></div>
       </div>
+      <div class="field"><label>體驗套版</label>
+        <select id="mp-template">
+          <option value="classic">🗺 經典</option>
+          <option value="rpg">⚔️ RPG 角色冒險</option>
+          <option value="detective">🕵️ 偵探案件</option>
+          <option value="agent">🛰 特務任務</option>
+          <option value="pirate">🏴‍☠️ 海盜寶藏</option>
+          <option value="academy">🪄 魔法學院</option>
+        </select>
+        <div class="tpl-prev" id="mp-template-prev"></div>
+        <div id="mp-npc-box" class="hidden">
+          <div class="row" style="margin-top:8px">
+            <div class="field"><label>NPC 名稱（選填）</label><input id="mp-npc_name" maxlength="20" placeholder="酒館老闆"></div>
+            <div class="field"><label>NPC 頭像（選填）</label><input id="mp-npc_avatar" maxlength="8" placeholder="🧙"></div>
+          </div>
+          <div class="help">留空使用套版預設；經典套版不會顯示對話。</div>
+        </div>
+        <div class="help">套版會改變用語、對話與特效，不影響關卡內容與計分。</div></div>
       <div class="field"><label>前台畫面風格</label>
         <select id="mp-theme">
           <option value="retro">🗺️ 復古探險（羊皮紙古地圖）</option>
@@ -513,8 +536,8 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/qrcode.min.js"></script>
-  <script src="config.js?v=20261123r"></script>
-  <script src="js/common.js?v=20261123r"></script>
-  <script src="js/admin.js?v=20261123r"></script>
+  <script src="config.js?v=20261124a"></script>
+  <script src="js/common.js?v=20261124a"></script>
+  <script src="js/admin.js?v=20261124a"></script>
 </body>
 </html>

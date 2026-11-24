@@ -1,0 +1,126 @@
+/* ===================================================================
+   體驗套版（body.tpl-*）
+   只使用既有的 CSS 變數（--accent、--card、--ink…），
+   所以 8 種色彩主題 x 6 種套版的任何組合都不會破版。
+   classic 不新增任何可見元素；新元素預設 .hidden。
+   =================================================================== */
+
+/* ---- 特效畫布：不擋操作、在所有 overlay（z-index 2000）之下 ---- */
+#fx-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1800; }
+
+/* ---- 特效開關（topbar；非 classic 才會由程式顯示） ---- */
+#btn-fx[aria-pressed="false"] { opacity: .65; }
+
+/* ---- RPG：HUD 的 Lv／EXP ---- */
+.hud-exp { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.hud-lv {
+  flex: none; padding: 2px 9px; border-radius: 999px; font-weight: 800; font-size: .82rem; letter-spacing: .04em;
+  background: linear-gradient(135deg, #f6d365, #e0a400); color: #3b2a00; box-shadow: 0 0 0 1px rgba(120, 80, 0, .35), 0 1px 4px rgba(0, 0, 0, .2);
+}
+.hud-exp-bar { flex: 1; min-width: 0; height: 10px; border-radius: 999px; background: var(--track, var(--line)); overflow: hidden; border: 1px solid var(--edge, var(--line)); }
+.hud-exp-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #f6d365, #e0a400); transition: width .6s ease; }
+.hud-exp-text { flex: none; font-size: .78rem; font-weight: 700; color: var(--muted); white-space: nowrap; }
+
+/* ---- NPC 對話框：固定在畫面下緣，避開手機下方安全區 ---- */
+.dialog {
+  position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 2400;
+  max-width: 560px; margin: 0 auto; display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  padding: 12px 14px; border-radius: 16px; background: var(--card); color: var(--ink);
+  border: 2px solid var(--edge, var(--line)); box-shadow: 0 8px 28px rgba(0, 0, 0, .35);
+  animation: dlg-in .28s ease-out both;
+}
+.dialog .dlg-avatar {
+  flex: none; width: 48px; height: 48px; display: grid; place-items: center; font-size: 1.9rem; line-height: 1;
+  border-radius: 50%; background: var(--accent-soft, var(--chip)); border: 2px solid var(--accent, var(--edge));
+}
+.dialog .dlg-body { flex: 1; min-width: 0; }
+.dialog .dlg-name { display: block; font-size: .82rem; color: var(--accent, var(--ink)); letter-spacing: .06em; margin-bottom: 2px; }
+.dialog .dlg-text { font-size: .98rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; min-height: 3em; }
+.dialog .dlg-next { flex: none; align-self: flex-end; color: var(--accent, var(--ink)); animation: dlg-blink 1s steps(2) infinite; }
+.dialog.typing .dlg-next { visibility: hidden; }
+@keyframes dlg-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes dlg-blink { 50% { opacity: .2; } }
+
+/* ---- RPG：LEVEL UP 全螢幕 ---- */
+.levelup { position: fixed; inset: 0; z-index: 2300; display: grid; place-items: center; background: rgba(0, 0, 0, .55); cursor: pointer; }
+.levelup .lu-box { text-align: center; color: #fff6d0; animation: lu-pop 1.6s ease-out both; }
+.levelup .lu-title {
+  display: block; font-size: 2.6rem; font-weight: 900; letter-spacing: .12em; color: #ffd84a;
+  text-shadow: 0 0 12px rgba(255, 200, 40, .9), 0 3px 0 #8a5a00, 0 0 40px rgba(255, 190, 0, .6);
+}
+.levelup .lu-lv { display: block; margin-top: 8px; font-size: 1.5rem; font-weight: 800; text-shadow: 0 2px 6px rgba(0, 0, 0, .6); }
+.levelup .lu-sub { display: block; margin-top: 4px; font-size: .9rem; opacity: .85; }
+@keyframes lu-pop { 0% { transform: scale(.3); opacity: 0; } 18% { transform: scale(1.18); opacity: 1; } 30% { transform: scale(1); } 85% { opacity: 1; } 100% { transform: scale(1.04); opacity: .96; } }
+
+/* ---- SOLVED 印章（偵探：紅色旋轉蓋下）---- */
+.stamp { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; pointer-events: none; }
+.stamp > span {
+  display: inline-block; padding: 6px 22px; font-size: 2.6rem; font-weight: 900; letter-spacing: .14em; color: #c1272d;
+  border: 6px double #c1272d; border-radius: 10px; background: rgba(255, 255, 255, .08); text-shadow: 0 0 1px rgba(193, 39, 45, .6);
+  transform: rotate(-14deg); animation: stamp-down .55s cubic-bezier(.2, 1.4, .4, 1) both; mix-blend-mode: multiply;
+}
+@keyframes stamp-down { 0% { transform: rotate(-30deg) scale(3); opacity: 0; } 70% { transform: rotate(-14deg) scale(.94); opacity: 1; } 100% { transform: rotate(-14deg) scale(1); opacity: .92; } }
+
+/* ---- NPC 在過關畫面的口吻（#solved-card 上方）---- */
+.solved-overlay:has(> .solved-npc:not(.hidden)) { align-content: center; row-gap: 10px; }
+.solved-overlay > .solved-npc { width: 100%; max-width: 420px; justify-self: center; }
+.solved-npc { display: flex; align-items: flex-start; gap: 8px; text-align: left; background: var(--card); border: 1px solid var(--edge, var(--line)); border-radius: 12px; padding: 8px 10px; }
+.solved-npc .dlg-avatar { flex: none; font-size: 1.6rem; line-height: 1.2; }
+.solved-npc .dlg-text { font-size: .92rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+
+/* ===== RPG：奇幻冒險 ===== */
+body.tpl-rpg h1, body.tpl-rpg h2, body.tpl-rpg .sheet-title, body.tpl-rpg .sc-title, body.tpl-rpg .solved-title { letter-spacing: .05em; }
+body.tpl-rpg .card, body.tpl-rpg .stage-card, body.tpl-rpg .next-step { border-radius: 16px; }
+body.tpl-rpg .dialog { border-style: double; border-width: 5px; }
+body.tpl-rpg .avatar-picker { grid-template-columns: repeat(4, 1fr); }
+body.tpl-rpg .avatar-opt { padding: 6px 0 4px; }
+body.tpl-rpg .avatar-opt::after { content: attr(data-name); display: block; font-size: .7rem; line-height: 1.3; font-weight: 700; color: var(--muted); }
+body.tpl-rpg .stage-card.solved .sc-state { color: #b8860b; }
+
+/* ===== 偵探推理：宋體／手寫、卷宗感 ===== */
+body.tpl-detective h1, body.tpl-detective h2, body.tpl-detective .sheet-title, body.tpl-detective .sc-title, body.tpl-detective .ns-main {
+  font-family: "Noto Serif TC", "Songti TC", "PMingLiU", "STSong", serif; letter-spacing: .08em;
+}
+body.tpl-detective .solved-title, body.tpl-detective .dlg-text, body.tpl-detective .solved-npc .dlg-text {
+  font-family: "DFKai-SB", "BiauKai", "Kaiti TC", "STKaiti", "Noto Serif TC", serif;
+}
+body.tpl-detective .card, body.tpl-detective .stage-card { border-radius: 4px; border-left-width: 4px; }
+body.tpl-detective .dialog { border-radius: 6px; border-style: dashed; }
+body.tpl-detective .dialog .dlg-avatar { border-radius: 6px; }
+body.tpl-detective .ns-label { border-radius: 2px; letter-spacing: .12em; }
+
+/* ===== 特務任務：等寬字、終端機前綴 ===== */
+body.tpl-agent h1, body.tpl-agent h2, body.tpl-agent .sheet-title, body.tpl-agent .sc-title, body.tpl-agent .ns-main,
+body.tpl-agent .solved-title, body.tpl-agent .dlg-name, body.tpl-agent .dlg-text, body.tpl-agent .ns-label {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
+}
+body.tpl-agent h2::before, body.tpl-agent .solved-title::before, body.tpl-agent .dlg-name::before { content: "> "; color: var(--accent); }
+body.tpl-agent .card, body.tpl-agent .stage-card, body.tpl-agent .next-step { border-radius: 2px; }
+body.tpl-agent .dialog { border-radius: 2px; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 8px 28px rgba(0, 0, 0, .4); }
+body.tpl-agent .dialog .dlg-avatar { border-radius: 2px; }
+body.tpl-agent .dialog .dlg-text::after { content: "_"; opacity: .0; }
+body.tpl-agent .dialog.typing .dlg-text::after { opacity: .9; animation: dlg-blink 1s steps(2) infinite; }
+
+/* ===== 海盜尋寶：航海日誌 ===== */
+body.tpl-pirate h1, body.tpl-pirate h2, body.tpl-pirate .sheet-title, body.tpl-pirate .sc-title, body.tpl-pirate .solved-title {
+  font-family: Georgia, "Noto Serif TC", "PMingLiU", serif; font-style: italic; letter-spacing: .06em;
+}
+body.tpl-pirate .card, body.tpl-pirate .stage-card { border-radius: 10px; border-width: 2px; }
+body.tpl-pirate .dialog { border-width: 3px; border-radius: 12px; border-style: groove; }
+body.tpl-pirate .next-step { border-style: dashed; }
+
+/* ===== 魔法學院：圓潤 ===== */
+body.tpl-academy h1, body.tpl-academy h2, body.tpl-academy .sheet-title, body.tpl-academy .sc-title, body.tpl-academy .ns-main, body.tpl-academy .solved-title {
+  font-family: "Hiragino Maru Gothic ProN", "Varela Round", "Noto Sans TC", "Microsoft JhengHei", sans-serif; letter-spacing: .03em;
+}
+body.tpl-academy .card, body.tpl-academy .stage-card, body.tpl-academy .next-step { border-radius: 20px; }
+body.tpl-academy .dialog { border-radius: 22px; }
+body.tpl-academy .avatar-opt { border-radius: 16px; }
+
+/* ---- 減少動態：全部停用 ---- */
+@media (prefers-reduced-motion: reduce) {
+  .dialog, .dialog .dlg-next, .levelup .lu-box, .stamp > span, body.tpl-agent .dialog.typing .dlg-text::after { animation: none !important; }
+  .hud-exp-bar > i { transition: none; }
+  .stamp > span { transform: rotate(-14deg); }
+  #fx-canvas { display: none; }
+}

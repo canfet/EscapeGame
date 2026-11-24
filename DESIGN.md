@@ -680,3 +680,11 @@ Apps Script 部署時「誰可以存取」不是「所有人」，或修改程�
 **地圖沒有顯示**
 地圖使用 OpenStreetMap，若網路擋住地圖圖磚，關卡功能仍可正常使用（距離與打卡不受影響）。
 
+
+## 體驗套版
+
+- Projects 新增欄位 `template`（`classic|rpg|detective|agent|pirate|academy`，空值＝classic）、`npc_name`、`npc_avatar`；與 `theme`（色彩）正交，`body` 同時帶 `theme-x tpl-y`。
+- 套版定義在 `js/templates.js`（用語、隊伍造型清單、NPC 預設、建議主題、特效），樣式在 `css/templates.css`，特效與逐字輸出在 `js/fx.js`。職業清單在 `Code.gs` 與 `templates.js` 各一份，必須一致（`tests/backend.test.js` 檢查）。
+- RPG：Lv = 1 + 已完成關卡數；EXP = 目前分數 / 全部關卡總分；前台即時計算，不另存。
+- 特效可由玩家關閉（`localStorage escapegame:fx`），並尊重 `prefers-reduced-motion`。
+- 詳細需求與設計見 `docs/`。

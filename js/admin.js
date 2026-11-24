@@ -7,7 +7,7 @@
   var KEY_STORE = 'escapegame-admin-key';
   var REMEMBER_STORE = 'escapegame-admin-remember';   // 「記住這台裝置」：存在本機，30 天內免重新輸入
   var REMEMBER_DAYS = 30;
-  var PROJECT_FIELDS = ['project_id', 'name', 'status', 'unlock_mode', 'description', 'intro', 'finish_message', 'cover_url', 'theme',
+  var PROJECT_FIELDS = ['project_id', 'name', 'status', 'unlock_mode', 'description', 'intro', 'finish_message', 'cover_url', 'theme', 'template', 'npc_name', 'npc_avatar',
     'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy', 'wrong_lock_after', 'wrong_lock_sec', 'is_default', 'show_leaderboard', 'leaderboard_live', 'require_run_code', 'collect_message', 'deck_id'];
   var STAGE_FIELDS = ['stage_id', 'enabled', 'clue', 'image_url', 'require_gps', 'show_location', 'bypass_code', 'question', 'show_question_early', 'require_photo', 'reward_code', 'reward_order', 'final_from_fragments', 'coop_final', 'item_name', 'item_icon', 'item_rarity', 'item_story', 'card_id', 'card_random',
     'answer_type', 'points', 'choices', 'answer', 'max_attempts', 'form_url', 'form_verify_sheet', 'success_message',
@@ -69,6 +69,7 @@
     $('#ms-answer_type').onchange = toggleTypeFields;
     $('#ms-here').onclick = useMyLocation;
     $('#mp-theme').onchange = renderThemePrev;
+    $('#mp-template').onchange = function () { onTemplateChange(true); };
     bindDeckUi();
     ['#ms-reward_code', '#ms-reward_order', '#ms-final_from_fragments', '#ms-coop_final', '#ms-title-input'].forEach(function (sel) {
       $(sel).addEventListener('input', renderFragPreview); $(sel).addEventListener('change', renderFragPreview);
@@ -167,6 +168,34 @@
   function renderThemePrev() {
     var t = $('#mp-theme').value, info = THEME_INFO[t] || THEME_INFO.retro;
     $('#mp-theme-prev').innerHTML = info[1].map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('') + '<span>' + info[0] + '</span>';
+  }
+
+  /* ---------- 體驗套版預覽 ---------- */
+  // [名稱, 說明, 用語範例, 特效, 建議色彩主題, 造型清單]
+  var TEMPLATE_INFO = {
+    classic:   ['🗺 經典', '原本的闖關介面，不加角色對話。', '關卡、線索、提交答案', '無額外特效', 'retro', []],
+    rpg:       ['⚔️ RPG 角色冒險', '把闖關變成冒險任務，NPC 會給任務與獎勵。', '任務、冒險者、經驗值、戰利品', '升級光效、戰利品彈出', 'forest', ['⚔️', '🧙', '🏹', '🗡️', '🛡️', '🩺', '🎻', '🐉']],
+    detective: ['🕵️ 偵探案件', '像辦案一樣蒐集線索、推理真相。', '案件、線索、證物、破案', '放大鏡聚焦、證物蓋章', 'history', ['🕵️', '🔍', '🧐', '📜', '🗝️', '🎩', '🔦', '🧤']],
+    agent:     ['🛰 特務任務', '機密任務風格，終端機式對話。', '任務簡報、情報、解碼、任務完成', '掃描線、解碼動畫', 'neon', ['🛰️', '🤖', '👾', '🦾', '🔒', '💾', '📡', '🕶️']],
+    pirate:    ['🏴‍☠️ 海盜寶藏', '循著藏寶圖找出寶藏。', '藏寶圖、船員、寶箱、啟航', '波浪、金幣散落', 'ocean', ['⚓', '🏴‍☠️', '🦜', '🗺️', '🧭', '💰', '🦑', '🚢']],
+    academy:   ['🪄 魔法學院', '在魔法學院完成課程與咒語。', '課程、咒語、學分、魔法書', '星光閃爍、魔法陣', 'campus', ['🧙‍♀️', '📚', '🪄', '🦉', '🔮', '⭐', '🧪', '🎓']]
+  };
+  var lastTplTheme = 'retro';   // 目前套版的建議主題（用來判斷使用者是否手動改過主題）
+  function renderTemplatePrev() {
+    var t = $('#mp-template').value, info = TEMPLATE_INFO[t] || TEMPLATE_INFO.classic;
+    $('#mp-template-prev').innerHTML = '<b>' + esc(info[0]) + '</b><div>' + esc(info[1]) + '</div>' +
+      '<div>用語範例：' + esc(info[2]) + '</div><div>特效：' + esc(info[3]) + '</div>' +
+      '<div>建議色彩主題：' + esc(info[4]) + '</div>';
+    $('#mp-npc-box').classList.toggle('hidden', t === 'classic');
+  }
+  function onTemplateChange(autoTheme) {
+    var t = $('#mp-template').value, info = TEMPLATE_INFO[t] || TEMPLATE_INFO.classic;
+    renderTemplatePrev();
+    if (autoTheme && t !== 'classic') {
+      var cur = $('#mp-theme').value;
+      if (cur === 'retro' || cur === lastTplTheme) { $('#mp-theme').value = info[4]; renderThemePrev(); }
+    }
+    lastTplTheme = info[4];
   }
 
   /* ---------- 圖鑑本（卡牌製作） ---------- */
@@ -843,6 +872,11 @@
 
   /* ---------- 路線與隊伍名單 ---------- */
   var AVATARS = ['🦊', '🐼', '🐯', '🐸', '🦉', '🐙', '🦄', '🐳', '🦖', '🐧', '🐝', '🦋', '🐢', '🐬', '🦁', '🐰'];
+  var ALL_AVATARS = (function () {
+    var out = AVATARS.slice();
+    Object.keys(TEMPLATE_INFO).forEach(function (k) { TEMPLATE_INFO[k][5].forEach(function (a) { if (out.indexOf(a) < 0) out.push(a); }); });
+    return out;
+  })();
   var ROUTE_COLORS = ['#e63946', '#1d5fa8', '#2f9e44', '#f59f00', '#7048e8', '#0ca678', '#d6336c', '#495057'];
   function newToken() {
     var chars = 'abcdefghjkmnpqrstuvwxyz23456789', out = '', buf = new Uint8Array(8);
@@ -907,7 +941,7 @@
     box.innerHTML = A.editTeams.length ? A.editTeams.map(function (t, i) {
       return '<div class="route-row" data-i="' + i + '">' +
         '<input data-f="name" placeholder="隊伍名稱" maxlength="30" value="' + esc(t.name) + '">' +
-        '<select data-f="avatar" title="隊伍造型"><option value="">造型：玩家自選</option>' + AVATARS.map(function (a) { return '<option value="' + a + '">' + a + '</option>'; }).join('') + '</select>' +
+        '<select data-f="avatar" title="隊伍造型"><option value="">造型：玩家自選</option>' + ALL_AVATARS.map(function (a) { return '<option value="' + a + '">' + a + '</option>'; }).join('') + '</select>' +
         (A.editRoutes.length ? '<select data-f="route">' + opts + '</select>' : '') +
         '<button type="button" class="sm ghost" data-del title="刪除這支隊伍">🗑</button></div>';
     }).join('') : '<div class="help" style="margin:0 0 6px">還沒有隊伍名單（玩家可自己輸入隊伍名稱）。</div>';
@@ -942,7 +976,7 @@
 
   function openProject(p) {
     A.editProjectNew = !p;
-    p = p || { status: 'draft', theme: 'retro', unlock_mode: 'sequential', gps_max_accuracy: 80, time_limit_min: 0, show_leaderboard: true };
+    p = p || { status: 'draft', theme: 'retro', template: 'classic', unlock_mode: 'sequential', gps_max_accuracy: 80, time_limit_min: 0, show_leaderboard: true };
     $('#mp-title').textContent = A.editProjectNew ? '新增專案' : '專案設定';
     PROJECT_FIELDS.forEach(function (f) {
       var el = $('#mp-' + f);
@@ -952,11 +986,14 @@
     });
     renderDeckSelect(p.deck_id || '');
     if (!p.theme) $('#mp-theme').value = 'retro';
+    if (!p.template || !TEMPLATE_INFO[p.template]) $('#mp-template').value = 'classic';
     A.editRoutes = (p.routes || []).map(function (r) { return { id: r.id, name: r.name, color: r.color }; });
     A.editTeams = (p.teams || []).map(function (t) { return { name: t.name, route: t.route || '', avatar: t.avatar || '' }; });
     $('#mp-team-bulk-box').classList.add('hidden');
     renderRouteEditor(); renderTeamEditor();
     renderThemePrev();
+    lastTplTheme = (TEMPLATE_INFO[$('#mp-template').value] || TEMPLATE_INFO.classic)[4];
+    onTemplateChange(false);
     refreshImgPrev('mp-cover_url');
     $('#mp-project_id').disabled = !A.editProjectNew;
     $('#m-project').classList.remove('hidden');
