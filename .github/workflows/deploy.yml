@@ -5,21 +5,21 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# actions: read —— deploy-pages 要用它查詢這次執行上傳的 github-pages 成品（缺少時可能出現 "No artifacts named github-pages"）
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  # 第一個工作：測試、產生 config.js、打包網站
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: 取得程式碼
         uses: actions/checkout@v6
@@ -48,6 +48,22 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: .
+
+  # 第二個工作：部署（官方建議把打包與部署分成兩個工作）
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 列出這次執行的成品（除錯用：確認有一個名為 github-pages 的成品）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s);console.log('artifact 數量:',j.total_count);(j.artifacts||[]).forEach(a=>console.log('-',a.name,a.size_in_bytes,'bytes','expired='+a.expired));if(!j.artifacts)console.log(s.slice(0,300))}catch(e){console.log(s.slice(0,300))}})"
 
       - name: 部署
         id: deployment
