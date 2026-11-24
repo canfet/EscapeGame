@@ -1306,3 +1306,9 @@ html.hc :focus-visible { outline: 4px solid #0033cc; outline-offset: 2px; }
 @keyframes skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) { .map.map-skel { animation: none; } }
 #fin-feedback { margin-top: 12px; }
+
+/* ===== 加到主畫面（全螢幕）時：頂端不要被狀態列／瀏海蓋到 ===== */
+.sheet { padding-top: env(safe-area-inset-top, 0px); }
+.sheet-body { max-height: calc(92vh - env(safe-area-inset-top, 0px)); max-height: calc(var(--sheet-max, 92dvh) - env(safe-area-inset-top, 0px)); }
+.solved-overlay { padding-top: calc(12px + env(safe-area-inset-top, 0px)); padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+.levelup { padding-top: env(safe-area-inset-top, 0px); }

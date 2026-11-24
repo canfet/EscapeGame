@@ -84,6 +84,27 @@ const chrome = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Applica
     const sub = await text('#ns-sub');
     ok('下一站顯示方向箭頭與距離', /[↑↗→↘↓↙←↖]/.test(sub) && /公尺|公里/.test(sub), sub);
 
+    // ---- 全螢幕（加到主畫面）：模擬瀏海／狀態列 47px，面板與 NPC 不可被蓋到
+    const inset = await send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 47, bottom: 34, left: 0, right: 0 } });
+    const insetOk = !(inset && inset.error);
+    if (!insetOk) res.push('SKIP 這版 Chrome 不支援模擬安全區域');
+    await click('#g-stages .stage-card.open'); await sleep(900);
+    if (insetOk) {
+      const tops = await ev(`(function(){var b=document.querySelector('#sheet-body').getBoundingClientRect(),n=document.querySelector('#sheet-body .npc-bubble');return {body:Math.round(b.top),npc:n?Math.round(n.getBoundingClientRect().top):null}})()`);
+      ok('全螢幕：關卡面板頂端避開狀態列（≥47px）', tops && tops.body >= 47, JSON.stringify(tops));
+      if (tops && tops.npc !== null) ok('全螢幕：NPC 氣泡不被狀態列蓋到', tops.npc >= 47, JSON.stringify(tops));
+    }
+    await click('#s-close'); await sleep(400);
+    if (insetOk) {   // 矮螢幕（橫放或鍵盤跳出）：面板長到頂時也不能鑽進狀態列
+      await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 420, deviceScaleFactor: 1, mobile: true });
+      await sleep(300);
+      await click('#g-stages .stage-card.open'); await sleep(900);
+      const tall = await ev(`Math.round(document.querySelector('#sheet-body').getBoundingClientRect().top)`);
+      ok('全螢幕：矮螢幕時面板頂端仍避開狀態列（≥47px）', tall >= 47, String(tall));
+      await click('#s-close'); await sleep(300);
+      await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+      await sleep(300);
+    }
     // ---- 4a) 前往中：線索 → 方向與地圖 → 現場作答欄（附說明）；答案欄在地圖之後
     await click('#g-stages .stage-card.open'); await sleep(900);
     const openOrder = await ev(`(function(){var b=document.querySelector('#sheet-body');var m=b.querySelector('.sheet-map-card,.compass'),a=b.querySelector('#s-ans');if(!a)return 'no answer field';if(!m)return 'no map';return (m.compareDocumentPosition(a)&4)?'map<answer':'answer<map'})()`);
@@ -158,7 +179,14 @@ const chrome = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Applica
         if (await vis('#s-code')) { await ev('(function(){var e=document.querySelector("#s-code");e.value="0000";})()'); await click('#s-code-btn'); await sleep(800); }
         if (await vis('#s-ans')) { await ev('(function(){var e=document.querySelector("#s-ans");e.value=' + JSON.stringify(ans[sid]) + ';e.dispatchEvent(new Event("input",{bubbles:true}))})()'); await click('#s-submit'); await sleep(1500); }
         await dismissAll();
-        if (await vis('#solved-next')) { await click('#solved-close'); await sleep(300); }
+        if (await vis('#solved-next')) {
+          if (insetOk && !globalThis.__solvedChecked) {
+            globalThis.__solvedChecked = true;
+            const st = await ev(`(function(){var o=document.querySelector('#solved'),f=Array.prototype.filter.call(o.children,function(e){return !e.classList.contains('hidden')})[0];return Math.round(f.getBoundingClientRect().top)})()`);
+            ok('全螢幕：過關畫面最上方的內容避開狀態列（≥47px）', st >= 47, String(st));
+          }
+          await click('#solved-close'); await sleep(300);
+        }
       }
     }
     for (let i = 0; i < 20 && !(await vis('#v-finish')); i++) { await dismissAll(); if (await vis('#solved-next')) await click('#solved-next'); await sleep(500); }
