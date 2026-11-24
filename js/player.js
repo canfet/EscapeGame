@@ -1519,17 +1519,14 @@
     } else if (ctx.wrong) flash('shake', 500);
   }
   /** 打卡成功後 NPC 講一句（每關一次；點一下關閉、數秒後自動關閉，不擋作答） */
-  /** 實際顯示關卡開場台詞（欄位 npc_arrive）：每關一次；面板還開著才出現；點一下關閉、8 秒後自動關閉 */
+  /** 顯示關卡開場台詞（欄位 npc_arrive）：每次點進關卡都會出現；面板還開著才出現；點一下關閉、8 秒後自動關閉 */
   function npcArriveShow(sid, ns, delay) {
     if (!isThemed() || !ns) return;
-    var key = 'escapegame:npcseen:' + P.sid + ':' + sid + ':arrive';
-    try { if (localStorage.getItem(key) === '1') return; } catch (e) { /* 讀不到就當沒看過 */ }
     var text = Q.Tpl.npcLine(P.tplId, 'arrive', ns);
     if (!text) return;
     setTimeout(function () {
       try {
         if (P.openId !== sid) return;
-        try { if (localStorage.getItem(key) === '1') return; localStorage.setItem(key, '1'); } catch (e) { /* */ }
         if (showDialog([text], null)) {
           var d = DLG;
           setTimeout(function () { if (DLG === d && d.open) closeDialog(true); }, 8000);
@@ -1537,7 +1534,7 @@
       } catch (e) { /* */ }
     }, delay);
   }
-  /** 點進關卡（前往中或已抵達）時，NPC 說開場台詞；每關只說一次 */
+  /** 點進關卡（前往中或已抵達）時，NPC 說開場台詞；每次進來都會說 */
   function npcOnOpen(id) {
     try {
       var st = findStage(id);

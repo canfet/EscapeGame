@@ -63,7 +63,7 @@ test('player.js no longer hard-codes strings replaced by vocab; classic vocab ke
 
 test('stage-panel NPC/battle code is guarded and gated to non-classic', () => {
   assert.ok(/function npcBubbleHtml\(npc, text\)/.test(player));
-  assert.ok(/escapegame:npcseen:/.test(player));
+  assert.ok(/function npcArriveShow\(sid, ns, delay\)/.test(player) && !/escapegame:npcseen:/.test(player));
   assert.ok(/function isThemed\(\)/.test(player) && /if \(themed\) h\.push\(sheetStatusHtml/.test(player));
   assert.ok(read('css/templates.css').indexOf('prefers-reduced-motion') > 0 && /#sheet\.shake/.test(read('css/templates.css')));
 });
