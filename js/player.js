@@ -1519,13 +1519,7 @@
     } else if (ctx.wrong) flash('shake', 500);
   }
   /** 打卡成功後 NPC 講一句（每關一次；點一下關閉、數秒後自動關閉，不擋作答） */
-  function npcArrive(sid, before, state) {
-    if (!isThemed()) return;
-    var ns = (state.stages || []).filter(function (x) { return x.stage_id === sid; })[0];
-    if (!ns || ns.status !== 'arrived' || before[sid] === 'arrived') return;
-    npcArriveShow(sid, ns, 1100);
-  }
-  /** 實際顯示抵達台詞：每關一次；面板還開著才出現；點一下關閉、8 秒後自動關閉 */
+  /** 實際顯示關卡開場台詞（欄位 npc_arrive）：每關一次；面板還開著才出現；點一下關閉、8 秒後自動關閉 */
   function npcArriveShow(sid, ns, delay) {
     if (!isThemed() || !ns) return;
     var key = 'escapegame:npcseen:' + P.sid + ':' + sid + ':arrive';
@@ -1543,11 +1537,11 @@
       } catch (e) { /* */ }
     }, delay);
   }
-  /** 點進已抵達的關卡時，也讓 NPC 說抵達台詞（涵蓋不用打卡的關卡、或打卡後關掉面板再開） */
+  /** 點進關卡（前往中或已抵達）時，NPC 說開場台詞；每關只說一次 */
   function npcOnOpen(id) {
     try {
       var st = findStage(id);
-      if (st && st.status === 'arrived') npcArriveShow(id, st, 450);
+      if (st && (st.status === 'open' || st.status === 'arrived')) npcArriveShow(id, st, 450);
     } catch (e) { /* */ }
   }
 
@@ -1749,7 +1743,7 @@
       });
       var solved = r.state.stages.filter(function (x) { return x.status === 'solved' && before[x.stage_id] && before[x.stage_id] !== 'solved'; })[0];
       var type = (r.correct === false || r.arrived === false) ? 'warn' : 'ok';
-      if (action === 'arrive' && r.arrived !== false && type !== 'warn') { arriveFlash(); try { npcArrive(payload.stageId, before, r.state); } catch (e) { /* */ } }
+      if (action === 'arrive' && r.arrived !== false && type !== 'warn') { arriveFlash(); }
       if (r.correct && payload && payload.stageId) clearDrafts(payload.stageId);
       if (solved) { sfx('win'); if (r.state.session.status === 'playing') celebrateSolved(liBefore, levelOf(r.state)); }
       else if (type === 'warn') sfx('bad');

@@ -80,7 +80,7 @@ test('stage-panel vocab keys: every template has values; classic equals the old 
 
 test('npcLine: stage override wins, defaults rotate, classic is silent', () => {
   assert.strictEqual(T.npcLine('classic', 'arrive', {}), '');
-  assert.strictEqual(T.npcLine('rpg', 'arrive', {}), '你們找到了！把試煉解開吧。');
+  assert.strictEqual(T.npcLine('rpg', 'arrive', {}), '冒險者，這就是你們的下一個任務。仔細看看線索吧！');
   assert.strictEqual(T.npcLine('rpg', 'arrive', { npc_arrive: ' 自訂 ' }), '自訂');
   T.IDS.filter((i) => i !== 'classic').forEach((id) => {
     ['arrive', 'hint'].forEach((k) => assert.ok(T.npcLine(id, k, {}), id + k));
