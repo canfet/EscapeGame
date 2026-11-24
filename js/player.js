@@ -1302,6 +1302,7 @@
     $('#sheet').classList.remove('hidden');
     layerOpen('sheet');
     fitSheet();
+    npcOnOpen(id);
     if (!P.prevFocus) P.prevFocus = document.activeElement;
     var sb = $('#sheet-body');
     sb.setAttribute('tabindex', '-1');
@@ -1522,6 +1523,11 @@
     if (!isThemed()) return;
     var ns = (state.stages || []).filter(function (x) { return x.stage_id === sid; })[0];
     if (!ns || ns.status !== 'arrived' || before[sid] === 'arrived') return;
+    npcArriveShow(sid, ns, 1100);
+  }
+  /** 實際顯示抵達台詞：每關一次；面板還開著才出現；點一下關閉、8 秒後自動關閉 */
+  function npcArriveShow(sid, ns, delay) {
+    if (!isThemed() || !ns) return;
     var key = 'escapegame:npcseen:' + P.sid + ':' + sid + ':arrive';
     try { if (localStorage.getItem(key) === '1') return; } catch (e) { /* 讀不到就當沒看過 */ }
     var text = Q.Tpl.npcLine(P.tplId, 'arrive', ns);
@@ -1529,13 +1535,20 @@
     setTimeout(function () {
       try {
         if (P.openId !== sid) return;
-        try { localStorage.setItem(key, '1'); } catch (e) { /* */ }
+        try { if (localStorage.getItem(key) === '1') return; localStorage.setItem(key, '1'); } catch (e) { /* */ }
         if (showDialog([text], null)) {
           var d = DLG;
           setTimeout(function () { if (DLG === d && d.open) closeDialog(true); }, 8000);
         }
       } catch (e) { /* */ }
-    }, 1100);
+    }, delay);
+  }
+  /** 點進已抵達的關卡時，也讓 NPC 說抵達台詞（涵蓋不用打卡的關卡、或打卡後關掉面板再開） */
+  function npcOnOpen(id) {
+    try {
+      var st = findStage(id);
+      if (st && st.status === 'arrived') npcArriveShow(id, st, 450);
+    } catch (e) { /* */ }
   }
 
   /** 照片挑選區：可以直接拍照，也可以從相簿選（相簿不會強制開相機） */
