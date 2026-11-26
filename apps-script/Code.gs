@@ -36,7 +36,7 @@ var THEMES = ['retro', 'history', 'sport', 'mist', 'forest', 'neon', 'campus', '
 var SCHEMA = {
   Projects: ['project_id', 'name', 'status', 'is_default', 'unlock_mode', 'description', 'intro',
     'finish_message', 'cover_url', 'theme', 'template', 'npc_name', 'npc_avatar', 'allow_tpl_switch', 'routes', 'teams', 'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy',
-    'show_leaderboard', 'leaderboard_live', 'require_run_code', 'wrong_lock_after', 'wrong_lock_sec', 'collect_message', 'deck_id', 'updated_at'],
+    'show_leaderboard', 'leaderboard_live', 'require_run_code', 'allowed_run_codes', 'max_teams', 'wrong_lock_after', 'wrong_lock_sec', 'collect_message', 'deck_id', 'updated_at'],
   Stages: ['project_id', 'stage_id', 'order', 'enabled', 'title', 'clue', 'image_url', 'lat', 'lng',
     'radius_m', 'show_location', 'require_gps', 'bypass_code', 'question', 'show_question_early', 'require_photo', 'reward_code', 'reward_order', 'final_from_fragments', 'coop_final', 'item_name', 'item_icon', 'item_rarity', 'item_story', 'card_id', 'card_random', 'routes', 'answer_type', 'choices',
     'answer', 'points', 'max_attempts', 'hint1', 'hint2', 'hint3', 'hint_penalty', 'success_message', 'npc_arrive', 'npc_wrong', 'npc_hint',
@@ -51,7 +51,7 @@ var SCHEMA = {
 
 /* 要強制為「純文字」格式的欄位（避免 007 變成 7） */
 var TEXT_COLUMNS = {
-  Projects: ['project_id', 'name', 'description', 'intro', 'finish_message', 'cover_url', 'collect_message', 'deck_id', 'routes', 'teams', 'npc_name', 'npc_avatar', 'allow_tpl_switch'],
+  Projects: ['project_id', 'name', 'description', 'intro', 'finish_message', 'cover_url', 'collect_message', 'deck_id', 'routes', 'teams', 'npc_name', 'npc_avatar', 'allow_tpl_switch', 'allowed_run_codes'],
   Decks: ['deck_id', 'title', 'cards'],
   Stages: ['project_id', 'stage_id', 'title', 'clue', 'image_url', 'bypass_code', 'question', 'answer', 'choices', 'hint1', 'hint2', 'hint3',
     'success_message', 'npc_arrive', 'npc_wrong', 'npc_hint', 'form_url', 'form_verify_sheet', 'reward_code', 'item_name', 'item_icon', 'item_story', 'card_id', 'routes'],
@@ -60,7 +60,7 @@ var TEXT_COLUMNS = {
 };
 /* 要強制成「數字」格式的欄位（避免試算表把 1、2 當成日期或時間） */
 var NUMBER_COLUMNS = {
-  Projects: ['time_limit_min', 'gps_max_accuracy', 'wrong_lock_after', 'wrong_lock_sec'],
+  Projects: ['time_limit_min', 'gps_max_accuracy', 'max_teams', 'wrong_lock_after', 'wrong_lock_sec'],
   Stages: ['order', 'lat', 'lng', 'radius_m', 'points', 'max_attempts', 'hint_penalty', 'reward_order', 'card_random']
 };
 var BOOL_COLUMNS = {
@@ -184,7 +184,20 @@ function startSession_(b) {
     if (!team) throw appError_('請輸入隊伍名稱（不能以 = + - @ 開頭）', 'BAD_INPUT');
     if (rateHit_('st_' + p.project_id, RATE.startPerMin, 60)) throw appError_('現在太多人同時開始了，請稍等幾秒再按一次', 'RATE');
     var run = str_(b.runCode).slice(0, 30);
+    var allowRuns = parseRunCodes_(p.allowed_run_codes);
+    if (!isTest && allowRuns.length) {
+      if (rateBlocked_('rc_' + p.project_id, RATE.runCodeFail)) throw appError_('場次代碼輸入錯誤次數過多，請 10 分鐘後再試', 'TOO_MANY');
+      if (!run) throw appError_('請輸入現場場次代碼（請向關主索取）', 'NEED_RUN_CODE');
+      var matchedRun = matchRunCode_(allowRuns, run);
+      if (!matchedRun) {
+        rateHit_('rc_' + p.project_id, RATE.runCodeFail, 600);
+        Utilities.sleep(500);
+        throw appError_('場次代碼不正確，請向關主確認', 'BAD_RUN_CODE');
+      }
+      run = matchedRun;
+    }
     var now = new Date();
+    var sessRows = readRows_('Sessions');
     // 隊伍與路線：
     //  ‧ 專案有「預設隊伍名單」：只能選名單內的隊伍，路線由名單決定（網址上的 route 一律不採用，避免被改）
     //  ‧ 沒有名單、但有路線：用連結（專屬 QR Code）帶的路線代碼，沒帶就平均分配
@@ -193,10 +206,10 @@ function startSession_(b) {
       preset = find_(p.teams, function (t) { return t.name === team; });
       if (!preset) throw appError_('請從名單中選擇隊伍名稱', 'BAD_TEAM');
       team = preset.name;
-      // 專案要求場次代碼、玩家沒填：用這支隊伍的路線代碼當場次（選隊伍時就知道路線，不用再問玩家）
-      if (p.require_run_code && !run && preset.route) run = preset.route;
+      // 專案要求場次代碼（且沒有白名單）、玩家沒填：用這支隊伍的路線代碼當場次（選隊伍時就知道路線，不用再問玩家）
+      if (p.require_run_code && !allowRuns.length && !run && preset.route) run = preset.route;
       // 同一場次、同一個隊伍名稱已經開始：直接接續（同隊的其他手機也能加入）
-      var dup = find_(readRows_('Sessions'), function (r) {
+      var dup = find_(sessRows, function (r) {
         return str_(r.project_id) === p.project_id && str_(r.run_code) === run && str_(r.team_name) === team && bool_(r.test) === isTest;
       });
       if (dup) {
@@ -209,9 +222,13 @@ function startSession_(b) {
       route = preset.route;
       avatarWant = preset.avatar || avatarWant;
     }
-    // 沒有隊伍名單、但連結（專屬 QR Code）帶了有效的路線代碼：同樣用路線代碼當場次
-    if (p.require_run_code && !run && !preset && str_(b.route) && routeById_(p, str_(b.route).slice(0, 20))) run = str_(b.route).slice(0, 20);
+    // 沒有隊伍名單、但連結（專屬 QR Code）帶了有效的路線代碼：同樣用路線代碼當場次（有白名單時不自動代入）
+    if (p.require_run_code && !allowRuns.length && !run && !preset && str_(b.route) && routeById_(p, str_(b.route).slice(0, 20))) run = str_(b.route).slice(0, 20);
     if (p.require_run_code && !run) throw appError_('請輸入場次代碼（請向關主索取）', 'NEED_RUN_CODE');
+    if (!isTest && p.max_teams > 0) {
+      var curCount = sessRows.filter(function (r) { return str_(r.project_id) === p.project_id && !bool_(r.test); }).length;
+      if (curCount >= p.max_teams) throw appError_('本活動隊伍名額已滿，請洽現場關主', 'FULL');
+    }
     if (p.routes.length) {
       if (!route) {
         var want = str_(b.route).slice(0, 20);
@@ -227,7 +244,7 @@ function startSession_(b) {
     ensureHeaders_('Sessions');
     // 隊伍造型：玩家挑的（或名單指定的）；沒挑就依目前隊伍數輪流分配
     var avList = avatarsFor_(p.template);
-    var avatar = avList.indexOf(avatarWant) >= 0 ? avatarWant : avList[readRows_('Sessions').filter(function (r) { return str_(r.project_id) === p.project_id; }).length % avList.length];
+    var avatar = avList.indexOf(avatarWant) >= 0 ? avatarWant : avList[sessRows.filter(function (r) { return str_(r.project_id) === p.project_id; }).length % avList.length];
     var s = {
       session_id: Utilities.getUuid(),
       code: uniqueCode_(p.project_id),
@@ -412,10 +429,13 @@ function getHint_(b) {
   });
 }
 
+/** 允許的玩家照片格式（排除 svg 等非點陣圖格式，避免上傳惡意檔案） */
+var PHOTO_DATA_URL_RE = /^data:(image\/(?:jpeg|png|webp|gif|heic|heif));base64,(.+)$/;
+
 /** 驗證並把 dataUrl 照片存進雲端硬碟，回傳檔案網址 */
 function savePhoto_(c, st, dataUrl, caption) {
-  var m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(String(dataUrl || ''));
-  if (!m) throw appError_('照片格式不正確', 'BAD_INPUT');
+  var m = PHOTO_DATA_URL_RE.exec(String(dataUrl || ''));
+  if (!m) throw appError_('照片格式不正確（請上傳 jpg、png、webp 或 gif 圖片）', 'BAD_INPUT');
   var bytes = Utilities.base64Decode(m[2]);
   if (bytes.length > MAX_PHOTO_BYTES) throw appError_('照片太大了，請重新拍攝', 'TOO_LARGE');
   var ext = m[1].split('/')[1].replace('jpeg', 'jpg');
@@ -428,20 +448,23 @@ function savePhoto_(c, st, dataUrl, caption) {
 
 /** 先檢查照片格式與大小（不存檔），避免答案送出後才發現照片有問題 */
 function checkPhoto_(dataUrl) {
-  var m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(String(dataUrl || ''));
-  if (!m) throw appError_('這一關需要同時上傳照片，請先選擇一張照片', 'NEED_PHOTO');
+  var m = PHOTO_DATA_URL_RE.exec(String(dataUrl || ''));
+  if (!m) throw appError_('這一關需要同時上傳照片（jpg／png／webp），請先選擇一張照片', 'NEED_PHOTO');
   if (m[2].length * 0.75 > MAX_PHOTO_BYTES) throw appError_('照片太大了，請重新拍攝', 'TOO_LARGE');
 }
 
 function uploadPhoto_(b) {
   // 存到雲端硬碟要好幾秒：先在鎖外做完（不會讓其他隊伍排隊等），鎖內只做「確認狀態 → 記錄過關」。
-  // 鎖外先擋掉明顯不該存的（還沒抵達、已結束、操作太頻繁），避免亂傳檔案。
+  // 鎖外先擋掉明顯不該存的（還沒抵達、已結束、操作太頻繁、同關並發連點），避免亂傳檔案。
   var fileUrl = '';
   var c0 = ctx_(b, false), st0 = getStage_(c0, b.stageId);
   if (st0.answer_type === 'photo' && statusOf_(c0, st0) === 'arrived' && c0.s.status === 'playing' && !isTimeUp_(c0) &&
     !rateBlocked_('s_' + c0.s.session_id, RATE.sessionPerMin)) {
     checkPhoto_(b.dataUrl);
     checkPlayable_(c0.p, bool_(c0.s.test));
+    if (rateHit_('ph_' + c0.s.session_id, RATE.photoPerMin, 60) || rateHit_('phs_' + c0.s.session_id + '_' + st0.stage_id, 2, 60)) {
+      throw appError_('照片上傳太頻繁，請稍等幾秒再試', 'RATE');
+    }
     fileUrl = savePhoto_(c0, st0, b.dataUrl, b.caption);
   }
   return lockedAction_(function () {
@@ -744,6 +767,8 @@ function adminSaveProject_(b) {
       var tms = parseTeams_(data.teams, routesNow);
       data.teams = tms.length ? JSON.stringify(tms) : '';
     }
+    if ('allowed_run_codes' in data) data.allowed_run_codes = parseRunCodes_(data.allowed_run_codes).join(', ');
+    if ('max_teams' in data) data.max_teams = Math.max(0, Math.floor(num_(data.max_teams, 0)));
     ['start_at', 'end_at'].forEach(function (k) { if (k in data) data[k] = data[k] ? (date_(data[k]) || '') : ''; });
     data.updated_at = new Date();
     if (bool_(data.is_default)) {
@@ -1124,7 +1149,9 @@ function publicProject_(p, stages) {
     teams: (p.teams || []).map(function (t) { var rt = routeById_(p, t.route); return { name: t.name, route_name: rt ? rt.name : '', color: rt ? rt.color : '', avatar: t.avatar || '' }; }),
     avatars: avatarsFor_(p.template), collect_message: p.collect_message || '', deck_title: p.deck_title || '', deck_size: (p.cards || []).length, deck_kind: p.deck_kind || 'nature', deck_style: p.deck_style || 'foil',
     unlock_mode: p.unlock_mode, time_limit_min: p.time_limit_min, show_leaderboard: p.show_leaderboard, leaderboard_live: !!p.leaderboard_live,
-    require_run_code: p.require_run_code, is_default: p.is_default, start_at: p.start_at || null,
+    require_run_code: !!(p.require_run_code || parseRunCodes_(p.allowed_run_codes).length),
+    has_run_whitelist: parseRunCodes_(p.allowed_run_codes).length > 0,
+    is_default: p.is_default, start_at: p.start_at || null,
     end_at: p.end_at || null, stage_count: stages.length
   };
 }
@@ -1183,7 +1210,13 @@ function checkProject_(p) {
   if (p.start_at && new Date(p.start_at) > now) add('info', '還沒到開放時間：玩家要等到開放後才能開始', 'project');
   if (p.end_at && new Date(p.end_at) < now) add('warn', '已經過了結束時間：玩家無法進入，排行榜也已關閉', 'project');
   if ((p.show_leaderboard || p.leaderboard_live) && !p.start_at && !p.end_at) add('info', '排行榜沒有設定開放／結束時間，會一直開放', 'project');
-  if (p.require_run_code) add('info', '需要場次代碼：玩家開始前要自己輸入，記得在現場告訴玩家', 'project');
+  var allowRuns = parseRunCodes_(p.allowed_run_codes);
+  if (allowRuns.length) add('info', '已設定場次代碼白名單（' + allowRuns.length + ' 組）：玩家需輸入現場公告的代碼才能開始', 'project');
+  else if (p.require_run_code) add('info', '需要場次代碼：玩家開始前要自己輸入，記得在現場告訴玩家（若要防止路人亂輸入，可設定「允許的場次代碼」）', 'project');
+  if (p.max_teams > 0) add('info', '已設定隊伍名額上限：最多 ' + p.max_teams + ' 支正式隊伍', 'project');
+  if (p.status === 'active' && !allowRuns.length && !(p.teams || []).length && !p.end_at) {
+    add('info', '目前專案公開且無開局門檻：任何知道網址的人都能建立隊伍。建議設定「允許的場次代碼」、「隊伍名額上限」，或改為「連結可玩」', 'project');
+  }
   // 關卡
   stages.forEach(function (s, i) {
     var tag = '第 ' + (i + 1) + ' 關「' + s.title + '」', w = 'stage:' + s.stage_id;
@@ -1696,6 +1729,8 @@ function cleanProject_(r) {
     start_at: sd ? sd.toISOString() : '', end_at: ed ? ed.toISOString() : '',
     time_limit_min: num_(r.time_limit_min, 0), gps_max_accuracy: num_(r.gps_max_accuracy, DEFAULT_GPS_MAX_ACCURACY),
     show_leaderboard: bool_(r.show_leaderboard), leaderboard_live: bool_(r.leaderboard_live), require_run_code: bool_(r.require_run_code),
+    allowed_run_codes: parseRunCodes_(r.allowed_run_codes).join(', '),
+    max_teams: Math.max(0, Math.floor(num_(r.max_teams, 0))),
     wrong_lock_after: Math.max(0, num_(r.wrong_lock_after, 3)), wrong_lock_sec: Math.max(0, num_(r.wrong_lock_sec, 30)),
     collect_message: str_(r.collect_message).slice(0, 300),
     deck_id: str_(r.deck_id).slice(0, 20), deck_title: '', deck_kind: 'nature', deck_style: 'foil', cards: []
@@ -1912,7 +1947,32 @@ function toCell_(v) {
 /* ===================== 頻率限制 ===================== */
 
 // 用 CacheService 計次（Apps Script 拿不到使用者 IP，所以以「專案」「隊伍」「後台」為單位限制）
-var RATE = { adminFail: 10, resumeFail: 20, startPerMin: 300, sessionPerMin: 60 };
+var RATE = { adminFail: 10, resumeFail: 20, runCodeFail: 20, startPerMin: 300, sessionPerMin: 60, photoPerMin: 10 };
+
+/** 解析允許的場次代碼（支援逗號、頓號、分號或換行分隔，去除重複與空白，最多 50 組） */
+function parseRunCodes_(v) {
+  var raw = Array.isArray(v) ? v : String(v == null ? '' : v).split(/[\r\n,，、;；]+/);
+  var out = [], seen = {};
+  for (var i = 0; i < raw.length && out.length < 50; i++) {
+    var s = noFormula_(raw[i]).trim().slice(0, 30);
+    if (!s) continue;
+    var k = s.toUpperCase();
+    if (seen[k]) continue;
+    seen[k] = 1;
+    out.push(s);
+  }
+  return out;
+}
+
+/** 不區分大小寫比對場次代碼，回傳白名單裡的標準寫法（不符回傳空字串） */
+function matchRunCode_(list, input) {
+  var want = str_(input).toUpperCase();
+  if (!want) return '';
+  for (var i = 0; i < list.length; i++) {
+    if (str_(list[i]).toUpperCase() === want) return list[i];
+  }
+  return '';
+}
 
 /** 已超過上限就回傳 true（不計次） */
 function rateBlocked_(key, limit) {

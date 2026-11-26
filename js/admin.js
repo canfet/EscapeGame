@@ -8,7 +8,7 @@
   var REMEMBER_STORE = 'escapegame-admin-remember';   // 「記住這台裝置」：存在本機，30 天內免重新輸入
   var REMEMBER_DAYS = 30;
   var PROJECT_FIELDS = ['project_id', 'name', 'status', 'unlock_mode', 'description', 'intro', 'finish_message', 'cover_url', 'theme', 'template', 'npc_name', 'npc_avatar', 'allow_tpl_switch',
-    'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy', 'wrong_lock_after', 'wrong_lock_sec', 'is_default', 'show_leaderboard', 'leaderboard_live', 'require_run_code', 'collect_message', 'deck_id'];
+    'start_at', 'end_at', 'time_limit_min', 'gps_max_accuracy', 'wrong_lock_after', 'wrong_lock_sec', 'allowed_run_codes', 'max_teams', 'is_default', 'show_leaderboard', 'leaderboard_live', 'require_run_code', 'collect_message', 'deck_id'];
   var STAGE_FIELDS = ['stage_id', 'enabled', 'clue', 'image_url', 'require_gps', 'show_location', 'bypass_code', 'question', 'show_question_early', 'require_photo', 'reward_code', 'reward_order', 'final_from_fragments', 'coop_final', 'item_name', 'item_icon', 'item_rarity', 'item_story', 'card_id', 'card_random',
     'answer_type', 'points', 'choices', 'answer', 'max_attempts', 'form_url', 'form_verify_sheet', 'success_message', 'npc_arrive', 'npc_wrong', 'npc_hint',
     'hint1', 'hint2', 'hint3', 'hint_penalty', 'lat', 'lng', 'radius_m'];
@@ -83,6 +83,7 @@
     $('#stage-route').onchange = function () { A.stageRoute = this.value; renderStages(); };
     $('#mon-route').onchange = function () { A.monRoute = this.value; loadMonitor(); };
     $('#ml-team-select').onchange = updateLink; $('#ml-team-input').addEventListener('input', updateLink); $('#ml-route').onchange = updateLink;
+    $('#ml-run-select').onchange = updateLink; $('#ml-run-input').addEventListener('input', updateLink);
     $('#ml-sheet').onclick = openQrSheet;
     $('#ck-rerun').onclick = function () { openCheck(A.checkPid); };
     $('#btn-clear-tests').onclick = async function () {
@@ -1005,7 +1006,7 @@
       var el = $('#mp-' + f);
       p[f] = el.type === 'checkbox' ? el.checked : el.value.trim();
     });
-    ['time_limit_min', 'gps_max_accuracy', 'wrong_lock_after', 'wrong_lock_sec'].forEach(function (f) { p[f] = p[f] === '' ? '' : Number(p[f]); });
+    ['time_limit_min', 'gps_max_accuracy', 'wrong_lock_after', 'wrong_lock_sec', 'max_teams'].forEach(function (f) { p[f] = p[f] === '' ? '' : Number(p[f]); });
     p.routes = A.editRoutes.filter(function (r) { return r.id; }).map(function (r) { return { id: r.id, name: (r.name || '').trim() || r.id, color: r.color || '' }; });
     p.teams = A.editTeams.map(function (t) { return { name: (t.name || '').trim(), route: t.route || '', avatar: t.avatar || '' }; }).filter(function (t) { return t.name; });
     var seenTeam = {};
@@ -1102,9 +1103,15 @@
   }
 
   /* ---------- 連結／QR ---------- */
+  function projRunCodes(pid) {
+    var p = A.projects.filter(function (x) { return x.project_id === pid; })[0];
+    return String((p && p.allowed_run_codes) || '').split(/[\r\n,，、;；]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
   function openLink(pid) {
     A.linkPid = pid;
-    var teams = projTeams(pid), routes = projRoutes(pid);
+    var proj = A.projects.filter(function (x) { return x.project_id === pid; })[0] || {};
+    var teams = projTeams(pid), routes = projRoutes(pid), runs = projRunCodes(pid);
     // 有隊伍名單：選隊伍（路線由名單決定）；沒有名單但有路線：選路線；都沒有：只有一般連結
     $('#ml-team-wrap').classList.remove('hidden');
     $('#ml-team-select').classList.toggle('hidden', !teams.length);
@@ -1116,23 +1123,32 @@
     $('#ml-team-help').textContent = teams.length ? '選一支隊伍，QR Code 會自動帶入隊伍名稱和它的路線，玩家掃了不用再選。' : '選填：預先帶入隊伍名稱，玩家掃了就不用自己打。';
     $('#ml-route-wrap').classList.toggle('hidden', !routes.length || !!teams.length);
     $('#ml-route').innerHTML = '<option value="">（不指定：系統平均分配）</option>' + routes.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(r.name) + '</option>'; }).join('');
+    var showRun = runs.length > 0 || !!proj.require_run_code;
+    $('#ml-run-wrap').classList.toggle('hidden', !showRun);
+    $('#ml-run-select').classList.toggle('hidden', !runs.length);
+    $('#ml-run-input').classList.toggle('hidden', !!runs.length || !proj.require_run_code);
+    $('#ml-run-select').innerHTML = '<option value="">（不帶入：玩家現場輸入，最安全）</option>' + runs.map(function (c) {
+      return '<option value="' + esc(c) + '">' + esc(c) + '</option>';
+    }).join('');
+    $('#ml-run-input').value = '';
     updateLink();
     $('#m-link').classList.remove('hidden');
   }
 
-  /** 目前選擇對應的 { team, route } */
+  /** 目前選擇對應的 { team, route, run } */
   function linkChoice() {
-    var pid = A.linkPid, teams = projTeams(pid);
+    var pid = A.linkPid, teams = projTeams(pid), runs = projRunCodes(pid);
+    var run = runs.length ? $('#ml-run-select').value : ($('#ml-run-input').value || '').trim();
     if (teams.length) {
       var name = $('#ml-team-select').value, t = teams.filter(function (x) { return x.name === name; })[0];
-      return { team: t ? t.name : '', route: t ? t.route : '' };
+      return { team: t ? t.name : '', route: t ? t.route : '', run: run };
     }
-    return { team: $('#ml-team-input').value.trim(), route: $('#ml-route').value };
+    return { team: $('#ml-team-input').value.trim(), route: $('#ml-route').value, run: run };
   }
 
   function updateLink() {
     var ch = linkChoice();
-    var url = playerUrl(A.linkPid, '', ch.route, ch.team);
+    var url = playerUrl(A.linkPid, ch.run, ch.route, ch.team);
     $('#ml-url').value = url;
     $('#ml-open').href = fromAdmin(url);   // 「開啟前台」要能回得來；上面的複製連結、QR Code 維持乾淨的網址
     drawQr($('#ml-qr'), url, 220);
@@ -1148,13 +1164,13 @@
   function openQrSheet() {
     var pid = A.linkPid;
     var proj = A.projects.filter(function (x) { return x.project_id === pid; })[0] || {};
-    var teams = projTeams(pid), routes = projRoutes(pid), cards = [];
+    var teams = projTeams(pid), routes = projRoutes(pid), run = linkChoice().run, cards = [];
     if (teams.length) {
-      teams.forEach(function (t) { cards.push({ title: t.name, route: t.route, url: playerUrl(pid, '', t.route, t.name) }); });
+      teams.forEach(function (t) { cards.push({ title: t.name, route: t.route, url: playerUrl(pid, run, t.route, t.name) }); });
     } else if (routes.length) {
-      routes.forEach(function (r) { cards.push({ title: r.name, route: r.id, url: playerUrl(pid, '', r.id, '') }); });
+      routes.forEach(function (r) { cards.push({ title: r.name, route: r.id, url: playerUrl(pid, run, r.id, '') }); });
     } else {
-      cards.push({ title: proj.name || pid, route: '', url: playerUrl(pid, '', '', '') });
+      cards.push({ title: proj.name || pid, route: '', url: playerUrl(pid, run, '', '') });
     }
     $('#qs-title').textContent = (proj.name || pid) + '：' + (teams.length ? '各隊 QR Code' : routes.length ? '各路線 QR Code' : 'QR Code');
     $('#qs-note').textContent = '共 ' + cards.length + ' 張。請用「列印」輸出，每張卡片剪下來發給對應的隊伍。';

@@ -32,8 +32,8 @@ test('ids referenced via $("#x") in player.js exist in index.html', () => {
 });
 
 test('admin wiring', () => {
-  ['mp-template', 'mp-npc_name', 'mp-npc_avatar'].forEach((id) => assert.ok(admin.includes('id="' + id + '"'), id));
-  ['template', 'npc_name', 'npc_avatar'].forEach((f) => assert.ok(adminJs.includes("'" + f + "'"), f));
+  ['mp-template', 'mp-npc_name', 'mp-npc_avatar', 'mp-allowed_run_codes', 'mp-max_teams', 'ml-run-select', 'ml-run-input'].forEach((id) => assert.ok(admin.includes('id="' + id + '"'), id));
+  ['template', 'npc_name', 'npc_avatar', 'allowed_run_codes', 'max_teams'].forEach((f) => assert.ok(adminJs.includes("'" + f + "'"), f));
 });
 
 test('versions', () => {

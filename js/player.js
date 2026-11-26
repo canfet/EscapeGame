@@ -238,8 +238,8 @@
         '<span class="chip">' + (p.unlock_mode === 'free' ? '🔓 自由順序' : '➡️ 依序解鎖') + '</span>'];
       if (p.time_limit_min) meta.push('<span class="chip amber">⏱ 限時 ' + p.time_limit_min + ' 分鐘</span>');
       $('#intro-meta').innerHTML = meta.join('');
-      // 專案要求場次代碼、但網址只帶了路線（專屬 QR Code）：直接拿路線代碼當場次，玩家不用再輸入
-      if (p.require_run_code && !P.runCode && P.urlRoute) P.runCode = P.urlRoute;
+      // 專案要求場次代碼（且沒有白名單）、網址只帶了路線（專屬 QR Code）：直接拿路線代碼當場次，玩家不用再輸入
+      if (p.require_run_code && !p.has_run_whitelist && !P.runCode && P.urlRoute) P.runCode = P.urlRoute;
       $('#f-run').value = P.runCode;
       // 隊伍名稱：專案有「預設隊伍名單」就只能從名單選（路線由名單決定）；否則自由輸入
       var restrict = !!p.restrict_teams, tms = p.teams || [];
@@ -293,9 +293,10 @@
     });
   }
 
-  /** 專案有預設隊伍名單、選到的隊伍有指定路線：後端會自動用那條路線的代碼當場次，不用玩家輸入 */
+  /** 專案有預設隊伍名單、選到的隊伍有指定路線：沒有場次白名單時，後端會自動用那條路線的代碼當場次，不用玩家輸入 */
   function runDerivable() {
     var pj = P.project || {};
+    if (pj.has_run_whitelist) return false;
     if (!pj.restrict_teams) return false;
     var name = $('#f-team-select').value, t = (pj.teams || []).filter(function (x) { return x.name === name; })[0];
     return !!(t && t.route_name);
@@ -329,7 +330,14 @@
       var tutSeen = false;
       try { tutSeen = localStorage.getItem('escapegame:tut') === '1'; } catch (e) { /* */ }
       if (!r.resumed && tutSeen) setTimeout(function () { showTeamCode(true); }, 1200);
-    } catch (e) { /* toast 已顯示 */ }
+    } catch (e) {
+      if (e && (e.code === 'BAD_RUN_CODE' || e.code === 'NEED_RUN_CODE')) {
+        P.runCode = '';
+        $('#run-field').classList.remove('hidden');
+        $('#f-run').focus();
+      }
+      /* toast 已顯示 */
+    }
   }
 
   function resetTeam(e) {
